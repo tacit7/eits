@@ -92,8 +92,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
         case Projects.get_project(id) do
           {:ok, project} ->
             case Projects.delete_project(project) do
-              {:ok, _} -> {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
-              {:error, _} -> {:noreply, put_flash(socket, :error, "Failed to delete project")}
+              {:ok, _} ->
+                {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+
+              {:error, _} ->
+                {:noreply, put_flash(socket, :error, "Failed to delete project")}
             end
 
           {:error, _} ->
@@ -384,6 +387,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     socket =
       if not is_nil(new_project) and new_project != previous_project do
         sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
+
         case project_path(new_project.id, sidebar_tab) do
           nil -> socket
           path -> push_navigate(socket, to: path)

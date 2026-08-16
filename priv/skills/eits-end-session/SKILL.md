@@ -1,10 +1,10 @@
 ---
-name: i-end-session
+name: eits-end-session
 description: Orchestrates a clean session end workflow with EITS tracking updates, commits, and summary. Use when wrapping up work or ending a session.
 user-invocable: true
 allowed-tools: Bash
 ---
-# End Session Workflow
+# EITS End Session Workflow
 
 Orchestrates a clean session close with tracking and commits.
 

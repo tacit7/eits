@@ -151,7 +151,10 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     args =
       args
       |> maybe_bool_flag("--verbose", verbose)
-      |> maybe_bool_flag("--dangerously-skip-permissions", opts[:skip_permissions] && opts[:permission_mode] in [nil, ""])
+      |> maybe_bool_flag(
+        "--dangerously-skip-permissions",
+        opts[:skip_permissions] && opts[:permission_mode] in [nil, ""]
+      )
       |> maybe_bool_flag("--sandbox", opts[:sandbox] == true)
       |> maybe_bool_flag("--chrome", opts[:chrome] == true)
       |> maybe_bool_flag("--no-chrome", opts[:chrome] == false)
@@ -267,8 +270,8 @@ defmodule EyeInTheSky.Claude.CLI.Args do
   defp normalize_model_name(model) when is_binary(model) do
     case String.downcase(model) do
       "haiku" -> "claude-haiku-4-5-20251001"
-      "sonnet" -> "claude-sonnet-4-6"
-      "opus" -> "claude-opus-4-7"
+      "sonnet" -> "claude-sonnet-5"
+      "opus" -> "claude-opus-4-8"
       _ -> model
     end
   end

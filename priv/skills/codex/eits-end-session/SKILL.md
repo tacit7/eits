@@ -1,5 +1,5 @@
 ---
-name: codex-end-session
+name: eits-end-session
 description: Clean session close for Codex agents. Completes in-progress tasks, logs commits, and marks the session done. Use when a Codex agent is finishing its work.
 ---
 
@@ -44,4 +44,4 @@ description: Clean session close for Codex agents. Completes in-progress tasks, 
 
 ## Note on Stop Hook
 
-The Stop hook (`codex-session-stop.sh`) will exit 2 and block if any task is in-progress without annotation. Step 1 above clears that gate. Always run it before declaring done.
+The Stop hook will exit 2 and block if any task is in-progress without annotation. Step 1 above clears that gate. Always run it before declaring done.

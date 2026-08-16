@@ -84,7 +84,11 @@ defmodule EyeInTheSkyWeb.DmLive.AgentLifecycle do
       session = socket.assigns[:session]
       title = (session && session.name) || "EITS"
       path = session && "/dm/#{session.uuid}"
-      Logger.info("Firing Desktop.notify(\"Session stopped\", #{inspect(title)}, #{inspect(path)})")
+
+      Logger.info(
+        "Firing Desktop.notify(\"Session stopped\", #{inspect(title)}, #{inspect(path)})"
+      )
+
       Desktop.notify("Session stopped", title, path)
     end
 

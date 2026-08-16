@@ -1,13 +1,13 @@
-EITS CLI (Rust core; bash fallback for extras)
+EITS CLI (Rust core; legacy extras fallback)
 
-Usage: eitsr [OPTIONS] <COMMAND>
+Usage: eits [OPTIONS] <COMMAND>
 
 Commands:
   tasks     Task queries and mutations
   notes     Note queries and mutations
   commits   Commit tracking queries and mutations
   sessions  Session queries and mutations
-  dm        Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+  dm        Send or read direct messages (root form: `eits dm --to <id> --message <text>`)
   whoami    Resolve and print session/agent identity (mirrors bash `eits whoami`)
   help      Print this message or the help of the given subcommand(s)
 

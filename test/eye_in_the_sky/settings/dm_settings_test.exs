@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Settings.DmSettingsTest do
   use ExUnit.Case, async: true
 
   alias EyeInTheSky.Settings.DmSettings
+  alias EyeInTheSky.Settings.JsonSettings
 
   @anthropic_full %{
     "anthropic" => %{
@@ -180,6 +181,15 @@ defmodule EyeInTheSky.Settings.DmSettingsTest do
   describe "to_provider_opts/2 — Codex provider" do
     test "returns empty list for empty effective map" do
       assert DmSettings.to_provider_opts(%{}, "codex") == []
+    end
+
+    test "schema defaults put codex out of sandbox" do
+      opts =
+        %{}
+        |> JsonSettings.effective_settings(%{})
+        |> DmSettings.to_provider_opts("codex")
+
+      assert opts[:bypass_sandbox] == true
     end
 
     test "maps full_auto" do

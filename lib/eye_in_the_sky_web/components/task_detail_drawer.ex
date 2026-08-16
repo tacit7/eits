@@ -341,13 +341,16 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             </span>
           </div>
           <%!-- Start Agent: disabled when an agent is already assigned or session exists --%>
-          <% has_agent = not is_nil(@task.agent_id) || (is_list(@task.sessions) && @task.sessions != []) %>
+          <% has_agent =
+            not is_nil(@task.agent_id) || (is_list(@task.sessions) && @task.sessions != []) %>
           <% agent_disabled_reason =
             cond do
               is_list(@task.sessions) && @task.sessions != [] ->
                 "Session #{session_label(List.first(@task.sessions))} already running"
+
               not is_nil(@task.agent_id) ->
                 "Agent ##{@task.agent_id} already assigned"
+
               true ->
                 "Start agent for this task"
             end %>

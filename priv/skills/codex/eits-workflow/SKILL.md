@@ -1,17 +1,29 @@
 ---
-name: codex-workflow
-description: EITS task, commit, and annotate workflow for Codex agents. Use when beginning a task, logging a commit, marking work done, or managing EITS task lifecycle. Codex uses eits CLI directly — no EITS-CMD directives.
+name: eits-workflow
+description: "EITS task, commit, and note workflow for Codex agents. Codex always uses the eits CLI directly with no CLAUDE_CODE_ENTRYPOINT check and no EITS-CMD directives. Use when beginning a task, logging a commit, marking work done, adding a note, or handling task lifecycle questions."
 ---
 
 # Codex EITS Workflow
 
-Use the `eits` CLI for all EITS operations.
+Codex agents use the `eits` CLI directly for EITS operations.
 
----
+## Codex Env Bootstrap
+
+Codex startup hooks persist EITS identity to
+`~/.eits/codex/sessions/<session_id>.env`. The `eits` CLI auto-loads that
+session-specific file when `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or
+`CODEX_SESSION_ID` is set. If no session id is known, ask the user for it.
+For commands that rely on shell expansion of `$EITS_SESSION_UUID`,
+`$EITS_AGENT_UUID`, or `$EITS_PROJECT_ID`, source the session-specific file in
+the same Bash command:
+
+```bash
+. ~/.eits/codex/sessions/<session_id>.env 2>/dev/null || true
+```
 
 ## Session Status
 
-Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatically via `.codex/hooks.json` when `~/.codex/config.toml` has `features.codex_hooks = true`. If hooks are not active, set status manually:
+Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatically via `.codex/hooks.json` when `~/.codex/config.toml` has `features.hooks = true`. If hooks are not active, set status manually:
 
 ```bash
 eits sessions update $EITS_SESSION_UUID --status working   # start of turn

@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   @moduledoc false
   use EyeInTheSkyWeb, :html
-# ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   # sessions_filters — scope toggle + search
   # ---------------------------------------------------------------------------
 

@@ -369,8 +369,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
            {:ok, _} <- Sessions.update_session(session, %{name: name}) do
         socket
       else
-        false -> socket
-        {:error, :not_found} -> socket
+        false ->
+          socket
+
+        {:error, :not_found} ->
+          socket
+
         {:error, reason} ->
           Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
           put_flash(socket, :error, "Failed to rename session")

@@ -101,19 +101,44 @@ defmodule EyeInTheSkyWeb.OverviewLive.SkillsTest do
     end
 
     test "duplicates a known skill file and reloads", %{path: path} do
-      skill = %Skill{id: "commands:deploy", slug: "deploy", source: :commands, abs_path: path, size: 8}
-      socket = socket_with(%{skills: [skill], flash: %{}, search_query: "", sort_by: "name_asc", type_filter: "all", scope_filter: "all"})
+      skill = %Skill{
+        id: "commands:deploy",
+        slug: "deploy",
+        source: :commands,
+        abs_path: path,
+        size: 8
+      }
 
-      {:noreply, result} = SkillsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+      socket =
+        socket_with(%{
+          skills: [skill],
+          flash: %{},
+          search_query: "",
+          sort_by: "name_asc",
+          type_filter: "all",
+          scope_filter: "all"
+        })
+
+      {:noreply, result} =
+        SkillsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
 
       assert File.exists?(Path.join(Path.dirname(path), "deploy-copy.md"))
       assert result.assigns.flash["info"] == "Duplicated"
     end
 
     test "rejects a path not in the currently loaded skills list", %{path: path} do
-      socket = socket_with(%{skills: [], flash: %{}, search_query: "", sort_by: "name_asc", type_filter: "all", scope_filter: "all"})
+      socket =
+        socket_with(%{
+          skills: [],
+          flash: %{},
+          search_query: "",
+          sort_by: "name_asc",
+          type_filter: "all",
+          scope_filter: "all"
+        })
 
-      {:noreply, result} = SkillsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+      {:noreply, result} =
+        SkillsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
 
       refute File.exists?(Path.join(Path.dirname(path), "deploy-copy.md"))
       assert result.assigns.flash["error"] == "Path not allowed"
@@ -131,10 +156,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.SkillsTest do
     end
 
     test "deletes a known skill file and clears selection if it was selected", %{path: path} do
-      skill = %Skill{id: "commands:deploy", slug: "deploy", source: :commands, abs_path: path, size: 8}
-      socket = socket_with(%{skills: [skill], selected_skill: skill, flash: %{}, search_query: "", sort_by: "name_asc", type_filter: "all", scope_filter: "all"})
+      skill = %Skill{
+        id: "commands:deploy",
+        slug: "deploy",
+        source: :commands,
+        abs_path: path,
+        size: 8
+      }
 
-      {:noreply, result} = SkillsLive.handle_event("delete_definition_file", %{"path" => path}, socket)
+      socket =
+        socket_with(%{
+          skills: [skill],
+          selected_skill: skill,
+          flash: %{},
+          search_query: "",
+          sort_by: "name_asc",
+          type_filter: "all",
+          scope_filter: "all"
+        })
+
+      {:noreply, result} =
+        SkillsLive.handle_event("delete_definition_file", %{"path" => path}, socket)
 
       refute File.exists?(path)
       assert is_nil(result.assigns.selected_skill)

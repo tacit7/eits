@@ -87,7 +87,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       assigns
       |> assign(:tabs, @tabs)
       |> update(:message_data, &normalize_message_data/1)
-      |> assign(:dm_settings_agent_effective, JsonSettings.effective_settings(agent_settings, %{}))
+      |> assign(
+        :dm_settings_agent_effective,
+        JsonSettings.effective_settings(agent_settings, %{})
+      )
       |> assign(:dm_settings_overrides, overrides)
 
     ~H"""
@@ -446,9 +449,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             </div>
           </div>
         <% end %>
-
       </div>
-
 
       <%= if @pty_pid do %>
         <%!-- PTY terminal — always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
@@ -463,7 +464,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <% end %>
       <%= if !@pty_pid || @active_tab not in ["messages", nil] do %>
         <%!-- Tab content — shown when no PTY, or PTY active but on non-messages tab --%>
-        <div class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col" id="dm-tab-content">
+        <div
+          class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col"
+          id="dm-tab-content"
+        >
           <%= case @active_tab do %>
             <% "messages" -> %>
               <.messages_tab_content

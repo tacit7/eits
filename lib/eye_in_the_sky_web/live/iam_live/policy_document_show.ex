@@ -243,6 +243,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
   defp delete_confirm_text(doc) do
     n = length(doc.agent_type_documents)
+
     "Deleting this document removes it from #{n} agent type(s). The underlying policies are not deleted."
   end
 
@@ -432,7 +433,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                           <.link
                             navigate={~p"/iam/agent-types/show?agent_type=#{atd.agent_type}"}
                             class="font-mono text-sm link link-hover"
-                          >{atd.agent_type}</.link>
+                          >
+                            {atd.agent_type}
+                          </.link>
                         </td>
                         <td class="text-right">
                           <button

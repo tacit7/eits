@@ -240,7 +240,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
           |> assign(:has_more, length(ordered_agents) > visible_count)
 
         case Enum.find(visible_agents, &(&1.id == session_id)) do
-          nil -> socket
+          nil ->
+            socket
+
           changed ->
             if is_new,
               do: Phoenix.LiveView.stream_insert(socket, :session_list, changed, at: 0),

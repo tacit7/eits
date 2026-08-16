@@ -243,12 +243,14 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   def handle_event("toggle_plan_mode", _params, socket) do
     opts = socket.assigns.session_cli_opts || []
+
     new_opts =
       if Keyword.get(opts, :permission_mode) == "plan" do
         Keyword.delete(opts, :permission_mode)
       else
         Keyword.put(opts, :permission_mode, "plan")
       end
+
     {:noreply, assign(socket, :session_cli_opts, new_opts)}
   end
 
@@ -785,7 +787,10 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   defp subscribe_dm_pty(socket, session_uuid) do
     session_key = "dm-#{session_uuid}"
-    {:ok, pty_pid} = PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+
+    {:ok, pty_pid} =
+      PtySupervisor.find_or_start_pty(session_key: session_key, cols: 220, rows: 50)
+
     :ok = PtyServer.subscribe(pty_pid)
     # Only launch if Claude has never been started in this PTY session.
     # has_launched is set to true the moment we write the launch command,

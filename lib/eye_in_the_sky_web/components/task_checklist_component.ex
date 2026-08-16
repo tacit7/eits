@@ -101,7 +101,11 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
           items = Tasks.list_checklist_items(task.id)
           next_position = if items == [], do: 0, else: length(items)
 
-          case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
+          case Tasks.create_checklist_item(%{
+                 task_id: task.id,
+                 title: title,
+                 position: next_position
+               }) do
             {:ok, _} ->
               updated_task = Tasks.get_task!(task.id)
               send(self(), {:checklist_updated, updated_task})

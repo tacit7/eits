@@ -318,7 +318,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
         <button
           type="button"
           phx-click="toggle_thinking"
-          title={if @thinking_enabled, do: "Thinking on — click to disable", else: "Enable extended thinking"}
+          title={
+            if @thinking_enabled,
+              do: "Thinking on — click to disable",
+              else: "Enable extended thinking"
+          }
           class={[
             "flex items-center gap-1.5 px-2.5 h-6 text-[11px] font-medium transition-colors rounded-l-lg",
             if(@thinking_enabled,
@@ -344,7 +348,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       <button
         type="button"
         phx-click="toggle_show_thinking"
-        title={if @show_thinking_blocks, do: "Thinking blocks visible — click to hide", else: "Show thinking blocks in chat"}
+        title={
+          if @show_thinking_blocks,
+            do: "Thinking blocks visible — click to hide",
+            else: "Show thinking blocks in chat"
+        }
         class={[
           "flex items-center justify-center w-6 h-6 transition-colors",
           if(@show_thinking_blocks,

@@ -9,7 +9,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   import EyeInTheSkyWeb.Components.OpenInEditorButton
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
-  import EyeInTheSkyWeb.Live.Shared.PromptsHelpers, only: [handle_duplicate_prompt: 3, handle_deactivate_prompt: 4]
+
+  import EyeInTheSkyWeb.Live.Shared.PromptsHelpers,
+    only: [handle_duplicate_prompt: 3, handle_deactivate_prompt: 4]
 
   @impl true
   def mount(%{"id" => _} = params, _session, socket) do
@@ -288,7 +290,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
           <%= if @detail_tab == :edit do %>
             <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
-              <span class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_prompt.slug}</span>
+              <span class="text-xs text-base-content/50 font-mono truncate flex-1">
+                {@selected_prompt.slug}
+              </span>
               <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
               <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
             </div>
@@ -385,7 +389,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               data-content={Base.encode64(@selected_prompt.prompt_text || "")}
               data-lang="markdown"
               class="flex-1 overflow-hidden min-h-0"
-            ></div>
+            >
+            </div>
           <% else %>
             <div class="flex-1 overflow-y-auto" style="scrollbar-width: none;">
               <%= if @detail_tab == :preview do %>

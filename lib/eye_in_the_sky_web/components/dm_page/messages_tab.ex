@@ -159,7 +159,6 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   />
                 </div>
               </div>
-
             </div>
           <% end %>
         <% end %>
@@ -206,7 +205,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   </div>
                 <% end %>
                 <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 whitespace-pre-wrap stream-content-appear stream-cursor">{String.trim_leading(@stream.content)}</div>
+                  <div class="text-[13px] leading-[1.7] text-base-content/60 stream-content-appear stream-cursor">
+                    <span class="whitespace-pre-wrap">{String.trim_leading(@stream.content)}</span>
+                  </div>
                 <% end %>
               </div>
             </div>
@@ -561,7 +562,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <div class="pb-1">
       <span class="text-nano font-mono text-[var(--text-disabled)]">
         <%= if @data.files != [] do %>
-          <span>{length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot; </span>
+          <span>
+            {length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot;
+          </span>
           <span>{@data.files |> Enum.map(&Path.basename/1) |> Enum.join(", ")}</span>
         <% end %>
         <%= if @data.cost_usd do %>

@@ -118,6 +118,21 @@ defmodule EyeInTheSky.Codex.CLITest do
       args = CLI.build_args(prompt: "x")
       refute "resume" in args
     end
+
+    test "resume uses config override instead of unsupported --sandbox flag" do
+      args =
+        CLI.build_args(
+          prompt: "continue",
+          resume: "thread-abc-123",
+          bypass_sandbox: false,
+          sandbox: "workspace-write"
+        )
+
+      refute "--sandbox" in args
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(sandbox_mode="workspace-write")]))
+    end
   end
 
   # ---------------------------------------------------------------------------

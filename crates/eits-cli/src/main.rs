@@ -19,9 +19,9 @@ use std::ffi::OsString;
 
 #[derive(Parser)]
 #[command(
-    name = "eitsr",
+    name = "eits",
     version,
-    about = "EITS CLI (Rust core; bash fallback for extras)"
+    about = "EITS CLI (Rust core; legacy extras fallback)"
 )]
 struct Cli {
     /// Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
@@ -56,7 +56,7 @@ enum Cmd {
         #[command(subcommand)]
         cmd: SessionsCmd,
     },
-    /// Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+    /// Send or read direct messages (root form: `eits dm --to <id> --message <text>`)
     Dm {
         #[command(subcommand)]
         cmd: Option<DmCmd>,
@@ -73,7 +73,7 @@ enum Cmd {
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
-    /// Anything not Rust-owned falls through to the bash extras script
+    /// Anything not Rust-owned falls through to the legacy extras script
     #[command(external_subcommand)]
     External(Vec<OsString>),
 }
@@ -93,7 +93,7 @@ fn main() {
                 let msg = e.to_string();
                 let first_line = msg.lines().next().unwrap_or("invalid arguments");
                 error::exit_with(
-                    EitsError::usage(first_line).with_hint("run `eitsr <cmd> --help`"),
+                    EitsError::usage(first_line).with_hint("run `eits <cmd> --help`"),
                     false,
                 );
             }
@@ -185,7 +185,7 @@ fn main() {
                 // Global flags are rejected before extras run, so there's no
                 // pretty-print preference to honor here.
                 error::exit_with(
-                    EitsError::usage("global flags are not supported for bash-extras subcommands")
+                    EitsError::usage("global flags are not supported for extras subcommands")
                         .with_hint("drop --pretty/--quiet or use a Rust-owned command"),
                     false,
                 );

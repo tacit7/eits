@@ -1,6 +1,6 @@
-Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+Send or read direct messages (root form: `eits dm --to <id> --message <text>`)
 
-Usage: eitsr dm [OPTIONS] [COMMAND]
+Usage: eits dm [OPTIONS] [COMMAND]
 
 Commands:
   inbox  Show inbound DMs for a session (alias: list)

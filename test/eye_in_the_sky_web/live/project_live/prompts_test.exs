@@ -113,7 +113,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
   end
 
   describe "handle_event/3 - deactivate_prompt" do
-    test "deactivates the prompt and removes it from the active list", %{conn: conn, project: project} do
+    test "deactivates the prompt and removes it from the active list", %{
+      conn: conn,
+      project: project
+    } do
       {:ok, prompt} =
         Prompts.create_prompt(%{
           project_id: project.id,

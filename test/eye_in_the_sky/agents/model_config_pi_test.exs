@@ -12,9 +12,12 @@ defmodule EyeInTheSky.Agents.ModelConfigPiTest do
     refute ModelConfig.valid_model?("pi", nil)
   end
 
-  test "non-pi providers keep list-based validation" do
+  test "non-pi providers accept known models and provider slug patterns" do
     assert ModelConfig.valid_model?("codex", "gpt-5.5")
+    assert ModelConfig.valid_model?("codex", "gpt-5.7-future")
+    assert ModelConfig.valid_model?("claude", "claude-sonnet-6")
     refute ModelConfig.valid_model?("codex", "made-up")
+    refute ModelConfig.valid_model?("claude", "made-up")
   end
 
   test "default_model for pi is nil (resolved from discovery in Phase 2)" do
@@ -22,7 +25,8 @@ defmodule EyeInTheSky.Agents.ModelConfigPiTest do
   end
 
   test "pi_split_model! splits on the FIRST slash only" do
-    assert ModelConfig.pi_split_model!("openrouter/qwen/qwen3-coder") == {"openrouter", "qwen/qwen3-coder"}
+    assert ModelConfig.pi_split_model!("openrouter/qwen/qwen3-coder") ==
+             {"openrouter", "qwen/qwen3-coder"}
   end
 
   test "spawn validator accepts pi with explicit model" do

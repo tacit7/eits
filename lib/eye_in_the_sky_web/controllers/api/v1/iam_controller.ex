@@ -42,7 +42,11 @@ defmodule EyeInTheSkyWeb.Api.V1.IAMController do
         params
 
       content when is_binary(content) and byte_size(content) > @max_content_bytes ->
-        Map.put(params, "resource_content", binary_part(content, 0, @max_content_bytes) <> "…[truncated]")
+        Map.put(
+          params,
+          "resource_content",
+          binary_part(content, 0, @max_content_bytes) <> "…[truncated]"
+        )
 
       _ ->
         params

@@ -61,7 +61,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActionsTest do
       socket = build_socket(%{})
 
       {:noreply, _result} =
-        RailSessionActions.handle_rename_channel(%{"channel_id" => channel.id, "name" => "  "}, socket)
+        RailSessionActions.handle_rename_channel(
+          %{"channel_id" => channel.id, "name" => "  "},
+          socket
+        )
 
       reloaded = Channels.get_channel(channel.id)
       assert reloaded.name == "general"
@@ -71,7 +74,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActionsTest do
       socket = build_socket(%{})
 
       {:noreply, result} =
-        RailSessionActions.handle_rename_channel(%{"channel_id" => 999_999_999, "name" => "x"}, socket)
+        RailSessionActions.handle_rename_channel(
+          %{"channel_id" => 999_999_999, "name" => "x"},
+          socket
+        )
 
       assert result.assigns.flash["error"] == "Channel not found"
     end

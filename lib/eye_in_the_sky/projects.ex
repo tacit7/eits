@@ -104,12 +104,14 @@ defmodule EyeInTheSky.Projects do
           # No workspace yet — happens on fresh desktop installs where DISABLE_AUTH=1
           # means no user ever logged in and triggered workspace creation. Seed one now.
           {:ok, user} = EyeInTheSky.Accounts.get_or_create_user("desktop")
+
           case EyeInTheSky.Workspaces.default_workspace_for_user(user) do
             nil ->
               case EyeInTheSky.Workspaces.create_default_workspace_for_user(user) do
                 {:ok, ws} -> ws
                 {:error, _} -> nil
               end
+
             ws ->
               ws
           end

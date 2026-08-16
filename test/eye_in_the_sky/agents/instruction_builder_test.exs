@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Agents.InstructionBuilderTest do
       assert result =~ "git push gitea worktree-my-feature"
       assert result =~ "tea pr create"
       assert result =~ "--head worktree-my-feature"
-      assert result =~ "i-end-session"
+      assert result =~ "eits-end-session"
     end
 
     test "uses description as base when worktree is set but no explicit instructions" do

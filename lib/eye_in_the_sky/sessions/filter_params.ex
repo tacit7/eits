@@ -24,7 +24,10 @@ defmodule EyeInTheSky.Sessions.FilterParams do
       if params["agent_def_slug"] && params["agent_def_slug"] != "", do: params["agent_def_slug"]
 
     [search_query: params["q"] || ""]
-    |> maybe_put(:project_id, params["project_id"] && ToolHelpers.parse_int(params["project_id"], nil))
+    |> maybe_put(
+      :project_id,
+      params["project_id"] && ToolHelpers.parse_int(params["project_id"], nil)
+    )
     |> maybe_put(:status_filter, params["status"])
     |> maybe_put(:agent_id, agent_int_id)
     |> maybe_put(:parent_session_id, parent_session_int_id)

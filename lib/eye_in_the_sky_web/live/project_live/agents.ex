@@ -83,8 +83,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
 
   @impl true
   def handle_event("delete_definition_file", %{"path" => path}, socket) do
-    DefinitionFileActions.handle_delete(path, socket, &open_path_allowed?/2, &load_agents/1,
-      &maybe_clear_selected(&1, path))
+    DefinitionFileActions.handle_delete(
+      path,
+      socket,
+      &open_path_allowed?/2,
+      &load_agents/1,
+      &maybe_clear_selected(&1, path)
+    )
   end
 
   @impl true
@@ -299,7 +304,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
           <%= if @detail_tab == :edit do %>
             <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
-              <code class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_agent.path}</code>
+              <code class="text-xs text-base-content/50 font-mono truncate flex-1">
+                {@selected_agent.path}
+              </code>
               <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
               <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
             </div>
@@ -320,7 +327,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                       </span>
                     <% end %>
                   </div>
-                  <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
+                  <p class="text-xs text-base-content/45 font-mono truncate">
+                    {@selected_agent.path}
+                  </p>
                   <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
                     {@selected_agent.description}
                   </p>
@@ -392,7 +401,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
               data-content={Base.encode64(@selected_agent.content || "")}
               data-lang={edit_language(@selected_agent)}
               class="flex-1 overflow-hidden min-h-0"
-            ></div>
+            >
+            </div>
           <% else %>
             <div class="flex-1 overflow-y-auto">
               <%= if @detail_tab == :preview do %>

@@ -28,7 +28,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       <div class="px-1.5 pb-1.5">
         <% ws_selected = @scope_type == :workspace %>
         <button
-          phx-click="select_workspace"          class={[
+          phx-click="select_workspace"
+          class={[
             "w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-sm text-left transition-colors",
             if(ws_selected,
               do: "bg-primary/10 text-primary",
@@ -60,7 +61,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
       </div>
       <div class="p-1.5 max-h-48 overflow-y-auto">
         <%= for project <- @projects do %>
-          <% selected = @scope_type == :project && not is_nil(@sidebar_project) && @sidebar_project.id == project.id %>
+          <% selected =
+            @scope_type == :project && not is_nil(@sidebar_project) &&
+              @sidebar_project.id == project.id %>
           <div
             class="group/proj relative flex items-center"
             data-ctx="project"
@@ -81,7 +84,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectSwitcher do
             >
               <div class={[
                 "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold",
-                if(selected, do: "bg-primary text-white", else: "bg-base-content/10 text-base-content/60")
+                if(selected,
+                  do: "bg-primary text-white",
+                  else: "bg-base-content/10 text-base-content/60"
+                )
               ]}>
                 {project_initial(project)}
               </div>

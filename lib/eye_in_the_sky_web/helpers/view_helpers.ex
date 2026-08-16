@@ -156,7 +156,8 @@ defmodule EyeInTheSkyWeb.Helpers.ViewHelpers do
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Editor not installed")}
 
       {:error, :not_allowed} ->
-        {:noreply, Phoenix.LiveView.put_flash(socket, :error, "Path is outside allowed directories")}
+        {:noreply,
+         Phoenix.LiveView.put_flash(socket, :error, "Path is outside allowed directories")}
 
       {:error, :not_found} ->
         {:noreply, Phoenix.LiveView.put_flash(socket, :error, "File not found")}

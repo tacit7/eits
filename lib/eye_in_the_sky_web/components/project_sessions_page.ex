@@ -40,34 +40,34 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       <div class="w-full max-w-3xl mx-auto">
         <%!-- Mobile-only action bar (desktop controls are in top bar) --%>
         <div class="md:hidden flex items-center gap-2 mb-4">
-            <button
-              :if={!@select_mode && @agents != []}
-              phx-click="enter_select_mode"
-              class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
-            >
-              <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
-            </button>
-            <button
-              phx-click="open_filter_sheet"
-              aria-label="Open filters"
-              aria-haspopup="dialog"
-              class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
-            >
-              <.icon name="hero-funnel-mini" class="size-4" />
-              <%= if @session_filter != "all" || @sort_by != "last_message" do %>
-                <span
-                  class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
-                  aria-hidden="true"
-                >
-                </span>
-              <% end %>
-            </button>
-            <button
-              phx-click="toggle_new_session_drawer"
-              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
-            >
-              <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
-            </button>
+          <button
+            :if={!@select_mode && @agents != []}
+            phx-click="enter_select_mode"
+            class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
+          >
+            <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
+          </button>
+          <button
+            phx-click="open_filter_sheet"
+            aria-label="Open filters"
+            aria-haspopup="dialog"
+            class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
+          >
+            <.icon name="hero-funnel-mini" class="size-4" />
+            <%= if @session_filter != "all" || @sort_by != "last_message" do %>
+              <span
+                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                aria-hidden="true"
+              >
+              </span>
+            <% end %>
+          </button>
+          <button
+            phx-click="toggle_new_session_drawer"
+            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
+          >
+            <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
+          </button>
         </div>
 
         <%= if @show_filter_sheet do %>

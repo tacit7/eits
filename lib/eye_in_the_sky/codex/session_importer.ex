@@ -23,7 +23,7 @@ defmodule EyeInTheSky.Codex.SessionImporter do
     last_uuid = Messages.get_last_source_uuid(session_id)
 
     with {:ok, messages} <- SessionReader.read_messages_after_uuid(thread_id, last_uuid) do
-      {:ok, import_messages(messages, session_id)}
+      {:ok, import_messages(messages, session_id, broadcast?: false)}
     end
   end
 
@@ -33,12 +33,13 @@ defmodule EyeInTheSky.Codex.SessionImporter do
 
   Returns the count of successfully imported messages.
   """
-  @spec import_messages(list(map()), integer()) ::
+  @spec import_messages(list(map()), integer(), keyword()) ::
           %{inserted: integer(), updated: integer(), skipped: integer()}
-  def import_messages(messages, session_id) do
+  def import_messages(messages, session_id, opts \\ []) do
     BulkImporter.import_messages(messages, session_id,
       provider: "codex",
-      importing_from_file?: true
+      importing_from_file?: true,
+      broadcast?: Keyword.get(opts, :broadcast?, true)
     )
   end
 end

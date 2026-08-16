@@ -58,11 +58,20 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # Order matters: billing before auth (a 400 usage error must not read as generic).
   def classify({:pi_turn_error, msg}) when is_binary(msg) do
     cond do
-      msg =~ ~r/out of .*usage|quota|credit|billing/iu -> :billing_error
-      msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu -> :rate_limit_error
-      msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|x-api-key|token)/iu -> :authentication_error
-      msg =~ ~r/HTTP 404|not_found_error|unknown model/iu -> :model_not_found
-      true -> :transient
+      msg =~ ~r/out of .*usage|quota|credit|billing/iu ->
+        :billing_error
+
+      msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu ->
+        :rate_limit_error
+
+      msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|x-api-key|token)/iu ->
+        :authentication_error
+
+      msg =~ ~r/HTTP 404|not_found_error|unknown model/iu ->
+        :model_not_found
+
+      true ->
+        :transient
     end
   end
 

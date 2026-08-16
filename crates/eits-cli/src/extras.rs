@@ -2,8 +2,8 @@ use crate::error::{Code, EitsError};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
-/// Spec: discovery order — EITS_EXTRAS, ../libexec/eits-extras, sibling,
-/// bash `eits` on PATH (guarding self-exec), bundled app path (later).
+/// Spec: discovery order — EITS_EXTRAS, ../libexec/eits-extras,
+/// sibling eits-extras, legacy eits-extras on PATH.
 pub fn find_extras() -> Result<PathBuf, EitsError> {
     if let Ok(p) = std::env::var("EITS_EXTRAS") {
         let p = PathBuf::from(p);
@@ -35,20 +35,19 @@ pub fn find_extras() -> Result<PathBuf, EitsError> {
         }
     }
 
-    // Migration period: bash `eits` on PATH, but never exec ourselves.
-    if let Some(path_eits) = which_on_path("eits") {
-        let canon = path_eits.canonicalize().ok();
+    if let Some(path_eits_extras) = which_on_path("eits-extras") {
+        let canon = path_eits_extras.canonicalize().ok();
         if canon.is_some() && canon != me {
-            return Ok(path_eits);
+            return Ok(path_eits_extras);
         }
     }
 
     Err(EitsError::api(
-        "no extras script found (set EITS_EXTRAS or install scripts/eits on PATH)",
+        "no extras script found (set EITS_EXTRAS or install eits-extras on PATH)",
         Code::ExtrasNotFound,
         None,
     )
-    .with_hint("set EITS_EXTRAS or install scripts/eits on PATH"))
+    .with_hint("set EITS_EXTRAS or install eits-extras on PATH"))
 }
 
 fn is_executable_file(p: &std::path::Path) -> bool {

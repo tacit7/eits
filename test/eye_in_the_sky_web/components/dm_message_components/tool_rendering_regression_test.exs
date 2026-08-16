@@ -41,10 +41,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "output stream type routing" do
     test "message_body with stream_type 'output' renders through output widget, not plain Markdown" do
-      message = msg(
-        body: "some command stdout here",
-        metadata: %{"stream_type" => "output"}
-      )
+      message =
+        msg(
+          body: "some command stdout here",
+          metadata: %{"stream_type" => "output"}
+        )
 
       html =
         render_component(
@@ -61,10 +62,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
     end
 
     test "message_body with stream_type 'output' in compact mode renders output widget" do
-      message = msg(
-        body: "line 1\nline 2",
-        metadata: %{"stream_type" => "output"}
-      )
+      message =
+        msg(
+          body: "line 1\nline 2",
+          metadata: %{"stream_type" => "output"}
+        )
 
       html =
         render_component(
@@ -83,10 +85,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
     end
 
     test "message_body with stream_type 'tool_result' renders through output widget" do
-      message = msg(
-        body: "command result",
-        metadata: %{"stream_type" => "tool_result"}
-      )
+      message =
+        msg(
+          body: "command result",
+          metadata: %{"stream_type" => "tool_result"}
+        )
 
       html =
         render_component(
@@ -108,10 +111,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "bash stream type routing" do
     test "message_body with stream_type 'bash' and tool-call body renders call widget" do
-      message = msg(
-        body: ~s(> `Bash` {"command":"echo hello"}),
-        metadata: %{"stream_type" => "bash"}
-      )
+      message =
+        msg(
+          body: ~s(> `Bash` {"command":"echo hello"}),
+          metadata: %{"stream_type" => "bash"}
+        )
 
       html =
         render_component(
@@ -134,10 +138,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "tool_use stream type routes to call widget" do
     test "message_body with stream_type 'tool_use' and parsed segments renders call widget" do
-      message = msg(
-        body: ~s(> `Write` {"file_path":"/tmp/x","content":"hello"}),
-        metadata: %{"stream_type" => "tool_use"}
-      )
+      message =
+        msg(
+          body: ~s(> `Write` {"file_path":"/tmp/x","content":"hello"}),
+          metadata: %{"stream_type" => "tool_use"}
+        )
 
       html =
         render_component(

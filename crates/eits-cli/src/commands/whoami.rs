@@ -92,7 +92,7 @@ mod tests {
             200,
             r#"{"uuid":"u-123","id":7,"agent_id":"a-456","agent_int_id":9,"project_id":1}"#,
         )]);
-        let out = Command::cargo_bin("eitsr")
+        let out = Command::cargo_bin("eits")
             .unwrap()
             .env("EITS_URL", &srv.url)
             .env("EITS_SESSION_UUID", "u-123")
@@ -123,7 +123,7 @@ mod tests {
             ),
             (200, r#"{"success":true,"agent":{"id":9}}"#),
         ]);
-        let out = Command::cargo_bin("eitsr")
+        let out = Command::cargo_bin("eits")
             .unwrap()
             .env("EITS_URL", &srv.url)
             .env("EITS_SESSION_UUID", "u-123")
@@ -147,10 +147,16 @@ mod tests {
 
     #[test]
     fn whoami_without_session_identity_is_usage_error() {
-        let out = Command::cargo_bin("eitsr")
+        let home = tempfile::tempdir().unwrap();
+        let out = Command::cargo_bin("eits")
             .unwrap()
+            .env("HOME", home.path())
             .env_remove("EITS_SESSION_UUID")
             .env_remove("EITS_SESSION_ID")
+            .env_remove("EITS_CODEX_ENV_FILE")
+            .env_remove("EITS_CODEX_SESSION_ID")
+            .env_remove("CODEX_THREAD_ID")
+            .env_remove("CODEX_SESSION_ID")
             .args(["whoami"])
             .assert()
             .code(2);

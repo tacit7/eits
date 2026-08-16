@@ -341,7 +341,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
           <% end %>
         </div>
       </div>
-
     </div>
     """
   end
@@ -361,5 +360,4 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     </button>
     """
   end
-
 end

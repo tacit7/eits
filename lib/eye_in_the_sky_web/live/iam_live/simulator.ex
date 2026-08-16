@@ -379,11 +379,16 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               <div class="flex flex-wrap gap-2">
                 <%= for dc <- @result.document_contributions do %>
                   <div class="badge badge-outline gap-1 py-3 px-3">
-                    <.link navigate={"/iam/documents/#{dc.document_id}"} class="link link-hover font-medium">
+                    <.link
+                      navigate={"/iam/documents/#{dc.document_id}"}
+                      class="link link-hover font-medium"
+                    >
                       {dc.document_name}
                     </.link>
                     <span class="text-base-content/50">→ {dc.agent_type}</span>
-                    <span class="badge badge-ghost badge-sm">{dc.effective_policy_count} matched</span>
+                    <span class="badge badge-ghost badge-sm">
+                      {dc.effective_policy_count} matched
+                    </span>
                   </div>
                 <% end %>
               </div>

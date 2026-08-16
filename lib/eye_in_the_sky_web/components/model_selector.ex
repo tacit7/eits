@@ -125,7 +125,10 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
     >
       <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
       <span class="flex-1 truncate" data-selector-row-label>{@entry.label}</span>
-      <span :if={@entry.default?} class="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">
+      <span
+        :if={@entry.default?}
+        class="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success"
+      >
         Recommended
       </span>
       <.icon :if={@active} name="hero-check-mini" class="size-3.5 text-primary flex-shrink-0" />

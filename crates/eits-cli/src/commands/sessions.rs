@@ -93,6 +93,9 @@ pub enum SessionsCmd {
         /// Model version string
         #[arg(long = "model-version")]
         model_version: Option<String>,
+        /// Compaction summary saved by PostCompact hook
+        #[arg(long = "compact-summary")]
+        compact_summary: Option<String>,
     },
     /// End a session (defaults uuid to the current session identity)
     End {
@@ -259,7 +262,7 @@ pub fn run(
             let id = resolve_self(cfg, &id)?;
             let v = client.get(&format!("/sessions/{id}"))?;
             let session = v.get("session").cloned().unwrap_or(v);
-            output::print_json(&json!({ "session": session }), pretty);
+            output::print_json(&session, pretty);
             Ok(())
         }
 
@@ -325,6 +328,7 @@ pub fn run(
             model_name,
             model_provider,
             model_version,
+            compact_summary,
         } => {
             let uuid = resolve_self(cfg, &uuid)?;
             let mut updates = serde_json::Map::new();
@@ -375,6 +379,9 @@ pub fn run(
             }
             if let Some(mv) = &model_version {
                 updates.insert("model_version".into(), json!(mv));
+            }
+            if let Some(cs) = &compact_summary {
+                updates.insert("compact_summary".into(), json!(cs));
             }
             let resp = client.patch(&format!("/sessions/{uuid}"), Value::Object(updates))?;
             if quiet {

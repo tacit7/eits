@@ -218,7 +218,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
             />
             <.worktree_field />
             <.eits_workflow_field />
-            <.cli_flags_section />
+            <.cli_flags_section selected_provider={@selected_provider} />
             <.modal_submit button_text={assigns[:button_text]} />
           </form>
         </div>
@@ -493,6 +493,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     """
   end
 
+  attr :selected_provider, :string, required: true
+
   defp cli_flags_section(assigns) do
     ~H"""
     <div class="collapse collapse-arrow bg-base-200 rounded-lg">
@@ -501,36 +503,96 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
-        <div class="form-control">
-          <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
-          <select name="permission_mode" class="select select-bordered select-sm w-full">
-            <option value="">Default</option>
-            <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
-            <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
-            <option value="dontAsk">dontAsk — never ask for confirmation</option>
-            <option value="plan">plan — read-only, no file changes</option>
-          </select>
-        </div>
-
-        <div class="form-control">
-          <label class="label">
-            <span class="label-text text-xs">Max Turns</span>
-            <span class="label-text-alt text-base-content/40 font-mono text-xs">
-              --max-turns
-            </span>
-          </label>
-          <input
-            type="number"
-            name="max_turns"
-            min="1"
-            placeholder="unlimited"
-            class="input input-bordered input-sm w-full font-mono min-h-[44px]"
-          />
-        </div>
-
-        <.path_fields />
-        <.boolean_flags />
+        <%= if @selected_provider == "codex" do %>
+          <.codex_cli_flags />
+        <% else %>
+          <.claude_cli_flags />
+        <% end %>
       </div>
+    </div>
+    """
+  end
+
+  defp claude_cli_flags(assigns) do
+    ~H"""
+    <div class="form-control">
+      <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
+      <select name="permission_mode" class="select select-bordered select-sm w-full">
+        <option value="">Default</option>
+        <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
+        <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
+        <option value="dontAsk">dontAsk — never ask for confirmation</option>
+        <option value="plan">plan — read-only, no file changes</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Max Turns</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          --max-turns
+        </span>
+      </label>
+      <input
+        type="number"
+        name="max_turns"
+        min="1"
+        placeholder="unlimited"
+        class="input input-bordered input-sm w-full font-mono min-h-[44px]"
+      />
+    </div>
+
+    <.path_fields />
+    <.boolean_flags />
+    """
+  end
+
+  defp codex_cli_flags(assigns) do
+    ~H"""
+    <label class="label cursor-pointer justify-start gap-2 py-1">
+      <input type="hidden" name="bypass_sandbox" value="false" />
+      <input
+        type="checkbox"
+        name="bypass_sandbox"
+        value="true"
+        checked
+        class="checkbox checkbox-sm checkbox-primary"
+      />
+      <span class="label-text text-xs">
+        Bypass approvals and sandbox
+        <span class="font-mono text-base-content/40 text-xs ml-1">
+          --dangerously-bypass-approvals-and-sandbox
+        </span>
+      </span>
+    </label>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Sandbox Mode</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">--sandbox</span>
+      </label>
+      <select name="sandbox" class="select select-bordered select-sm w-full">
+        <option value="">Default</option>
+        <option value="read-only">read-only</option>
+        <option value="workspace-write">workspace-write</option>
+        <option value="danger-full-access">danger-full-access</option>
+      </select>
+    </div>
+
+    <div class="form-control">
+      <label class="label">
+        <span class="label-text text-xs">Approval Policy</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+          approval_policy
+        </span>
+      </label>
+      <select name="ask_for_approval" class="select select-bordered select-sm w-full">
+        <option value="">Default</option>
+        <option value="untrusted">untrusted</option>
+        <option value="on-request">on-request</option>
+        <option value="on-failure">on-failure</option>
+        <option value="never">never</option>
+      </select>
     </div>
     """
   end

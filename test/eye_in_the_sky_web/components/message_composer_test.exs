@@ -32,18 +32,25 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     html = render_component(&MessageComposer.message_composer/1, base_assigns())
     assert html =~ ~s(data-event="select_model")
     assert html =~ ~s(data-allow-provider-switch="false")
-    assert html =~ "Opus 4.8"
+    assert html =~ "Opus 5"
   end
 
   test "pi provider sessions get Pi entries, not the Claude fallback (bug being fixed)" do
-    html = render_component(&MessageComposer.message_composer/1, base_assigns(%{provider: "pi", selected_model: "ollama-lan/qwen3.6:27b"}))
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "pi", selected_model: "ollama-lan/qwen3.6:27b"})
+      )
+
     assert html =~ ~s(data-allow-provider-switch="false")
     # The trigger must not silently fall through to a Claude label.
     refute html =~ "Claude Code"
   end
 
   test "trigger is disabled while processing" do
-    html = render_component(&MessageComposer.message_composer/1, base_assigns(%{processing: true}))
+    html =
+      render_component(&MessageComposer.message_composer/1, base_assigns(%{processing: true}))
+
     assert html =~ "disabled"
   end
 end

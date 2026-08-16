@@ -29,7 +29,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
             ]}>
               <button
                 phx-click="file_switch_tab"
-                phx-value-path={tab.path}                class={[
+                phx-value-path={tab.path}
+                class={[
                   "px-3 py-1.5 text-xs truncate max-w-[160px]",
                   if(active,
                     do: "text-base-content/90 font-medium",
@@ -42,7 +43,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
               </button>
               <button
                 phx-click="file_close_tab"
-                phx-value-path={tab.path}                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
+                phx-value-path={tab.path}
+                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
                 title="Close"
               >
                 <.icon name="hero-x-mark-mini" class="size-3" />

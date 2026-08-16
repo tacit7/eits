@@ -25,14 +25,19 @@ defmodule EyeInTheSky.Pi.ControlTest do
 
     # Guard against a dead-but-registered name from a prior test.
     case Process.whereis(StubCLI) do
-      nil -> :ok
-      pid -> Process.exit(pid, :kill); wait_gone(StubCLI)
+      nil ->
+        :ok
+
+      pid ->
+        Process.exit(pid, :kill)
+        wait_gone(StubCLI)
     end
 
     {:ok, _} = StubCLI.start_link()
 
     on_exit(fn ->
       Application.delete_env(:eye_in_the_sky, :pi_cli_module)
+
       case Process.whereis(StubCLI) do
         nil -> :ok
         pid -> Process.exit(pid, :kill)
@@ -44,8 +49,12 @@ defmodule EyeInTheSky.Pi.ControlTest do
 
   defp wait_gone(name) do
     case Process.whereis(name) do
-      nil -> :ok
-      _ -> Process.sleep(5); wait_gone(name)
+      nil ->
+        :ok
+
+      _ ->
+        Process.sleep(5)
+        wait_gone(name)
     end
   end
 
@@ -53,8 +62,11 @@ defmodule EyeInTheSky.Pi.ControlTest do
     responder = fn %{id: id, type: type} ->
       data =
         case type do
-          "initialize" -> ~s({"protocolVersion":1})
-          "discover_models" -> ~s({"models":[{"id":"ollama-lan/qwen3.6:27b","provider":"ollama-lan"}]})
+          "initialize" ->
+            ~s({"protocolVersion":1})
+
+          "discover_models" ->
+            ~s({"models":[{"id":"ollama-lan/qwen3.6:27b","provider":"ollama-lan"}]})
         end
 
       ~s({"id":"#{id}","type":"response","command":"#{type}","success":true,"data":#{data}})

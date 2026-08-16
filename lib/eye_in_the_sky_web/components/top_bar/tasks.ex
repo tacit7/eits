@@ -32,8 +32,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
           )
         ]}
       >
-        All
-        <% total = @state_counts |> Map.values() |> Enum.sum() %>
+        All <% total = @state_counts |> Map.values() |> Enum.sum() %>
         <%= if total > 0 do %>
           <span class={[
             "tabular-nums text-micro px-1 min-w-[16px] text-center rounded-full leading-4",
@@ -61,7 +60,11 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
           ]}
         >
           <%= if active do %>
-            <span class="size-1.5 rounded-full flex-shrink-0" style={"background-color: #{state.color}"}></span>
+            <span
+              class="size-1.5 rounded-full flex-shrink-0"
+              style={"background-color: #{state.color}"}
+            >
+            </span>
           <% end %>
           {state.name}
           <%= if count > 0 do %>

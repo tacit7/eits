@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
   import Ecto.Query, only: [from: 2]
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.{Repo, Tasks}
+  alias EyeInTheSky.{Repo, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
 
   import EyeInTheSky.Factory
@@ -84,6 +84,31 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
 
       assert resp["success"] == true
       assert Enum.any?(resp["tasks"], &(&1["id"] == task.id))
+    end
+
+    test "filters by team_id and includes linked session ids", %{conn: conn} do
+      {:ok, team} = Teams.create_team(%{name: "task-team-#{uniq()}"})
+      agent = create_agent()
+      session = create_session(agent)
+      team_task = create_task(%{team_id: team.id})
+      other_task = create_task()
+
+      Repo.insert_all(
+        "task_sessions",
+        [%{task_id: team_task.id, session_id: session.id}],
+        on_conflict: :nothing
+      )
+
+      conn = get(conn, ~p"/api/v1/tasks?team_id=#{team.id}")
+      resp = json_response(conn, 200)
+
+      ids = Enum.map(resp["tasks"], & &1["id"])
+      [presented] = resp["tasks"]
+
+      assert team_task.id in ids
+      refute other_task.id in ids
+      assert presented["team_id"] == team.id
+      assert session.id in presented["session_ids"]
     end
 
     test "respects limit param", %{conn: conn} do

@@ -701,5 +701,4 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
     socket
   end
-
 end

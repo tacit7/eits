@@ -111,7 +111,8 @@ defmodule EyeInTheSky.Notes do
   - `:limit` - integer, default 200
   - `:sort` - "newest" (default) | "oldest"
   """
-  def list_notes_by_source_session(source_session_uuid, opts \\ []) when is_binary(source_session_uuid) do
+  def list_notes_by_source_session(source_session_uuid, opts \\ [])
+      when is_binary(source_session_uuid) do
     parent_type = Keyword.get(opts, :parent_type)
     parent_id = Keyword.get(opts, :parent_id)
     starred_only = Keyword.get(opts, :starred, false)
@@ -178,7 +179,10 @@ defmodule EyeInTheSky.Notes do
         base
       end
 
-    base = if source_session_uuid, do: from(n in base, where: n.source_session_uuid == ^source_session_uuid), else: base
+    base =
+      if source_session_uuid,
+        do: from(n in base, where: n.source_session_uuid == ^source_session_uuid),
+        else: base
 
     Repo.all(base)
   end

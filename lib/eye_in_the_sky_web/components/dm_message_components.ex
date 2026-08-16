@@ -88,7 +88,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         <% end %>
         <%= if @cache_pct do %>
           <span class="inline-flex items-center gap-0.5 text-[11px] font-mono tabular-nums text-base-content/40">
-            <%= if @metrics_text != "" do %> · <% end %>
+            <%= if @metrics_text != "" do %>
+              ·
+            <% end %>
             <.icon name="hero-circle-stack" class="size-3" />
             {@cache_pct}%
           </span>
@@ -254,7 +256,10 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     ]}>
       <%= if @stream_type == "hook_failure" do %>
         <div class="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-2.5 py-2">
-          <.icon name="hero-exclamation-triangle" class="size-3.5 text-warning/80 mt-0.5 flex-shrink-0" />
+          <.icon
+            name="hero-exclamation-triangle"
+            class="size-3.5 text-warning/80 mt-0.5 flex-shrink-0"
+          />
           <div class="min-w-0 space-y-1">
             <p class="text-mini font-mono font-semibold text-warning/80">
               Hook failed: {@hook_name} (exit {@exit_code})

@@ -25,7 +25,7 @@ defmodule EyeInTheSky.Claude.SessionImporter do
 
     with {:ok, raw_messages} <-
            SessionReader.read_messages_after_uuid(session_uuid, project_path, last_uuid) do
-      {:ok, import_messages(raw_messages, session_id)}
+      {:ok, import_messages(raw_messages, session_id, broadcast?: false)}
     end
   end
 
@@ -34,15 +34,16 @@ defmodule EyeInTheSky.Claude.SessionImporter do
 
   Returns `%{inserted: n, updated: n, skipped: n}`.
   """
-  @spec import_messages(list(), integer()) ::
+  @spec import_messages(list(), integer(), keyword()) ::
           %{inserted: integer(), updated: integer(), skipped: integer()}
-  def import_messages(raw_messages, session_id) do
+  def import_messages(raw_messages, session_id, opts \\ []) do
     raw_messages
     |> SessionReader.format_messages()
     |> BulkImporter.import_messages(session_id,
       provider: "claude",
       metadata_fn: &extract_metadata/1,
-      importing_from_file?: true
+      importing_from_file?: true,
+      broadcast?: Keyword.get(opts, :broadcast?, true)
     )
   end
 

@@ -67,7 +67,7 @@ impl Client {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
                     if matches!(status, 429 | 502 | 503 | 504) && attempt < 3 {
-                        eprintln!("[eitsr] {status}, retrying in {}ms...", jitter(delay_ms));
+                        eprintln!("[eits] {status}, retrying in {}ms...", jitter(delay_ms));
                         std::thread::sleep(Duration::from_millis(jitter(delay_ms)));
                         delay_ms = (delay_ms * 2).min(30_000);
                         continue;
@@ -89,7 +89,7 @@ impl Client {
                 }
                 Err(e) if (e.is_connect() || e.is_timeout()) && attempt < 3 => {
                     eprintln!(
-                        "[eitsr] connection error, retrying in {}ms... (server restarting?)",
+                        "[eits] connection error, retrying in {}ms... (server restarting?)",
                         jitter(delay_ms)
                     );
                     std::thread::sleep(Duration::from_millis(jitter(delay_ms)));

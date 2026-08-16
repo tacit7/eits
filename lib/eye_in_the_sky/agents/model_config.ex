@@ -33,15 +33,19 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def codex_models do
     [
+      "gpt-5.6-sol",
+      "gpt-5.6-tenna",
+      "gpt-5.6-luna",
       "gpt-5.5",
       "gpt-5.4",
       "gpt-5.4-mini",
+      # backward compat for sessions spawned before the unified list
+      "gpt-5.6-terra",
       "gpt-5.3-codex",
       "gpt-5.2-codex",
       "gpt-5.2",
       "gpt-5.1-codex-max",
       "gpt-5.1-codex-mini",
-      # backward compat for sessions spawned before the unified list
       "gpt-5.1",
       "gpt-5-codex-mini"
     ]
@@ -50,17 +54,29 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   @doc """
   Returns the default model slug for a provider.
   Claude: resolved from Settings.default_model() (user-configured)
-  Codex: "gpt-5.5"
+  Codex: "gpt-5.6-sol"
   Pi: nil (no default; model must be specified explicitly from discovery)
   """
-  def default_model("codex"), do: "gpt-5.5"
+  def default_model("codex"), do: "gpt-5.6-sol"
   def default_model("pi"), do: nil
 
   # Pi models are format-validated ("<pi-provider>/<model-id>"); the true list
   # comes from Pi model discovery (Phase 2). Model id may itself contain "/".
+  @claude_model_regex ~r/^(claude-[A-Za-z0-9][A-Za-z0-9_.:-]*(?:\[1m\])?|(?:opus|sonnet|haiku)(?:\[1m\])?|default)$/
+  @codex_model_regex ~r/^gpt-[A-Za-z0-9][A-Za-z0-9_.-]*$/
   @pi_model_regex ~r{^[A-Za-z0-9_.-]+/[A-Za-z0-9_.:/@+-]+$}
 
   @doc "Validates a model for a provider: format-based for pi, list-based otherwise."
+  def valid_model?("claude", model) when is_binary(model),
+    do: model in claude_models() or Regex.match?(@claude_model_regex, model)
+
+  def valid_model?("claude", _), do: false
+
+  def valid_model?("codex", model) when is_binary(model),
+    do: model in codex_models() or Regex.match?(@codex_model_regex, model)
+
+  def valid_model?("codex", _), do: false
+
   def valid_model?("pi", model) when is_binary(model), do: Regex.match?(@pi_model_regex, model)
   def valid_model?("pi", _), do: false
   def valid_model?(provider, model), do: model in valid_model_slugs(provider)

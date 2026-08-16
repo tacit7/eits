@@ -190,22 +190,33 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   # --- Data Events ---
 
   @doc "Result received from SDK — save to DB synchronously so the message is committed before claude_complete fires."
-  def on_result_received(session_id, %{
-        provider: provider,
-        text: text,
-        metadata: metadata,
-        channel_id: channel_id,
-        source_uuid: source_uuid
-      } = params)
+  def on_result_received(
+        session_id,
+        %{
+          provider: provider,
+          text: text,
+          metadata: metadata,
+          channel_id: channel_id,
+          source_uuid: source_uuid
+        } = params
+      )
       when is_binary(text) do
     job_context = Map.get(params, :job_context)
+
     if String.trim(text) in ["", "[NO_RESPONSE]"] do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else
       if get_in(job_context, ["reply_mode"]) == "cli_required" do
-        save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)
+        save_result(session_id, provider, text, metadata,
+          visibility: :session_only,
+          context: job_context
+        )
       else
-        save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)
+        save_result(session_id, provider, text, metadata,
+          channel_id: channel_id,
+          source_uuid: source_uuid
+        )
+
         maybe_fanout_mentions(channel_id, text, session_id)
       end
     end
@@ -235,9 +246,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         Logger.warning("[#{session_id}] Hook failure stored: #{hook_name} exit=#{exit_code}")
 
       {:error, reason} ->
-        Logger.warning(
-          "[#{session_id}] Failed to store hook failure: #{inspect(reason)}"
-        )
+        Logger.warning("[#{session_id}] Failed to store hook failure: #{inspect(reason)}")
     end
   end
 
@@ -344,7 +353,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
           })
 
         {[metadata: full_metadata],
-         fn -> Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only") end,
+         fn ->
+           Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only")
+         end,
          fn r -> Logger.warning("[#{session_id}] Transcript-only save failed: #{inspect(r)}") end}
       else
         channel_id = opts[:channel_id]
@@ -352,7 +363,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         base = [metadata: db_metadata]
         base = if channel_id, do: Keyword.put(base, :channel_id, channel_id), else: base
         base = if source_uuid, do: Keyword.put(base, :source_uuid, source_uuid), else: base
-        {base, fn -> :ok end, fn r -> Logger.warning("[#{session_id}] DB save failed: #{inspect(r)}") end}
+
+        {base, fn -> :ok end,
+         fn r -> Logger.warning("[#{session_id}] DB save failed: #{inspect(r)}") end}
       end
 
     case Messages.record_incoming_reply(session_id, provider, text, reply_opts) do

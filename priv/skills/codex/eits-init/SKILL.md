@@ -1,11 +1,16 @@
 ---
-name: codex-init
+name: eits-init
 description: Initialize EITS session tracking for a Codex agent at session start. Use when starting a new Codex session or when EITS env vars need verification.
 ---
 
 # Codex EITS Init
 
 EITS env vars are pre-injected by AgentWorker before the session starts.
+For Codex hook sessions, startup also writes non-secret identity vars to
+`~/.eits/codex/sessions/<session_id>.env`. The `eits` CLI auto-loads that file
+only when `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is
+set. If no session id is known, ask the user for it before running
+identity-scoped EITS commands.
 
 | Variable | Description |
 |----------|-------------|
@@ -56,7 +61,7 @@ feature flag in `~/.codex/config.toml`:
 
 ```toml
 [features]
-codex_hooks = true
+hooks = true
 ```
 
 When enabled, these run automatically:

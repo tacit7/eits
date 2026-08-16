@@ -258,7 +258,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
           }
       }
 
-      {:noreply, updated} = FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "new.txt"}, socket)
+      {:noreply, updated} =
+        FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "new.txt"}, socket)
 
       refute File.exists?(Path.join(dir, "old.txt"))
       assert File.exists?(Path.join(dir, "new.txt"))
@@ -266,11 +267,15 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActionsTest do
       assert [%{path: "new.txt", name: "new.txt"}] = updated.assigns.file_tabs
     end
 
-    test "flashes an error and leaves the file alone when the target name exists", %{socket: socket, dir: dir} do
+    test "flashes an error and leaves the file alone when the target name exists", %{
+      socket: socket,
+      dir: dir
+    } do
       File.write!(Path.join(dir, "taken.txt"), "x")
       socket = %{socket | assigns: %{socket.assigns | sidebar_project: %{path: dir}}}
 
-      {:noreply, updated} = FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "taken.txt"}, socket)
+      {:noreply, updated} =
+        FileActions.handle_rename_file(%{"path" => "old.txt", "name" => "taken.txt"}, socket)
 
       assert File.exists?(Path.join(dir, "old.txt"))
       assert updated.assigns.flash["error"] =~ "already exists"

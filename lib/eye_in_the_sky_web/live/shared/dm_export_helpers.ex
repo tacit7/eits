@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
            SessionReader.read_messages_after_uuid(session_uuid, project_path, nil) do
       case Repo.transaction(fn ->
              Messages.delete_session_messages(session_id)
-             SessionImporter.import_messages(raw_messages, session_id)
+             SessionImporter.import_messages(raw_messages, session_id, broadcast?: false)
            end) do
         {:ok, %{inserted: inserted}} ->
           socket = load_messages_fn.(socket)
@@ -91,7 +91,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmExportHelpers do
       {:ok, messages} ->
         case Repo.transaction(fn ->
                Messages.delete_session_messages(session_id)
-               CodexImporter.import_messages(messages, session_id)
+               CodexImporter.import_messages(messages, session_id, broadcast?: false)
              end) do
           {:ok, %{inserted: inserted}} ->
             socket = load_messages_fn.(socket)

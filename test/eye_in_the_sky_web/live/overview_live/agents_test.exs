@@ -260,7 +260,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.AgentsTest do
       agent = %{id: "a1", abs_path: path}
       socket = build_socket(%{agents: [agent]})
 
-      {:noreply, result} = AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+      {:noreply, result} =
+        AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
 
       assert File.exists?(Path.join(Path.dirname(path), "reviewer-copy.md"))
       assert result.assigns.flash["info"] == "Duplicated"
@@ -269,7 +270,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.AgentsTest do
     test "rejects a path not in the currently loaded agents list", %{path: path} do
       socket = build_socket(%{agents: []})
 
-      {:noreply, result} = AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
+      {:noreply, result} =
+        AgentsLive.handle_event("duplicate_definition_file", %{"path" => path}, socket)
 
       refute File.exists?(Path.join(Path.dirname(path), "reviewer-copy.md"))
       assert result.assigns.flash["error"] == "Path not allowed"
@@ -290,7 +292,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.AgentsTest do
       agent = %{id: "a1", abs_path: path}
       socket = build_socket(%{agents: [agent], selected_agent: agent})
 
-      {:noreply, result} = AgentsLive.handle_event("delete_definition_file", %{"path" => path}, socket)
+      {:noreply, result} =
+        AgentsLive.handle_event("delete_definition_file", %{"path" => path}, socket)
 
       refute File.exists?(path)
       assert is_nil(result.assigns.selected_agent)

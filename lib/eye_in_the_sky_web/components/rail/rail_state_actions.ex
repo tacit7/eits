@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_refresh_usage(params, socket) do
     _ = params
+
     {:noreply,
      socket
      |> assign(:flyout_usage, nil)
@@ -77,7 +78,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_show_more_project_sessions(%{"project_id" => pid_str}, socket) do
     case parse_int(pid_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       pid ->
         current = Map.get(socket.assigns.session_project_visible, pid, 5)
 
@@ -92,7 +95,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_toggle_project_sessions(%{"project_id" => pid_str}, socket) do
     case parse_int(pid_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       pid ->
         collapsed = socket.assigns.session_project_collapsed
 
@@ -118,7 +123,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_open_task_detail(%{"task_id" => task_id_str}, socket) do
     case parse_int(task_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       task_id ->
         tasks = socket.assigns.flyout_tasks
         index = Enum.find_index(tasks, &(&1.id == task_id)) || 0
@@ -135,7 +142,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_open_note_detail(%{"note_id" => note_id_str}, socket) do
     case parse_int(note_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       note_id ->
         notes = socket.assigns.flyout_notes
         index = Enum.find_index(notes, &(&1.id == note_id)) || 0

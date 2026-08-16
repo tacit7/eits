@@ -5,12 +5,15 @@ defmodule EyeInTheSky.PiTest do
 
   setup do
     original = Application.get_env(:eye_in_the_sky, :pi_session_root)
+
     on_exit(fn ->
       System.delete_env("EITS_PI_SESSION_ROOT")
+
       if original,
         do: Application.put_env(:eye_in_the_sky, :pi_session_root, original),
         else: Application.delete_env(:eye_in_the_sky, :pi_session_root)
     end)
+
     :ok
   end
 

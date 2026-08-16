@@ -115,61 +115,61 @@ defmodule EyeInTheSkyWeb.Helpers.FileHelpers do
   }
 
   @binary_extensions MapSet.new([
-    # Executables and libraries
-    ".so",
-    ".dll",
-    ".dylib",
-    ".exe",
-    ".bin",
-    ".o",
-    ".a",
-    ".lib",
-    # Archives
-    ".zip",
-    ".tar",
-    ".gz",
-    ".bz2",
-    ".xz",
-    ".7z",
-    ".rar",
-    # Images
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".bmp",
-    ".ico",
-    ".svg",
-    ".webp",
-    # Media
-    ".mp3",
-    ".mp4",
-    ".avi",
-    ".mov",
-    ".mkv",
-    ".wav",
-    ".flac",
-    # Documents
-    ".pdf",
-    ".doc",
-    ".docx",
-    ".xls",
-    ".xlsx",
-    ".ppt",
-    ".pptx",
-    # Databases
-    ".db",
-    ".sqlite",
-    ".sqlite3",
-    ".db-shm",
-    ".db-wal",
-    # Others
-    ".wasm",
-    ".beam",
-    ".class",
-    ".jar",
-    ".war"
-  ])
+                       # Executables and libraries
+                       ".so",
+                       ".dll",
+                       ".dylib",
+                       ".exe",
+                       ".bin",
+                       ".o",
+                       ".a",
+                       ".lib",
+                       # Archives
+                       ".zip",
+                       ".tar",
+                       ".gz",
+                       ".bz2",
+                       ".xz",
+                       ".7z",
+                       ".rar",
+                       # Images
+                       ".jpg",
+                       ".jpeg",
+                       ".png",
+                       ".gif",
+                       ".bmp",
+                       ".ico",
+                       ".svg",
+                       ".webp",
+                       # Media
+                       ".mp3",
+                       ".mp4",
+                       ".avi",
+                       ".mov",
+                       ".mkv",
+                       ".wav",
+                       ".flac",
+                       # Documents
+                       ".pdf",
+                       ".doc",
+                       ".docx",
+                       ".xls",
+                       ".xlsx",
+                       ".ppt",
+                       ".pptx",
+                       # Databases
+                       ".db",
+                       ".sqlite",
+                       ".sqlite3",
+                       ".db-shm",
+                       ".db-wal",
+                       # Others
+                       ".wasm",
+                       ".beam",
+                       ".class",
+                       ".jar",
+                       ".war"
+                     ])
 
   defp file_type_info(ext),
     do: Map.get(@file_types, ext, %{atom: :text, class: "plaintext", cm: "text"})

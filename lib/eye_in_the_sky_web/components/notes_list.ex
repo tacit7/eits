@@ -213,7 +213,9 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     </.link>
                   </li>
                   <%= if @installed_editors != [] do %>
-                    <% preferred = Enum.find(@installed_editors, &(&1.id == @preferred_editor)) || List.first(@installed_editors) %>
+                    <% preferred =
+                      Enum.find(@installed_editors, &(&1.id == @preferred_editor)) ||
+                        List.first(@installed_editors) %>
                     <li>
                       <button
                         type="button"

@@ -6,6 +6,7 @@ import Dotenvy
 # Check both the user config dir (used by the Tauri desktop bundle) and
 # the CWD (used in dev/server deployments). User config dir takes precedence.
 config_dir = Path.expand("~/.config/eits")
+
 dot_env_files =
   Enum.filter(
     [Path.join(config_dir, ".env"), ".env", ".env.local"],

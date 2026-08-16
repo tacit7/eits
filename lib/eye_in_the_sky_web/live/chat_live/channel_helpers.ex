@@ -1,5 +1,4 @@
 defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
-
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Claude.ChannelFanout
 
@@ -25,7 +24,14 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHelpers do
   Delegates to ChannelFanout.fanout_all/6.
   """
   def route_to_members(channel_id, body, sender_session_id, content_blocks, sender_role \\ "user") do
-    ChannelFanout.fanout_all(channel_id, body, sender_session_id, content_blocks, nil, sender_role)
+    ChannelFanout.fanout_all(
+      channel_id,
+      body,
+      sender_session_id,
+      content_blocks,
+      nil,
+      sender_role
+    )
   end
 
   def build_sessions_by_project(channel_members, all_projects, search) do

@@ -6,7 +6,7 @@ end
 defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.Teams
+  alias EyeInTheSky.{Messages, Teams}
 
   import EyeInTheSky.Factory
 
@@ -465,7 +465,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
       assert json_response(conn, 422)["error"] =~ "terminated"
     end
 
-    test "skips completed and failed sessions", %{conn: conn} do
+    test "stores DMs for completed and failed member sessions", %{conn: conn} do
       team = create_team()
 
       sender_agent = create_agent()
@@ -488,8 +488,16 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
 
       resp = json_response(conn, 200)
       assert resp["success"] == true
-      # Both targets are terminated — nothing should be sent
-      assert resp["sent_count"] == 0
+      assert resp["sent_count"] == 2
+      assert resp["failed"] == 0
+
+      [done_dm] = Messages.list_inbound_dms(done_session.id)
+      [failed_dm] = Messages.list_inbound_dms(failed_session.id)
+
+      assert done_dm.from_session_id == sender.id
+      assert failed_dm.from_session_id == sender.id
+      assert done_dm.body =~ "test broadcast"
+      assert failed_dm.body =~ "test broadcast"
     end
 
     test "delivers to active members and returns correct sent_count", %{conn: conn} do

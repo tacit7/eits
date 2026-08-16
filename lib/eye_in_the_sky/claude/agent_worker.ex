@@ -184,7 +184,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # A worker is evictable when it holds no work: idle or failed, empty queue.
   # :running / :retry_wait always have in-flight or queued work; idle-with-queue
   # is about to process. Never evict those.
-  defp evictable?(%__MODULE__{status: status, queue: []}) when status in [:idle, :failed], do: true
+  defp evictable?(%__MODULE__{status: status, queue: []}) when status in [:idle, :failed],
+    do: true
+
   defp evictable?(%__MODULE__{}), do: false
 
   defp with_worker(session_id, fun, default) do
@@ -344,8 +346,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Hook failure — save to DB as a warning message so it appears in the DM transcript
   @impl true
   def handle_info(
-        {:claude_message, ref,
-         %Message{type: :hook_failure, content: stderr, metadata: meta}},
+        {:claude_message, ref, %Message{type: :hook_failure, content: stderr, metadata: meta}},
         %__MODULE__{sdk_ref: ref} = state
       ) do
     WorkerEvents.on_hook_failure(

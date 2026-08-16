@@ -85,7 +85,9 @@ defmodule EyeInTheSky.Pi.CLITest do
       case CLI.resolve_harness_command() do
         {:ok, {exe, args}} ->
           assert String.ends_with?(exe, "eits-pi-harness") or String.contains?(exe, "bun")
-          if String.contains?(exe, "bun"), do: assert([Path.expand("pi-harness/src/main.ts")] == args)
+
+          if String.contains?(exe, "bun"),
+            do: assert([Path.expand("pi-harness/src/main.ts")] == args)
 
         {:error, reason} ->
           assert reason == {:pi_harness_not_found, hint: "run scripts/build-pi-harness.sh"}

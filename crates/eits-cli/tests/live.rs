@@ -1,4 +1,4 @@
-//! Live integration suite for `eitsr` against a real EITS dev server.
+//! Live integration suite for `eits` against a real EITS dev server.
 //!
 //! Every test here is `#[ignore]`: they hit the network, mutate real data
 //! (a throwaway task), and depend on env vars (`EITS_SESSION_UUID` /
@@ -57,8 +57,8 @@ macro_rules! skip_unless_live {
     };
 }
 
-fn run_eitsr(args: &[&str]) -> Value {
-    let out = Command::cargo_bin("eitsr")
+fn run_eits(args: &[&str]) -> Value {
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .args(args)
         .assert()
@@ -73,31 +73,31 @@ fn run_bash_eits(args: &[&str]) -> Value {
         .parent()
         .and_then(|p| p.parent())
         .expect("crates/eits-cli is two levels below repo root");
-    let out = StdCommand::new(repo_root.join("scripts/eits"))
+    let out = StdCommand::new(repo_root.join("scripts/eits-extras"))
         .args(args)
         .current_dir(repo_root)
         .output()
-        .expect("failed to run scripts/eits");
+        .expect("failed to run scripts/eits-extras");
     assert!(
         out.status.success(),
-        "bash eits {:?} failed: {}",
+        "legacy eits extras {:?} failed: {}",
         args,
         String::from_utf8_lossy(&out.stderr)
     );
-    serde_json::from_slice(&out.stdout).expect("bash eits did not emit JSON on stdout")
+    serde_json::from_slice(&out.stdout).expect("legacy eits extras did not emit JSON on stdout")
 }
 
-/// `eitsr whoami` derives its fields from `GET /sessions/:id` + `/agents/:id`.
-/// Bash's own `whoami` is broken upstream (agent_id in the session response
+/// `eits whoami` derives its fields from `GET /sessions/:id` + `/agents/:id`.
+/// Legacy extras `whoami` is broken upstream (agent_id in the session response
 /// is actually the session's own uuid, so the `/agents/:id` lookup 404s —
-/// see scripts/eits cmd_whoami and CLAUDE.md notes), so we cross-check
+/// see scripts/eits-extras cmd_whoami and CLAUDE.md notes), so we cross-check
 /// against `eits sessions get self` instead, which returns the same
 /// underlying fields under different names.
 #[test]
 #[ignore]
 fn whoami_matches_sessions_get_self_fields() {
     skip_unless_live!();
-    let whoami = run_eitsr(&["whoami"]);
+    let whoami = run_eits(&["whoami"]);
     let session = run_bash_eits(&["sessions", "get", "self", "--json"]);
 
     assert_eq!(whoami["session_uuid"], session["uuid"]);
@@ -112,7 +112,7 @@ fn whoami_matches_sessions_get_self_fields() {
 fn tasks_get_returns_normalized_task_shape() {
     skip_unless_live!();
     let known_task_id = std::env::var("EITSR_LIVE_TASK_ID").unwrap_or_else(|_| "8051".to_string());
-    let resp = run_eitsr(&["tasks", "get", &known_task_id]);
+    let resp = run_eits(&["tasks", "get", &known_task_id]);
 
     let task = resp
         .get("task")
@@ -128,14 +128,14 @@ fn tasks_get_returns_normalized_task_shape() {
 #[ignore]
 fn tasks_begin_quiet_then_complete_round_trip() {
     skip_unless_live!();
-    let out = Command::cargo_bin("eitsr")
+    let out = Command::cargo_bin("eits")
         .unwrap()
         .args([
             "--quiet",
             "tasks",
             "begin",
             "--title",
-            "eitsr live test — safe to delete",
+            "eits live test — safe to delete",
         ])
         .assert()
         .success();
@@ -143,12 +143,12 @@ fn tasks_begin_quiet_then_complete_round_trip() {
     let task_id: u64 = stdout.trim().parse().expect("expected a bare task id");
     assert!(task_id > 0);
 
-    let complete = run_eitsr(&[
+    let complete = run_eits(&[
         "tasks",
         "complete",
         &task_id.to_string(),
         "--message",
-        "eitsr live suite: closing throwaway task",
+        "eits live suite: closing throwaway task",
     ]);
     assert_eq!(
         complete["success"], true,
@@ -165,7 +165,7 @@ fn tasks_begin_quiet_then_complete_round_trip() {
 #[ignore]
 fn dm_inbox_limit_one_parses() {
     skip_unless_live!();
-    let resp = run_eitsr(&["dm", "inbox", "--limit", "1"]);
+    let resp = run_eits(&["dm", "inbox", "--limit", "1"]);
     assert!(resp.get("count").is_some(), "missing count: {resp}");
     let items = resp["items"]
         .as_array()

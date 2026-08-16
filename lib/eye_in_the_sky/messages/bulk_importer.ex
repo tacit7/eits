@@ -28,6 +28,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   Options:
     - `:provider` - (required) provider string, e.g. "claude" or "codex"
     - `:metadata_fn` - optional 1-arity function returning a metadata map or nil for a message
+    - `:broadcast?` - whether to emit `{:new_message, message}` for persisted rows, default true
 
   Returns the count of successfully persisted or skipped messages (insert,
   update, fast-path skip, or DM dedup skip). Rows that conflict on source_uuid
@@ -38,6 +39,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
   def import_messages(messages, session_id, opts) do
     provider = Keyword.fetch!(opts, :provider)
     metadata_fn = Keyword.get(opts, :metadata_fn, fn _msg -> nil end)
+    broadcast? = Keyword.get(opts, :broadcast?, true)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     messages_with_uuid = Enum.filter(messages, & &1.uuid)
@@ -85,15 +87,15 @@ defmodule EyeInTheSky.Messages.BulkImporter do
     # would give the last message in the batch the smallest id, inverting
     # relative order for any messages inserted in the same batch (most visibly
     # a tool call and its result landing in the same second).
-    insert_count = inserts |> Enum.reverse() |> run_inserts(session_id)
-    update_count = run_updates(updates, session_id)
+    insert_count = inserts |> Enum.reverse() |> run_inserts(session_id, broadcast?)
+    update_count = run_updates(updates, session_id, broadcast?)
 
     %{inserted: insert_count, updated: update_count, skipped: skip_count}
   end
 
-  defp run_inserts([], _session_id), do: 0
+  defp run_inserts([], _session_id, _broadcast?), do: 0
 
-  defp run_inserts(inserts, session_id) do
+  defp run_inserts(inserts, session_id, broadcast?) do
     {count, _} =
       Repo.insert_all(Message, inserts,
         on_conflict: :nothing,
@@ -102,7 +104,7 @@ defmodule EyeInTheSky.Messages.BulkImporter do
 
     # Broadcast inserted messages to PubSub so DM page gets real-time updates.
     # Fetch the inserted messages using their source_uuids and broadcast each.
-    if count > 0 do
+    if broadcast? and count > 0 do
       source_uuids = Enum.map(inserts, & &1.source_uuid)
       broadcast_inserted_messages(session_id, source_uuids)
     end
@@ -137,15 +139,18 @@ defmodule EyeInTheSky.Messages.BulkImporter do
       end
   end
 
-  defp run_updates(updates, session_id) do
-    Enum.count(updates, fn update -> run_single_update(update, session_id) end)
+  defp run_updates(updates, session_id, broadcast?) do
+    Enum.count(updates, fn update -> run_single_update(update, session_id, broadcast?) end)
   end
 
-  defp run_single_update({existing, update_attrs}, session_id) do
+  defp run_single_update({existing, update_attrs}, session_id, broadcast?) do
     case Messages.update_message(existing, update_attrs) do
       {:ok, updated_message} ->
         # Broadcast the updated message to PubSub so DM page gets real-time updates.
-        Events.session_new_message(session_id, updated_message)
+        if broadcast? do
+          Events.session_new_message(session_id, updated_message)
+        end
+
         true
 
       {:error, reason} ->

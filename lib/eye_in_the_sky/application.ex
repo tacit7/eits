@@ -56,8 +56,7 @@ defmodule EyeInTheSky.Application do
           {DynamicSupervisor,
            name: EyeInTheSky.Claude.AgentSupervisor,
            strategy: :one_for_one,
-           max_children:
-             Application.get_env(:eye_in_the_sky, :agent_supervisor_max_children, 50)},
+           max_children: Application.get_env(:eye_in_the_sky, :agent_supervisor_max_children, 50)},
           # DynamicSupervisor for per-channel chat workers
           {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
           # Oban job processing (includes Cron plugin for JobDispatcherWorker)

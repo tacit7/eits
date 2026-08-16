@@ -34,8 +34,7 @@ defmodule EyeInTheSkyWeb.DmLive.SlashCommands do
     {"model",
      {:enum,
       ["opus", "opus[1m]", "sonnet", "sonnet[1m]", "haiku"] ++
-        Enum.map(EyeInTheSkyWeb.Helpers.ModelHelpers.codex_models(), &elem(&1, 0))},
-     "Set model"},
+        Enum.map(EyeInTheSkyWeb.Helpers.ModelHelpers.codex_models(), &elem(&1, 0))}, "Set model"},
     {"max-turns", :integer, "Limit agentic steps"},
     {"add-dir", :path, "Add extra working directory"},
     {"mcp", :path, "Load MCP config file"},

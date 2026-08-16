@@ -157,7 +157,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                 <span class="label-text text-xs">Documents</span>
                 <div class="mt-1 space-y-1 max-h-48 overflow-y-auto border border-base-content/10 rounded p-2">
                   <%= if @available_documents == [] do %>
-                    <p class="text-xs text-base-content/50 py-2 text-center">No documents available</p>
+                    <p class="text-xs text-base-content/50 py-2 text-center">
+                      No documents available
+                    </p>
                   <% end %>
                   <%= for doc <- @available_documents do %>
                     <label class="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-base-content/5 rounded">

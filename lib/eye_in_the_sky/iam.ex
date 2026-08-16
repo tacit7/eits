@@ -212,6 +212,7 @@ defmodule EyeInTheSky.IAM do
     instructions_snapshot =
       Enum.map(decision.instructions, fn instr ->
         p = instr.policy
+
         %{
           "policy_id" => p.id,
           "system_key" => p.system_key,
@@ -323,7 +324,8 @@ defmodule EyeInTheSky.IAM do
   """
   @spec add_policy_to_document(integer(), integer()) ::
           {:ok, DocumentPolicy.t()}
-          | {:error, :document_not_found | :policy_not_found | :already_attached | Ecto.Changeset.t()}
+          | {:error,
+             :document_not_found | :policy_not_found | :already_attached | Ecto.Changeset.t()}
   def add_policy_to_document(document_id, policy_id) do
     case Repo.get(PolicyDocument, document_id) do
       nil ->

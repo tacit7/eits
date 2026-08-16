@@ -149,7 +149,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       assert "-p" in args
       assert "hello" in args
       assert "--model" in args
-      assert "claude-sonnet-4-6" in args
+      assert "claude-sonnet-5" in args
     end
 
     test "DB model appears when caller doesn't specify model" do
@@ -158,7 +158,7 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test")
 
       assert "--model" in args
-      assert "claude-opus-4-7" in args
+      assert "claude-opus-4-8" in args
     end
 
     test "caller model overrides DB model and gets normalized" do
@@ -177,14 +177,14 @@ defmodule EyeInTheSky.Claude.CLIBuildArgsTest do
       args = CLI.build_args(prompt: "test", model: nil)
 
       assert "--model" in args
-      assert "claude-opus-4-7" in args
+      assert "claude-opus-4-8" in args
     end
 
     test "model names are normalized to full Claude identifiers" do
       test_cases = [
         {"haiku", "claude-haiku-4-5-20251001"},
-        {"sonnet", "claude-sonnet-4-6"},
-        {"opus", "claude-opus-4-7"},
+        {"sonnet", "claude-sonnet-5"},
+        {"opus", "claude-opus-4-8"},
         # case insensitive
         {"HAIKU", "claude-haiku-4-5-20251001"},
         # passthrough for unknown models

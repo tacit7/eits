@@ -84,8 +84,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
 
   @impl true
   def handle_event("delete_definition_file", %{"path" => path}, socket) do
-    DefinitionFileActions.handle_delete(path, socket, &open_path_allowed?/2, &load_agents/1,
-      &maybe_clear_selected(&1, path))
+    DefinitionFileActions.handle_delete(
+      path,
+      socket,
+      &open_path_allowed?/2,
+      &load_agents/1,
+      &maybe_clear_selected(&1, path)
+    )
   end
 
   @impl true

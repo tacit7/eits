@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn envelope_shape_and_exit_codes() {
         let e = EitsError::api("Task not found", Code::NotFound, Some(404))
-            .with_hint("Run `eitsr tasks list`");
+            .with_hint("Run `eits tasks list`");
         let v = e.to_envelope();
         assert_eq!(v["code"], "not_found");
         assert_eq!(v["status"], 404);

@@ -312,7 +312,7 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | `working` | UserPromptSubmit hook | Claude Code is processing a message |
 | `idle` | Stop hook, SessionEnd hook (cli), or SessionEnd hook (sdk-cli) | Session stopped gracefully; sdk-cli can be resumed |
 | `waiting` | Explicit POST /sessions/:id/waiting | Session waiting for action/resume; blocked or temporarily paused |
-| `completed` | Explicit POST /sessions/:id/complete or i-end-session skill | Session finished (manually set) |
+| `completed` | Explicit POST /sessions/:id/complete or eits-end-session skill | Session finished (manually set) |
 | `failed` | AgentWorker abnormal exit or zombie sweep | Billing/auth/watchdog error, agent crash, or zombie cleanup; session persisted to DB, Teams cleanup fired |
 
 ### Status Reason Field
@@ -434,7 +434,7 @@ This prevents `ArgumentError` crashes when UI renders sessions with newly-added 
 
 **Auto-completion behavior:**
 - Status is **not** auto-set on CLI exit (Stop hook sets `idle`, not `completed`)
-- Completed status must be set **explicitly** via i-end-session skill or `POST /sessions/:id/complete`
+- Completed status must be set **explicitly** via eits-end-session skill or `POST /sessions/:id/complete`
 - This prevents incorrect status when sessions are retried or resumed
 
 ---

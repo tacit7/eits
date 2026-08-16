@@ -5,14 +5,19 @@ defmodule EyeInTheSky.Pi.ParserTest do
   alias EyeInTheSky.Pi.Parser
 
   test "response envelope is a protocol event" do
-    line = ~s({"id":"pi-1","type":"response","command":"initialize","success":true,"data":{"version":"0.74.0","protocolVersion":1}})
+    line =
+      ~s({"id":"pi-1","type":"response","command":"initialize","success":true,"data":{"version":"0.74.0","protocolVersion":1}})
+
     assert {:protocol, %{"type" => "response", "id" => "pi-1", "success" => true}} =
              Parser.parse_stream_line(line)
   end
 
   test "ready is a protocol event" do
-    line = ~s({"type":"ready","sessionId":"abc-123","sessionFile":"/x/y","model":"openrouter/qwen/qwen3-coder"})
-    assert {:protocol, %{"type" => "ready", "sessionId" => "abc-123"}} = Parser.parse_stream_line(line)
+    line =
+      ~s({"type":"ready","sessionId":"abc-123","sessionFile":"/x/y","model":"openrouter/qwen/qwen3-coder"})
+
+    assert {:protocol, %{"type" => "ready", "sessionId" => "abc-123"}} =
+             Parser.parse_stream_line(line)
   end
 
   test "assistant_delta becomes a delta text message" do
@@ -26,14 +31,28 @@ defmodule EyeInTheSky.Pi.ParserTest do
   end
 
   test "tool_update start becomes a partial tool_use" do
-    line = ~s({"type":"tool_update","phase":"start","toolCallId":"t1","toolName":"bash","args":{"command":"ls"}})
-    assert {:ok, %Message{type: :tool_use, content: %{name: "bash", input: %{"command" => "ls"}}, metadata: %{partial: true, tool_call_id: "t1"}}} =
+    line =
+      ~s({"type":"tool_update","phase":"start","toolCallId":"t1","toolName":"bash","args":{"command":"ls"}})
+
+    assert {:ok,
+            %Message{
+              type: :tool_use,
+              content: %{name: "bash", input: %{"command" => "ls"}},
+              metadata: %{partial: true, tool_call_id: "t1"}
+            }} =
              Parser.parse_stream_line(line)
   end
 
   test "tool_result becomes a completed tool_use" do
-    line = ~s({"type":"tool_result","toolCallId":"t1","toolName":"bash","result":"ok\\n","isError":false})
-    assert {:ok, %Message{type: :tool_use, content: %{name: "bash", input: %{"result" => "ok\n", "isError" => false}}, metadata: %{tool_call_id: "t1"}}} =
+    line =
+      ~s({"type":"tool_result","toolCallId":"t1","toolName":"bash","result":"ok\\n","isError":false})
+
+    assert {:ok,
+            %Message{
+              type: :tool_use,
+              content: %{name: "bash", input: %{"result" => "ok\n", "isError" => false}},
+              metadata: %{tool_call_id: "t1"}
+            }} =
              Parser.parse_stream_line(line)
   end
 
@@ -60,16 +79,21 @@ defmodule EyeInTheSky.Pi.ParserTest do
   end
 
   test "tool_request is a protocol event (SDK auto-denies in Phase 1)" do
-    line = ~s({"type":"tool_request","requestId":"r1","toolCallId":"t2","kind":"commandExecution","input":{"command":"rm -rf /"}})
-    assert {:protocol, %{"type" => "tool_request", "requestId" => "r1"}} = Parser.parse_stream_line(line)
+    line =
+      ~s({"type":"tool_request","requestId":"r1","toolCallId":"t2","kind":"commandExecution","input":{"command":"rm -rf /"}})
+
+    assert {:protocol, %{"type" => "tool_request", "requestId" => "r1"}} =
+             Parser.parse_stream_line(line)
   end
 
   test "exit event is a protocol event" do
-    assert {:protocol, %{"type" => "exit"}} = Parser.parse_stream_line(~s({"type":"exit","error":"fatal"}))
+    assert {:protocol, %{"type" => "exit"}} =
+             Parser.parse_stream_line(~s({"type":"exit","error":"fatal"}))
   end
 
   test "top-level error event is an error" do
-    assert {:error, {:pi_error, "bad things"}} = Parser.parse_stream_line(~s({"type":"error","error":"bad things"}))
+    assert {:error, {:pi_error, "bad things"}} =
+             Parser.parse_stream_line(~s({"type":"error","error":"bad things"}))
   end
 
   test "unknown event types are skipped (forward compat)" do
@@ -82,7 +106,12 @@ defmodule EyeInTheSky.Pi.ParserTest do
   end
 
   test "compaction events become status text messages" do
-    assert {:ok, %Message{type: :text}} = Parser.parse_stream_line(~s({"type":"compaction_start","reason":"context"}))
-    assert {:ok, %Message{type: :text}} = Parser.parse_stream_line(~s({"type":"compaction_end","reason":"context","aborted":false,"willRetry":false}))
+    assert {:ok, %Message{type: :text}} =
+             Parser.parse_stream_line(~s({"type":"compaction_start","reason":"context"}))
+
+    assert {:ok, %Message{type: :text}} =
+             Parser.parse_stream_line(
+               ~s({"type":"compaction_end","reason":"context","aborted":false,"willRetry":false})
+             )
   end
 end

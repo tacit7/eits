@@ -122,7 +122,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           </li>
         <% end %>
         <%= if @session_uuid || @show_iterm do %>
-          <li id="dm-topbar-li-div1"><div class="divider my-0"></div></li>
+          <li id="dm-topbar-li-div1">
+            <div class="divider my-0"></div>
+          </li>
         <% end %>
         <li id="dm-topbar-li-reload">
           <button
@@ -158,7 +160,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
-        <li id="dm-topbar-li-div2"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-div2">
+          <div class="divider my-0"></div>
+        </li>
         <li id="dm-topbar-li-notify">
           <button
             id="topbar-push-setup-btn"
@@ -172,7 +176,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             <.icon name="hero-bell" class="size-3.5" /> Notify
           </button>
         </li>
-        <li id="dm-topbar-li-div3"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-div3">
+          <div class="divider my-0"></div>
+        </li>
         <li id="dm-topbar-li-schedule">
           <button
             phx-click="open_schedule_timer"

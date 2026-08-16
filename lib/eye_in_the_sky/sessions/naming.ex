@@ -23,7 +23,9 @@ defmodule EyeInTheSky.Sessions.Naming do
   the DB WHERE clause makes the guard atomic (no TOCTOU).
   """
   def try_auto_name(session_id, body, fallback_name) do
-    Logger.debug("auto-naming: starting for session=#{session_id} fallback=#{inspect(fallback_name)}")
+    Logger.debug(
+      "auto-naming: starting for session=#{session_id} fallback=#{inspect(fallback_name)}"
+    )
 
     name_query =
       if is_nil(fallback_name) do
@@ -50,7 +52,10 @@ defmodule EyeInTheSky.Sessions.Naming do
         :ok
 
       other ->
-        Logger.warning("auto-naming: unexpected result for session=#{session_id}: #{inspect(other)}")
+        Logger.warning(
+          "auto-naming: unexpected result for session=#{session_id}: #{inspect(other)}"
+        )
+
         :ok
     end
   end

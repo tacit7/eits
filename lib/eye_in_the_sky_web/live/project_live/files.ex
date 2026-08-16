@@ -277,7 +277,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     payload_path = Map.get(payload, "path", "")
     original_hash = Map.get(payload, "original_hash", "")
 
-    with {:ok, full_path} <- resolve_write_target(payload_path, socket.assigns.file_full_path, project.path),
+    with {:ok, full_path} <-
+           resolve_write_target(payload_path, socket.assigns.file_full_path, project.path),
          :ok <- verify_disk_hash(full_path, original_hash),
          :ok <- File.write(full_path, content) do
       new_hash = hash_content(content)

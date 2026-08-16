@@ -139,7 +139,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   # Page LiveView navigation — adopt new sidebar context broadcast by page LiveViews.
   @impl true
-  def handle_info({:rail_context, %{sidebar_tab: sidebar_tab, sidebar_project: sidebar_project, active_channel_id: active_channel_id}}, socket) do
+  def handle_info(
+        {:rail_context,
+         %{
+           sidebar_tab: sidebar_tab,
+           sidebar_project: sidebar_project,
+           active_channel_id: active_channel_id
+         }},
+        socket
+      ) do
     previous_tab = socket.assigns[:sidebar_tab]
     previous_project = socket.assigns[:sidebar_project]
     next_section = Map.get(@section_map, sidebar_tab, :sessions)
@@ -152,7 +160,9 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # Only adopt sidebar_project if non-nil — prevents pages without a project
     # from clearing a project locally selected via the rail's own project picker.
     socket =
-      if is_nil(sidebar_project), do: socket, else: assign(socket, :sidebar_project, sidebar_project)
+      if is_nil(sidebar_project),
+        do: socket,
+        else: assign(socket, :sidebar_project, sidebar_project)
 
     socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
     socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
@@ -196,7 +206,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   # Channel list refresh from floating_chat_live
   def handle_info(:rail_refresh_channels, socket) do
-    {:noreply, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
+    {:noreply,
+     assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
   def handle_info({:settings_changed, "preferred_editor", _val}, socket) do
@@ -560,73 +571,85 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-folder"
-          label="Files"        />
+          label="Files"
+        />
         <.rail_item
           section={:sessions}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-bot-message-square"
-          label="Sessions"        />
+          label="Sessions"
+        />
         <.rail_item
           section={:tasks}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-kanban"
-          label="Tasks"        />
+          label="Tasks"
+        />
         <.rail_item
           section={:notes}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-pencil-square"
-          label="Notes"        />
+          label="Notes"
+        />
         <.rail_item
           section={:agents}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-robot"
-          label="Agents"        />
+          label="Agents"
+        />
         <.rail_item
           section={:skills}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-bolt"
-          label="Skills"        />
+          label="Skills"
+        />
         <.rail_item
           section={:prompts}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-document-text"
-          label="Prompts"        />
+          label="Prompts"
+        />
         <.rail_item
           section={:teams}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-users"
-          label="Teams"        />
+          label="Teams"
+        />
         <.rail_item
           section={:jobs}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-clock"
-          label="Jobs"        />
+          label="Jobs"
+        />
         <.rail_item
           section={:canvas}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-squares-2x2"
-          label="Canvas"        />
+          label="Canvas"
+        />
         <.rail_item
           section={:chat}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chat-bubble-left-ellipsis"
-          label="Chat"        />
+          label="Chat"
+        />
         <.rail_item
           section={:usage}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chart-bar"
-          label="Usage"        />
+          label="Usage"
+        />
 
         <div class="flex-1" />
         <div class="mb-3" />
@@ -748,9 +771,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       />
 
       <%!-- ── Channel modal ── --%>
-      <.new_channel_modal
-        :if={@show_new_channel_form}
-      />
+      <.new_channel_modal :if={@show_new_channel_form} />
 
       <%!-- ── Rail modal (new task / new prompt) ── --%>
       <.rail_modal

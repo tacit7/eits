@@ -48,7 +48,7 @@ defmodule EyeInTheSky.Agents.InstructionBuilder do
           1. Commit all changes with a clear message describing what was done.
           2. Push your branch: git push gitea #{branch}
           3. Create a pull request: tea pr create --login claude --repo eits-web --base main --head #{branch} --title "<your task summary>" --description "<what you did and why>"
-          4. Call i-end-session to mark your session complete.
+          4. Call eits-end-session to mark your session complete.
           """
     end
   end

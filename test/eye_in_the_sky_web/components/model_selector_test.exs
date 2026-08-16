@@ -7,9 +7,27 @@ defmodule EyeInTheSkyWeb.Components.ModelSelectorTest do
 
   defp claude_entries do
     [
-      %ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true},
-      %ModelEntry{provider: "claude", slug: "claude-opus-4-7", label: "Opus 4.7", group: "Claude Code", legacy?: true},
-      %ModelEntry{provider: "claude", slug: "opus[1m]", label: "Opus (1M)", group: "Claude Code", premium?: true}
+      %ModelEntry{
+        provider: "claude",
+        slug: "claude-opus-4-8",
+        label: "Opus 5",
+        group: "Claude Code",
+        default?: true
+      },
+      %ModelEntry{
+        provider: "claude",
+        slug: "claude-opus-4-7",
+        label: "Opus 4.7",
+        group: "Claude Code",
+        legacy?: true
+      },
+      %ModelEntry{
+        provider: "claude",
+        slug: "opus[1m]",
+        label: "Opus (1M)",
+        group: "Claude Code",
+        premium?: true
+      }
     ]
   end
 
@@ -24,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelectorTest do
         event: "select_model"
       )
 
-    assert html =~ "Opus 4.8"
+    assert html =~ "Opus 5"
     assert html =~ ~s(id="test-selector")
   end
 

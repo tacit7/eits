@@ -91,6 +91,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
 
   defp delete_confirm_text(doc) do
     n = length(doc.agent_type_documents)
+
     "Deleting this document removes it from #{n} agent type(s). The underlying policies are not deleted."
   end
 

@@ -37,7 +37,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
       <%!-- Description --%>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @task.description && @task.description != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">{@task.description}</p>
+          <p class="text-xs text-base-content/60 leading-relaxed break-words">
+            <span class="whitespace-pre-wrap">{@task.description}</span>
+          </p>
         <% else %>
           <p class="text-xs text-base-content/30 italic">No description.</p>
         <% end %>
@@ -50,7 +52,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="prev"            disabled={@total <= 1}
+            phx-value-dir="prev"
+            disabled={@total <= 1}
             class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-left-mini" class="size-3.5" />
@@ -61,7 +64,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="next"            disabled={@total <= 1}
+            phx-value-dir="next"
+            disabled={@total <= 1}
             class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-right-mini" class="size-3.5" />

@@ -231,7 +231,7 @@ curl -X POST localhost:5001/api/v1/sessions/abc-123/waiting \
 
 ### POST /api/v1/sessions/:uuid/end
 
-End a session with optional final status. Implements the i-end-session MCP tool.
+End a session with optional final status. Implements the eits-end-session MCP tool.
 
 Accepts integer session ID or UUID string. Sets `status` to the provided `final_status` (default: `"completed"`) and `ended_at=now` if the status is a terminal state.
 
@@ -1343,7 +1343,7 @@ eitsr dm wait --session 42 --timeout 30   # eitsr only; bash `eits dm` has no `w
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.
 
-Messages can only be delivered to sessions with `status` in `["working", "idle"]`. Attempts to DM sessions with other statuses (e.g., `waiting`, `completed`, `failed`) return `422 Unprocessable Entity`.
+DMs can be sent to any session regardless of status. If the recipient session is active (`working`, `idle`, or `waiting`), the message is delivered live. If the session is terminated (`completed` or `failed`), the message is persisted to the database and will be available on resume — no `422` is returned.
 
 **Request body (current format):**
 
@@ -1378,7 +1378,7 @@ Messages can only be delivered to sessions with `status` in `["working", "idle"]
 }
 ```
 
-`reachable: true` indicates the target session is in a receivable status (`working` or `idle`). Future implementations may support queuing to `waiting` sessions.
+`reachable: true` indicates the target session is in an active status (`working` or `idle`). When `reachable: false`, the message was persisted but not live-delivered (e.g. the session is `waiting`, `completed`, or `failed`).
 
 **Message body format sent to agent:**
 
@@ -1677,7 +1677,7 @@ Send a message to a channel.
 | `sender_role` | string | no | Default: `"agent"` |
 | `recipient_role` | string | no | Default: `"user"` |
 | `provider` | string | no | Default: `"claude"` |
-| `broadcast_to_team_id` | integer | no | When present, fans out DMs to all team members with active sessions (excluding sender) after message is persisted |
+| `broadcast_to_team_id` | integer | no | When present, fans out DMs to all team members with sessions (excluding sender) after message is persisted; terminated sessions receive a persisted message via deliver_or_persist |
 
 **Response:** `201 Created`
 
@@ -1988,6 +1988,7 @@ List tasks with optional filtering by project, session, agent, tag, search query
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `project_id` | integer | no | Filter to tasks in a specific project |
+| `team_id` | integer | no | Filter to tasks belonging to a specific team |
 | `session_id` | string or integer | no | Filter to tasks for a specific session (UUID or integer ID) |
 | `created_by_session_id` | string or integer | no | Filter to tasks created by a specific session |
 | `agent_id` | string or integer | no | Filter to tasks assigned to an agent |

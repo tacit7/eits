@@ -66,6 +66,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
             if socket.assigns.session.name in ["New Chat", nil] do
               fallback = socket.assigns.session.name
+
               Task.start(fn ->
                 EyeInTheSky.Sessions.Naming.try_auto_name(session_id, full_body, fallback)
               end)
@@ -306,7 +307,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
     thread_id = socket.assigns.session_uuid
 
     with {:ok, messages} <- CodexReader.read_messages(thread_id) do
-      imported = CodexImporter.import_messages(messages, session_id)
+      imported = CodexImporter.import_messages(messages, session_id, broadcast?: false)
       {:ok, TabHelpers.force_reload_messages(socket, session_id), imported}
     else
       {:error, reason} -> {:error, reason}
@@ -323,7 +324,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
 
   defp sync_codex_async(session_id, session_uuid) do
     with {:ok, messages} <- CodexReader.read_messages(session_uuid) do
-      {:ok, CodexImporter.import_messages(messages, session_id)}
+      {:ok, CodexImporter.import_messages(messages, session_id, broadcast?: false)}
     end
   end
 

@@ -94,7 +94,9 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   Check if a due date is today.
   """
   def due_today?(nil), do: false
-  def due_today?(%DateTime{} = dt), do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :eq
+
+  def due_today?(%DateTime{} = dt),
+    do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :eq
 
   def due_today?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do

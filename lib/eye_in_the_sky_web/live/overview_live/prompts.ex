@@ -171,7 +171,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                     data-ctx-id={prompt.id}
                     data-ctx-uuid={prompt.uuid}
                     data-ctx-slug={prompt.slug}
-                    data-ctx-path={if prompt.project_id, do: ~p"/projects/#{prompt.project_id}/prompts/#{prompt.uuid}"}
+                    data-ctx-path={
+                      if prompt.project_id,
+                        do: ~p"/projects/#{prompt.project_id}/prompts/#{prompt.uuid}"
+                    }
                   >
                     <div class="flex items-center gap-2">
                       <.icon

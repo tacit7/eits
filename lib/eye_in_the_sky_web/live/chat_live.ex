@@ -95,6 +95,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           unsubscribe_channel_messages(prev_channel_id)
           subscribe_channel_messages(channel_id)
         end
+
         # else: same channel, already subscribed — do nothing
       else
         subscribe_channel_messages(channel_id)
@@ -123,7 +124,9 @@ defmodule EyeInTheSkyWeb.ChatLive do
     # waiting for the next PubSub broadcast.
     int_channel_id = parse_int(channel_id, nil)
     prev_channel_id = socket.assigns[:active_channel_id]
-    channel_changed? = int_channel_id != nil && to_string(prev_channel_id) != to_string(channel_id)
+
+    channel_changed? =
+      int_channel_id != nil && to_string(prev_channel_id) != to_string(channel_id)
 
     unread_counts =
       if connected?(socket) && channel_changed? && session_id do
@@ -252,6 +255,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
   attr :message_search_results, :list, default: []
   attr :uploads, :any, required: true
   attr :socket, :any, required: true
+
   defp message_feed(assigns) do
     ~H"""
     <div class="flex-1 min-h-0 overflow-hidden flex flex-col">

@@ -189,7 +189,7 @@
 - **EITS_HOOKS.md** or **CHAT.md**: Document eits-dm skill for agents: teaches DM parsing of "DM from:<name> (session:<uuid>) <body>" format and reply flow via eits dm CLI; update eits CLI docs to show --from defaults to $EITS_SESSION_UUID
 - **CHAT.md**: Update typing indicator docs; clarify that ambient messages no longer trigger agent responses (only @direct and @all do); document per-channel sequential message numbering with backfill migration
 - **REST_API.md**: Add GET /api/v1/channels/:channel_id/messages endpoint documentation with pagination and CLI support via eits cli
-- **SESSION_MANAGER.md**: Document "stopped" session status (set by Stop hook, displays yellow left bar); clarify that "completed" status is now set explicitly via i-end-session skill (not auto-set on CLI exit)
+- **SESSION_MANAGER.md**: Document "stopped" session status (set by Stop hook, displays yellow left bar); clarify that "completed" status is now set explicitly via eits-end-session skill (not auto-set on CLI exit)
 - **CODE_GUIDELINES.md** or **DM_FEATURES.md**: Document Quick Note modal and New Note CodeMirror editor: title/body textarea in modal, inline CodeMirror editor with Cmd+S save handler, parent_type resolution (system vs project), and InlineNoteCreatorHook JS integration
 - **CODE_GUIDELINES.md**: Document new Opus 4.6 1M model and Sonnet 4.5 1M addition to claude_models(), model_display_name helpers, and max effort option availability across all forms (DM page, agent drawer, session modal, jobs)
 - **CODEX_SDK.md**: Document restored Codex streaming pipeline: CodexStreamAssembler module for provider-polymorphic stream dispatch; provider-aware avatar/label in DM UI; stream_thinking assign for UI display

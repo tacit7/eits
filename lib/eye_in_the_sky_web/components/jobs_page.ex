@@ -247,10 +247,12 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
     case parse_job_id(id) do
       {:ok, int_id} ->
         selected = socket.assigns.bulk_selected_jobs
+
         updated =
           if MapSet.member?(selected, int_id),
             do: MapSet.delete(selected, int_id),
             else: MapSet.put(selected, int_id)
+
         {:noreply, assign(socket, :bulk_selected_jobs, updated)}
 
       :error ->
@@ -441,332 +443,338 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
   def render(assigns) do
     ~H"""
     <div>
-    <%!-- Drawers and modals sit outside the flex layout so they aren't clipped --%>
-    <%= if @project_id do %>
-      <.job_form_drawer
-        show={@show_form}
-        editing_job={@editing_job}
-        form={@form}
-        form_job_type={@form_job_type}
-        form_schedule_type={@form_schedule_type}
-        form_config={@form_config}
+      <%!-- Drawers and modals sit outside the flex layout so they aren't clipped --%>
+      <%= if @project_id do %>
+        <.job_form_drawer
+          show={@show_form}
+          editing_job={@editing_job}
+          form={@form}
+          form_job_type={@form_job_type}
+          form_schedule_type={@form_schedule_type}
+          form_config={@form_config}
+          project_id={@project_id}
+          project={@project}
+          form_scope={@form_scope}
+          show_daily_digest={true}
+          target={@myself}
+        />
+      <% else %>
+        <.job_form_drawer
+          show={@show_form}
+          editing_job={@editing_job}
+          form={@form}
+          form_job_type={@form_job_type}
+          form_schedule_type={@form_schedule_type}
+          form_config={@form_config}
+          target={@myself}
+        />
+      <% end %>
+
+      <%!-- Claude AI Drawer — relayed via send_update(AIJobCreator, action: :toggle_drawer) --%>
+      <.live_component
+        module={AIJobCreator}
+        id="ai-job-creator"
         project_id={@project_id}
         project={@project}
-        form_scope={@form_scope}
-        show_daily_digest={true}
-        target={@myself}
       />
-    <% else %>
-      <.job_form_drawer
-        show={@show_form}
-        editing_job={@editing_job}
-        form={@form}
-        form_job_type={@form_job_type}
-        form_schedule_type={@form_schedule_type}
-        form_config={@form_config}
-        target={@myself}
-      />
-    <% end %>
 
-    <%!-- Claude AI Drawer — relayed via send_update(AIJobCreator, action: :toggle_drawer) --%>
-    <.live_component
-      module={AIJobCreator}
-      id="ai-job-creator"
-      project_id={@project_id}
-      project={@project}
-    />
-
-    <%!-- Run Now Confirmation Modal --%>
-    <%= if @confirm_run_modal_job do %>
-      <div class="modal modal-open">
-        <div class="modal-box max-w-sm">
-          <h3 class="font-bold text-lg mb-4">Confirm Run Job</h3>
-          <div class="space-y-3 mb-6">
-            <div>
-              <p class="text-xs font-medium text-base-content/70">Job Name</p>
-              <p class="text-sm font-mono">{@confirm_run_modal_job.name}</p>
-            </div>
-            <%= if @confirm_run_modal_job.description do %>
+      <%!-- Run Now Confirmation Modal --%>
+      <%= if @confirm_run_modal_job do %>
+        <div class="modal modal-open">
+          <div class="modal-box max-w-sm">
+            <h3 class="font-bold text-lg mb-4">Confirm Run Job</h3>
+            <div class="space-y-3 mb-6">
               <div>
-                <p class="text-xs font-medium text-base-content/70">Description</p>
-                <p class="text-sm text-base-content/80">{@confirm_run_modal_job.description}</p>
+                <p class="text-xs font-medium text-base-content/70">Job Name</p>
+                <p class="text-sm font-mono">{@confirm_run_modal_job.name}</p>
               </div>
-            <% end %>
-            <div>
-              <p class="text-xs font-medium text-base-content/70">Type</p>
-              <p class="text-sm">
-                <span class="badge badge-xs badge-ghost">
-                  <%= case @confirm_run_modal_job.job_type do %>
-                    <% "spawn_agent" -> %>Agent
-                    <% "mix_task" -> %>Mix
-                    <% "daily_digest" -> %>Daily Digest
-                    <% "workable_task" -> %>Workable Task
-                    <% _ -> %>{String.upcase(@confirm_run_modal_job.job_type)}
-                  <% end %>
-                </span>
-              </p>
-            </div>
-            <div class="rounded-lg bg-warning/10 border border-warning/30 p-3">
-              <p class="text-xs font-medium text-warning flex items-center gap-1.5">
-                <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
-                This will spawn a Claude agent
-              </p>
-            </div>
-          </div>
-          <div class="modal-action gap-2">
-            <button class="btn btn-ghost" phx-click="cancel_run_job" phx-target={@myself}>
-              Cancel
-            </button>
-            <button
-              class="btn btn-primary"
-              phx-click="confirm_run_job"
-              phx-value-id={@confirm_run_modal_job.id}
-              phx-target={@myself}
-            >
-              Run Job
-            </button>
-          </div>
-        </div>
-        <div class="modal-backdrop" phx-click="cancel_run_job" phx-target={@myself}></div>
-      </div>
-    <% end %>
-
-    <%!-- Agent Schedule Section — always rendered so the form persists across tab switches --%>
-    <.live_component
-      module={AgentScheduleSection}
-      id="agent-schedule-section"
-      project_id={@project_id}
-      active_tab={@active_tab}
-    />
-
-    <%!-- Split-panel layout --%>
-    <div class={["flex overflow-hidden", @selected_job && "flex-1"]}>
-      <%!-- List panel --%>
-      <div class={[
-        "overflow-y-auto px-4 sm:px-6 py-6",
-        if(@selected_job,
-          do: "w-[440px] flex-shrink-0",
-          else: "w-full max-w-3xl mx-auto"
-        )
-      ]}>
-        <%= if @active_tab == :all_jobs do %>
-          <% job_list = if @project_id, do: (@project_jobs || []) ++ (@global_jobs || []), else: @jobs %>
-          <.jobs_table
-            jobs={job_list}
-            expanded_job_id={@expanded_job_id}
-            runs={@runs}
-            running_ids={@running_ids}
-            last_run_map={@last_run_map}
-            last_failed_runs={@last_failed_runs}
-            last_n_runs_map={@last_n_runs_map}
-            scope="overview"
-            show_origin={true}
-            bulk_selected_jobs={@bulk_selected_jobs}
-            target={@myself}
-          />
-        <% end %>
-      </div>
-
-      <%!-- Detail panel — shown when a job row is clicked --%>
-      <%= if @selected_job do %>
-        <% job = @selected_job %>
-        <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-        <% trend_runs = Map.get(@last_n_runs_map, job.id, []) %>
-        <div class="hidden md:flex flex-col flex-1 overflow-hidden border-l border-base-content/8">
-          <%!-- Panel header --%>
-          <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
-            <div class="flex items-start justify-between gap-4">
-              <div class="flex items-center gap-3 min-w-0">
-                <%!-- Status indicator --%>
-                <%= if job_state == :running do %>
-                  <span class="loading loading-spinner loading-xs text-primary flex-shrink-0 mt-0.5" />
-                <% else %>
-                  <span class={[
-                    "size-2 rounded-full flex-shrink-0 mt-1.5",
-                    case job_state do
-                      :healthy -> "bg-success"
-                      :failed -> "bg-error"
-                      _ -> "bg-base-content/20"
-                    end
-                  ]} />
-                <% end %>
-                <div class="min-w-0">
-                  <h2 class="text-base font-semibold text-base-content truncate">{job.name}</h2>
-                  <div class="flex items-center gap-1.5 mt-0.5">
-                    <span class="text-xs text-base-content/40">{type_label(job.job_type)}</span>
-                    <%= if is_nil(job.project_id) do %>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-xs text-base-content/30">global</span>
+              <%= if @confirm_run_modal_job.description do %>
+                <div>
+                  <p class="text-xs font-medium text-base-content/70">Description</p>
+                  <p class="text-sm text-base-content/80">{@confirm_run_modal_job.description}</p>
+                </div>
+              <% end %>
+              <div>
+                <p class="text-xs font-medium text-base-content/70">Type</p>
+                <p class="text-sm">
+                  <span class="badge badge-xs badge-ghost">
+                    <%= case @confirm_run_modal_job.job_type do %>
+                      <% "spawn_agent" -> %>
+                        Agent
+                      <% "mix_task" -> %>
+                        Mix
+                      <% "daily_digest" -> %>
+                        Daily Digest
+                      <% "workable_task" -> %>
+                        Workable Task
+                      <% _ -> %>
+                        {String.upcase(@confirm_run_modal_job.job_type)}
                     <% end %>
-                    <%= if job.origin == "system" do %>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-xs text-base-content/30">system</span>
+                  </span>
+                </p>
+              </div>
+              <div class="rounded-lg bg-warning/10 border border-warning/30 p-3">
+                <p class="text-xs font-medium text-warning flex items-center gap-1.5">
+                  <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
+                  This will spawn a Claude agent
+                </p>
+              </div>
+            </div>
+            <div class="modal-action gap-2">
+              <button class="btn btn-ghost" phx-click="cancel_run_job" phx-target={@myself}>
+                Cancel
+              </button>
+              <button
+                class="btn btn-primary"
+                phx-click="confirm_run_job"
+                phx-value-id={@confirm_run_modal_job.id}
+                phx-target={@myself}
+              >
+                Run Job
+              </button>
+            </div>
+          </div>
+          <div class="modal-backdrop" phx-click="cancel_run_job" phx-target={@myself}></div>
+        </div>
+      <% end %>
+
+      <%!-- Agent Schedule Section — always rendered so the form persists across tab switches --%>
+      <.live_component
+        module={AgentScheduleSection}
+        id="agent-schedule-section"
+        project_id={@project_id}
+        active_tab={@active_tab}
+      />
+
+      <%!-- Split-panel layout --%>
+      <div class={["flex overflow-hidden", @selected_job && "flex-1"]}>
+        <%!-- List panel --%>
+        <div class={[
+          "overflow-y-auto px-4 sm:px-6 py-6",
+          if(@selected_job,
+            do: "w-[440px] flex-shrink-0",
+            else: "w-full max-w-3xl mx-auto"
+          )
+        ]}>
+          <%= if @active_tab == :all_jobs do %>
+            <% job_list =
+              if @project_id, do: (@project_jobs || []) ++ (@global_jobs || []), else: @jobs %>
+            <.jobs_table
+              jobs={job_list}
+              expanded_job_id={@expanded_job_id}
+              runs={@runs}
+              running_ids={@running_ids}
+              last_run_map={@last_run_map}
+              last_failed_runs={@last_failed_runs}
+              last_n_runs_map={@last_n_runs_map}
+              scope="overview"
+              show_origin={true}
+              bulk_selected_jobs={@bulk_selected_jobs}
+              target={@myself}
+            />
+          <% end %>
+        </div>
+
+        <%!-- Detail panel — shown when a job row is clicked --%>
+        <%= if @selected_job do %>
+          <% job = @selected_job %>
+          <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+          <% trend_runs = Map.get(@last_n_runs_map, job.id, []) %>
+          <div class="hidden md:flex flex-col flex-1 overflow-hidden border-l border-base-content/8">
+            <%!-- Panel header --%>
+            <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
+              <div class="flex items-start justify-between gap-4">
+                <div class="flex items-center gap-3 min-w-0">
+                  <%!-- Status indicator --%>
+                  <%= if job_state == :running do %>
+                    <span class="loading loading-spinner loading-xs text-primary flex-shrink-0 mt-0.5" />
+                  <% else %>
+                    <span class={[
+                      "size-2 rounded-full flex-shrink-0 mt-1.5",
+                      case job_state do
+                        :healthy -> "bg-success"
+                        :failed -> "bg-error"
+                        _ -> "bg-base-content/20"
+                      end
+                    ]} />
+                  <% end %>
+                  <div class="min-w-0">
+                    <h2 class="text-base font-semibold text-base-content truncate">{job.name}</h2>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span class="text-xs text-base-content/40">{type_label(job.job_type)}</span>
+                      <%= if is_nil(job.project_id) do %>
+                        <span class="text-base-content/20 text-xs">&middot;</span>
+                        <span class="text-xs text-base-content/30">global</span>
+                      <% end %>
+                      <%= if job.origin == "system" do %>
+                        <span class="text-base-content/20 text-xs">&middot;</span>
+                        <span class="text-xs text-base-content/30">system</span>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+                <%!-- Close: clicking the same job id toggles it off --%>
+                <button
+                  phx-click="expand_job"
+                  phx-value-id={job.id}
+                  phx-target={@myself}
+                  class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                  title="Close"
+                >
+                  <.icon name="hero-x-mark" class="size-4" />
+                </button>
+              </div>
+
+              <%!-- Controls: enable toggle + run/edit/delete --%>
+              <div class="flex items-center gap-3 mt-4">
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-sm toggle-primary"
+                    checked={job.enabled}
+                    phx-click="toggle_job"
+                    phx-value-id={job.id}
+                    phx-target={@myself}
+                  />
+                  <span class="text-xs text-base-content/60">
+                    {if job.enabled, do: "Enabled", else: "Disabled"}
+                  </span>
+                </label>
+                <div class="ml-auto flex items-center gap-1">
+                  <button
+                    class="btn btn-sm btn-primary gap-1"
+                    phx-click="run_now"
+                    phx-value-id={job.id}
+                    phx-target={@myself}
+                  >
+                    <.icon name="hero-play" class="size-3.5" /> Run Now
+                  </button>
+                  <%= if job.origin != "system" do %>
+                    <button
+                      class="btn btn-sm btn-ghost"
+                      phx-click="edit_job"
+                      phx-value-id={job.id}
+                      phx-target={@myself}
+                      title="Edit"
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </button>
+                    <button
+                      class="btn btn-sm btn-ghost text-error/60 hover:text-error"
+                      phx-click="delete_job"
+                      phx-value-id={job.id}
+                      phx-target={@myself}
+                      data-confirm="Delete this job?"
+                      title="Delete"
+                    >
+                      <.icon name="hero-trash" class="size-4" />
+                    </button>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+
+            <%!-- Panel body --%>
+            <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              <%!-- Description --%>
+              <%= if job.description && job.description != "" do %>
+                <div>
+                  <p class="text-xs font-medium text-base-content/50 mb-1">Description</p>
+                  <p class="text-sm text-base-content/80 leading-relaxed">{job.description}</p>
+                </div>
+              <% end %>
+
+              <%!-- Schedule --%>
+              <div>
+                <p class="text-xs font-medium text-base-content/50 mb-1">Schedule</p>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-mono text-base-content/80">{format_schedule(job)}</span>
+                  <%= if job.timezone && job.timezone not in ["Etc/UTC", "UTC"] do %>
+                    <span class="text-xs text-base-content/40">({job.timezone})</span>
+                  <% end %>
+                </div>
+              </div>
+
+              <%!-- Stats row --%>
+              <div class="flex items-start gap-6">
+                <div>
+                  <p class="text-xs font-medium text-base-content/50 mb-0.5">Runs</p>
+                  <p class="text-sm font-mono text-base-content/80">{job.run_count || 0}</p>
+                </div>
+                <%= if job.last_run_at do %>
+                  <div>
+                    <p class="text-xs font-medium text-base-content/50 mb-0.5">Last run</p>
+                    <p class="text-sm font-mono text-base-content/80">
+                      {format_relative_time(job.last_run_at)}
+                    </p>
+                  </div>
+                <% end %>
+                <%= if not is_nil(job.next_run_at) and job.enabled do %>
+                  <div>
+                    <p class="text-xs font-medium text-base-content/50 mb-0.5">Next run</p>
+                    <p class="text-sm font-mono text-base-content/80">
+                      {format_relative_time(job.next_run_at)}
+                    </p>
+                  </div>
+                <% end %>
+              </div>
+
+              <%!-- Trend dots --%>
+              <%= if trend_runs != [] do %>
+                <div>
+                  <p class="text-xs font-medium text-base-content/50 mb-2">Trend</p>
+                  <div class="flex items-center gap-1">
+                    <%= for run <- trend_runs do %>
+                      <span
+                        title={run.status}
+                        class={[
+                          "size-2.5 rounded-full flex-shrink-0",
+                          run_status_dot_class(run.status)
+                        ]}
+                      />
                     <% end %>
                   </div>
                 </div>
-              </div>
-              <%!-- Close: clicking the same job id toggles it off --%>
-              <button
-                phx-click="expand_job"
-                phx-value-id={job.id}
-                phx-target={@myself}
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
-                title="Close"
-              >
-                <.icon name="hero-x-mark" class="size-4" />
-              </button>
-            </div>
-
-            <%!-- Controls: enable toggle + run/edit/delete --%>
-            <div class="flex items-center gap-3 mt-4">
-              <label class="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  class="toggle toggle-sm toggle-primary"
-                  checked={job.enabled}
-                  phx-click="toggle_job"
-                  phx-value-id={job.id}
-                  phx-target={@myself}
-                />
-                <span class="text-xs text-base-content/60">
-                  {if job.enabled, do: "Enabled", else: "Disabled"}
-                </span>
-              </label>
-              <div class="ml-auto flex items-center gap-1">
-                <button
-                  class="btn btn-sm btn-primary gap-1"
-                  phx-click="run_now"
-                  phx-value-id={job.id}
-                  phx-target={@myself}
-                >
-                  <.icon name="hero-play" class="size-3.5" /> Run Now
-                </button>
-                <%= if job.origin != "system" do %>
-                  <button
-                    class="btn btn-sm btn-ghost"
-                    phx-click="edit_job"
-                    phx-value-id={job.id}
-                    phx-target={@myself}
-                    title="Edit"
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </button>
-                  <button
-                    class="btn btn-sm btn-ghost text-error/60 hover:text-error"
-                    phx-click="delete_job"
-                    phx-value-id={job.id}
-                    phx-target={@myself}
-                    data-confirm="Delete this job?"
-                    title="Delete"
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </button>
-                <% end %>
-              </div>
-            </div>
-          </div>
-
-          <%!-- Panel body --%>
-          <div class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-            <%!-- Description --%>
-            <%= if job.description && job.description != "" do %>
-              <div>
-                <p class="text-xs font-medium text-base-content/50 mb-1">Description</p>
-                <p class="text-sm text-base-content/80 leading-relaxed">{job.description}</p>
-              </div>
-            <% end %>
-
-            <%!-- Schedule --%>
-            <div>
-              <p class="text-xs font-medium text-base-content/50 mb-1">Schedule</p>
-              <div class="flex items-center gap-2">
-                <span class="text-sm font-mono text-base-content/80">{format_schedule(job)}</span>
-                <%= if job.timezone && job.timezone not in ["Etc/UTC", "UTC"] do %>
-                  <span class="text-xs text-base-content/40">({job.timezone})</span>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Stats row --%>
-            <div class="flex items-start gap-6">
-              <div>
-                <p class="text-xs font-medium text-base-content/50 mb-0.5">Runs</p>
-                <p class="text-sm font-mono text-base-content/80">{job.run_count || 0}</p>
-              </div>
-              <%= if job.last_run_at do %>
-                <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-0.5">Last run</p>
-                  <p class="text-sm font-mono text-base-content/80">
-                    {format_relative_time(job.last_run_at)}
-                  </p>
-                </div>
               <% end %>
-              <%= if not is_nil(job.next_run_at) and job.enabled do %>
+
+              <%!-- Run history --%>
+              <%= if @runs != [] do %>
                 <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-0.5">Next run</p>
-                  <p class="text-sm font-mono text-base-content/80">
-                    {format_relative_time(job.next_run_at)}
-                  </p>
-                </div>
-              <% end %>
-            </div>
-
-            <%!-- Trend dots --%>
-            <%= if trend_runs != [] do %>
-              <div>
-                <p class="text-xs font-medium text-base-content/50 mb-2">Trend</p>
-                <div class="flex items-center gap-1">
-                  <%= for run <- trend_runs do %>
-                    <span
-                      title={run.status}
-                      class={[
-                        "size-2.5 rounded-full flex-shrink-0",
-                        run_status_dot_class(run.status)
-                      ]}
-                    />
-                  <% end %>
-                </div>
-              </div>
-            <% end %>
-
-            <%!-- Run history --%>
-            <%= if @runs != [] do %>
-              <div>
-                <p class="text-xs font-medium text-base-content/50 mb-2">Run history</p>
-                <div class="divide-y divide-base-content/5">
-                  <%= for run <- @runs do %>
-                    <div class="py-2 flex items-center gap-3">
-                      <span class={[
-                        "size-2 rounded-full flex-shrink-0",
-                        run_status_dot_class(run.status)
-                      ]} />
-                      <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span class={[
-                            "text-xs font-medium",
-                            run_status_text_class(run.status)
-                          ]}>
-                            {String.capitalize(run.status)}
-                          </span>
-                          <%= if run.started_at do %>
-                            <span class="text-[10px] text-base-content/30 font-mono">
-                              {format_relative_time(run.started_at)}
+                  <p class="text-xs font-medium text-base-content/50 mb-2">Run history</p>
+                  <div class="divide-y divide-base-content/5">
+                    <%= for run <- @runs do %>
+                      <div class="py-2 flex items-center gap-3">
+                        <span class={[
+                          "size-2 rounded-full flex-shrink-0",
+                          run_status_dot_class(run.status)
+                        ]} />
+                        <div class="flex-1 min-w-0">
+                          <div class="flex items-center gap-2">
+                            <span class={[
+                              "text-xs font-medium",
+                              run_status_text_class(run.status)
+                            ]}>
+                              {String.capitalize(run.status)}
                             </span>
+                            <%= if run.started_at do %>
+                              <span class="text-[10px] text-base-content/30 font-mono">
+                                {format_relative_time(run.started_at)}
+                              </span>
+                            <% end %>
+                          </div>
+                          <%= if run.result && run.result != "" do %>
+                            <p class="text-xs text-base-content/50 truncate mt-0.5">{run.result}</p>
                           <% end %>
                         </div>
-                        <%= if run.result && run.result != "" do %>
-                          <p class="text-xs text-base-content/50 truncate mt-0.5">{run.result}</p>
-                        <% end %>
                       </div>
-                    </div>
-                  <% end %>
+                    <% end %>
+                  </div>
                 </div>
-              </div>
-            <% end %>
+              <% end %>
+            </div>
           </div>
-        </div>
-      <% end %>
-    </div>
+        <% end %>
+      </div>
     </div>
     """
   end

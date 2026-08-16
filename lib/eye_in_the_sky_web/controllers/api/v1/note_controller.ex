@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     # the request header (session context) when the caller doesn't pass one.
     source_session_uuid =
       trim_param(params["source_session_uuid"]) ||
-        (conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first())
+        conn |> Plug.Conn.get_req_header("x-eits-session") |> List.first()
 
     attrs = %{
       parent_type: parent_type,

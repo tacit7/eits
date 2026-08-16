@@ -10,6 +10,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT_JSON="$(timeout 2 cat 2>/dev/null || true)"
 [ -z "$INPUT_JSON" ] && exit 0
 
+load_codex_env() {
+  local env_file="${EITS_CODEX_ENV_FILE:-}"
+
+  if [ -z "$env_file" ]; then
+    local session_id="${EITS_CODEX_SESSION_ID:-${CODEX_THREAD_ID:-${CODEX_SESSION_ID:-}}}"
+    [ -n "$session_id" ] && env_file="$HOME/.eits/codex/sessions/$session_id.env"
+  fi
+
+  [ -f "$env_file" ] || return 0
+  # shellcheck disable=SC1090
+  . "$env_file"
+}
+
+load_codex_env
+
 hook_event_name="$(echo "$INPUT_JSON" | jq -r '.hook_event_name // .hook_event // empty' 2>/dev/null || true)"
 hook_source="$(echo "$INPUT_JSON" | jq -r '.source // empty' 2>/dev/null || true)"
 tool_name="$(echo "$INPUT_JSON" | jq -r '.tool_name // empty' 2>/dev/null || true)"

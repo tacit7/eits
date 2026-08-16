@@ -32,39 +32,53 @@ defmodule EyeInTheSky.Claude.AgentWorker.EvictionTest do
 
     test "idle but with a queued message is NOT evictable" do
       state = %AgentWorker{status: :idle, queue: [:queued_job], idle_since: DateTime.utc_now()}
-      assert {:reply, {false, _}, ^state} = AgentWorker.handle_call(:eviction_snapshot, self(), state)
+
+      assert {:reply, {false, _}, ^state} =
+               AgentWorker.handle_call(:eviction_snapshot, self(), state)
     end
 
     test "failed but with a queued message is NOT evictable" do
       state = %AgentWorker{status: :failed, queue: [:queued_job], idle_since: DateTime.utc_now()}
-      assert {:reply, {false, _}, ^state} = AgentWorker.handle_call(:eviction_snapshot, self(), state)
+
+      assert {:reply, {false, _}, ^state} =
+               AgentWorker.handle_call(:eviction_snapshot, self(), state)
     end
 
     test "running worker is NOT evictable even with an empty queue" do
       state = %AgentWorker{status: :running, queue: [], idle_since: DateTime.utc_now()}
-      assert {:reply, {false, _}, ^state} = AgentWorker.handle_call(:eviction_snapshot, self(), state)
+
+      assert {:reply, {false, _}, ^state} =
+               AgentWorker.handle_call(:eviction_snapshot, self(), state)
     end
 
     test "retry_wait worker is NOT evictable" do
       state = %AgentWorker{status: :retry_wait, queue: [], idle_since: DateTime.utc_now()}
-      assert {:reply, {false, _}, ^state} = AgentWorker.handle_call(:eviction_snapshot, self(), state)
+
+      assert {:reply, {false, _}, ^state} =
+               AgentWorker.handle_call(:eviction_snapshot, self(), state)
     end
   end
 
   describe "evict_if_parked (atomic kill)" do
     test "parked worker self-stops with :normal (not restarted) and replies :ok" do
       state = %AgentWorker{status: :idle, queue: [], idle_since: DateTime.utc_now()}
-      assert {:stop, :normal, :ok, ^state} = AgentWorker.handle_call(:evict_if_parked, self(), state)
+
+      assert {:stop, :normal, :ok, ^state} =
+               AgentWorker.handle_call(:evict_if_parked, self(), state)
     end
 
     test "failed+empty worker self-stops too" do
       state = %AgentWorker{status: :failed, queue: [], idle_since: DateTime.utc_now()}
-      assert {:stop, :normal, :ok, ^state} = AgentWorker.handle_call(:evict_if_parked, self(), state)
+
+      assert {:stop, :normal, :ok, ^state} =
+               AgentWorker.handle_call(:evict_if_parked, self(), state)
     end
 
     test "a worker that has started work replies :busy and keeps running" do
       running = %AgentWorker{status: :running, queue: [], idle_since: DateTime.utc_now()}
-      assert {:reply, :busy, ^running} = AgentWorker.handle_call(:evict_if_parked, self(), running)
+
+      assert {:reply, :busy, ^running} =
+               AgentWorker.handle_call(:evict_if_parked, self(), running)
 
       queued = %AgentWorker{status: :idle, queue: [:job], idle_since: DateTime.utc_now()}
       assert {:reply, :busy, ^queued} = AgentWorker.handle_call(:evict_if_parked, self(), queued)
@@ -91,7 +105,10 @@ defmodule EyeInTheSky.Claude.AgentWorker.EvictionTest do
       # Registry deregistration is driven by a process monitor inside the Registry
       # process. The test receives its :DOWN before the Registry processes its own,
       # so poll briefly (up to 500ms) rather than asserting immediately.
-      assert poll_until(fn -> Registry.lookup(AgentRegistry, {:session, session_id}) == [] end, 500)
+      assert poll_until(
+               fn -> Registry.lookup(AgentRegistry, {:session, session_id}) == [] end,
+               500
+             )
     end
 
     test "a dead pid reports not-evictable / busy instead of crashing the caller" do

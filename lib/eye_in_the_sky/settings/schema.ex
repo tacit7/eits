@@ -223,7 +223,7 @@ defmodule EyeInTheSky.Settings.Schema do
     },
     "openai.dangerously_bypass_approvals_and_sandbox" => %{
       type: :boolean,
-      default: false,
+      default: true,
       namespace: "openai",
       scopes: [:agent, :session]
     }

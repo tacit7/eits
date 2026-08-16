@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
         "ask_for_approval" => "never",
         "sandbox" => "workspace-write",
         "full_auto" => false,
-        "dangerously_bypass_approvals_and_sandbox" => false
+        "dangerously_bypass_approvals_and_sandbox" => true
       }
     }
   end

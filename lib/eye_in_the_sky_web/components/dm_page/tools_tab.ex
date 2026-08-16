@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ToolsTab do
         >
           <div class="flex flex-wrap gap-1.5 pt-1">
             <span
-              :for={skill <- (@session_init_data["skills"] || [])}
+              :for={skill <- @session_init_data["skills"] || []}
               class="inline-flex items-center px-2 py-0.5 rounded bg-base-content/[0.06] text-base-content/60 font-mono text-mini"
             >
               {if is_map(skill), do: skill["name"] || inspect(skill), else: skill}
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ToolsTab do
         >
           <div class="flex flex-wrap gap-1.5 pt-1">
             <span
-              :for={agent <- (@session_init_data["agents"] || [])}
+              :for={agent <- @session_init_data["agents"] || []}
               class="inline-flex items-center px-2 py-0.5 rounded bg-base-content/[0.06] text-base-content/60 font-mono text-mini"
             >
               {if is_map(agent), do: agent["name"] || inspect(agent), else: agent}

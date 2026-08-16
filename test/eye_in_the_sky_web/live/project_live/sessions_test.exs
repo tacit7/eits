@@ -315,7 +315,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
       project: project
     } do
       agent = Factory.create_agent(%{project_id: project.id})
-      s = Factory.create_session(agent, %{name: "renameme", status: "idle", project_id: project.id})
+
+      s =
+        Factory.create_session(agent, %{name: "renameme", status: "idle", project_id: project.id})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
       refute has_element?(view, "input[name='name']")

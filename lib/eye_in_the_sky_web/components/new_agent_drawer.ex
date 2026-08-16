@@ -29,7 +29,11 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
   end
 
   @impl true
-  def handle_event("model_and_provider_selected", %{"provider" => provider, "model" => model}, socket) do
+  def handle_event(
+        "model_and_provider_selected",
+        %{"provider" => provider, "model" => model},
+        socket
+      ) do
     if ModelConfig.valid_model?(provider, model) do
       {:noreply, assign(socket, pending_provider: provider, pending_model: model)}
     else

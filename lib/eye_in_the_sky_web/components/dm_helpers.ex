@@ -450,13 +450,27 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   # ---------------------------------------------------------------------------
   def tool_badge_class(name) do
     case name do
-      n when n in ["Bash", "Shell"] -> "text-lime-400 bg-lime-400/10"
-      n when n in ["Read", "Glob"] -> "text-sky-400 bg-sky-400/10"
-      n when n in ["Edit", "Write", "MultiEdit"] -> "text-amber-400 bg-amber-400/10"
-      n when n in ["Grep", "Search"] -> "text-violet-400 bg-violet-400/10"
-      n when n in ["Task", "Agent"] -> "text-cyan-400 bg-cyan-400/10"
-      n when n in ["WebFetch", "WebSearch"] -> "text-indigo-400 bg-indigo-400/10"
-      n when n in ["ToolSearch"] -> "text-fuchsia-400 bg-fuchsia-400/10"
+      n when n in ["Bash", "Shell"] ->
+        "text-lime-400 bg-lime-400/10"
+
+      n when n in ["Read", "Glob"] ->
+        "text-sky-400 bg-sky-400/10"
+
+      n when n in ["Edit", "Write", "MultiEdit"] ->
+        "text-amber-400 bg-amber-400/10"
+
+      n when n in ["Grep", "Search"] ->
+        "text-violet-400 bg-violet-400/10"
+
+      n when n in ["Task", "Agent"] ->
+        "text-cyan-400 bg-cyan-400/10"
+
+      n when n in ["WebFetch", "WebSearch"] ->
+        "text-indigo-400 bg-indigo-400/10"
+
+      n when n in ["ToolSearch"] ->
+        "text-fuchsia-400 bg-fuchsia-400/10"
+
       n ->
         if is_binary(n) and String.starts_with?(n, "mcp") do
           "text-slate-400 bg-slate-400/10"

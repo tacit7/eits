@@ -181,9 +181,7 @@ defmodule EyeInTheSky.Sessions do
   defdelegate load_session_data(session_id, opts \\ []), to: Loader
   defdelegate get_session_counts(session_id), to: Loader
 
-  @doc """
-  Returns statuses that indicate a session can no longer send or receive messages.
-  """
+  @doc "Returns statuses that indicate a session's execution has ended."
   def terminated_statuses, do: ~w(completed failed)
 
   # --- Event Delegates ---
@@ -213,5 +211,4 @@ defmodule EyeInTheSky.Sessions do
 
   defdelegate record_tool_event(session, type, params),
     to: EyeInTheSky.Sessions.ToolEventRecorder
-
 end

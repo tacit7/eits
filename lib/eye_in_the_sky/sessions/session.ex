@@ -65,6 +65,7 @@ defmodule EyeInTheSky.Sessions.Session do
     field :entrypoint, :string
     field :status_reason, :string
     field :read_only, :boolean, default: false
+    field :compact_summary, :string
     # Cached token and cost totals — incremented atomically on each message insert.
     # Avoids full aggregate scans over the messages table for per-session usage display.
     # Source of truth for display; fall back to aggregate query only when nil (pre-migration rows).
@@ -138,7 +139,8 @@ defmodule EyeInTheSky.Sessions.Session do
       :entrypoint,
       :status_reason,
       :read_only,
-      :settings
+      :settings,
+      :compact_summary
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [

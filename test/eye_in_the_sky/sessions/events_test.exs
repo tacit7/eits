@@ -20,6 +20,7 @@ defmodule EyeInTheSky.Sessions.EventsTest do
 
     test "status_reason is appended to the body when present", %{session: s} do
       s = %{s | status_reason: "exit code 1"}
+
       assert {"Session failed", "deploy-agent — exit code 1", _} =
                Events.desktop_alert_spec(s, "failed")
     end

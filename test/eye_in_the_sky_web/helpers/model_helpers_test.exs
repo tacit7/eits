@@ -19,9 +19,9 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       end
     end
 
-    test "includes the expected default sonnet slug" do
+    test "includes the expected current sonnet slug" do
       values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
-      assert "claude-sonnet-4-6" in values
+      assert "claude-sonnet-5" in values
     end
 
     test "no duplicate values" do
@@ -220,23 +220,28 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.default_model_for("codex") == "gpt-5.6-sol"
     end
 
-    test "\"claude\" returns claude-opus-4-8" do
-      assert ModelHelpers.default_model_for("claude") == "claude-opus-4-8"
+    test "\"claude\" returns claude-sonnet-5" do
+      assert ModelHelpers.default_model_for("claude") == "claude-sonnet-5"
     end
 
     test "nil falls back to claude default" do
-      assert ModelHelpers.default_model_for(nil) == "claude-opus-4-8"
+      assert ModelHelpers.default_model_for(nil) == "claude-sonnet-5"
     end
 
     test "unknown provider falls back to claude default" do
-      assert ModelHelpers.default_model_for("openai") == "claude-opus-4-8"
-      assert ModelHelpers.default_model_for("") == "claude-opus-4-8"
+      assert ModelHelpers.default_model_for("openai") == "claude-sonnet-5"
+      assert ModelHelpers.default_model_for("") == "claude-sonnet-5"
     end
 
     test "default for codex is in valid_model_slugs" do
       assert ModelHelpers.default_model_for("codex") in ModelHelpers.valid_model_slugs("codex")
     end
 
+    test "every Codex model rendered by the UI is accepted by core validation" do
+      for slug <- ModelHelpers.valid_model_slugs("codex") do
+        assert EyeInTheSky.Agents.ModelConfig.valid_model?("codex", slug)
+      end
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -247,7 +252,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "known claude slug returns its label" do
       assert ModelHelpers.model_display_name("claude-sonnet-4-6") == "Sonnet 4.6"
       assert ModelHelpers.model_display_name("claude-haiku-4-5-20251001") == "Haiku 4.5"
-      assert ModelHelpers.model_display_name("claude-opus-4-8") == "Opus 4.8"
+      assert ModelHelpers.model_display_name("claude-opus-4-8") == "Opus 5"
     end
 
     test "known codex slug returns its label" do
@@ -255,8 +260,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
     end
 
-    test "short alias \"opus\" returns \"Opus 4.8\"" do
-      assert ModelHelpers.model_display_name("opus") == "Opus 4.8"
+    test "short alias \"opus\" returns \"Opus 5\"" do
+      assert ModelHelpers.model_display_name("opus") == "Opus 5"
     end
 
     test "short alias \"sonnet\" returns \"Sonnet 5\"" do
@@ -329,9 +334,9 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       refute Enum.any?(entries, &(&1.slug == "claude-opus-4-8" and &1.premium?))
     end
 
-    test "exactly one default entry, on claude-opus-4-8", %{entries: entries} do
+    test "exactly one default entry, on claude-sonnet-5", %{entries: entries} do
       defaults = Enum.filter(entries, & &1.default?)
-      assert [%{slug: "claude-opus-4-8"}] = defaults
+      assert [%{slug: "claude-sonnet-5"}] = defaults
     end
   end
 
@@ -340,17 +345,21 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       %{entries: ModelHelpers.entries_for_provider("codex")}
     end
 
-    test "every entry has provider \"codex\" and group \"Codex\", never premium", %{entries: entries} do
+    test "every entry has provider \"codex\" and group \"Codex\", never premium", %{
+      entries: entries
+    } do
       assert entries != []
       assert Enum.all?(entries, &(&1.provider == "codex"))
       assert Enum.all?(entries, &(&1.group == "Codex"))
       refute Enum.any?(entries, & &1.premium?)
     end
 
-    test "gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna are primary; rest are legacy", %{entries: entries} do
+    test "gpt-5.6-sol, gpt-5.6-tenna, gpt-5.6-luna are primary; rest are legacy", %{
+      entries: entries
+    } do
       by_slug = Map.new(entries, &{&1.slug, &1})
       assert by_slug["gpt-5.6-sol"].legacy? == false
-      assert by_slug["gpt-5.6-terra"].legacy? == false
+      assert by_slug["gpt-5.6-tenna"].legacy? == false
       assert by_slug["gpt-5.6-luna"].legacy? == false
       assert by_slug["gpt-5.5"].legacy? == true
       assert by_slug["gpt-5.4"].legacy? == true
@@ -421,8 +430,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   describe "entries_with_current/3" do
     test "returns entries unchanged when current slug is already present" do
       entries = [
-        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.5", label: "GPT-5.5", group: "Codex", default?: true},
-        %EyeInTheSky.ModelEntry{provider: "codex", slug: "gpt-5.4", label: "GPT-5.4", group: "Codex"}
+        %EyeInTheSky.ModelEntry{
+          provider: "codex",
+          slug: "gpt-5.5",
+          label: "GPT-5.5",
+          group: "Codex",
+          default?: true
+        },
+        %EyeInTheSky.ModelEntry{
+          provider: "codex",
+          slug: "gpt-5.4",
+          label: "GPT-5.4",
+          group: "Codex"
+        }
       ]
 
       result = ModelHelpers.entries_with_current(entries, "codex", "gpt-5.5")
@@ -431,8 +451,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "synthesizes and appends a Current entry when the slug is absent from every list" do
       entries = [
-        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true},
-        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-sonnet-5", label: "Sonnet 5", group: "Claude Code"}
+        %EyeInTheSky.ModelEntry{
+          provider: "claude",
+          slug: "claude-opus-4-8",
+          label: "Opus 5",
+          group: "Claude Code",
+          default?: true
+        },
+        %EyeInTheSky.ModelEntry{
+          provider: "claude",
+          slug: "claude-sonnet-5",
+          label: "Sonnet 5",
+          group: "Claude Code"
+        }
       ]
 
       result = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")
@@ -451,7 +482,13 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "does not duplicate when called twice with the same missing slug" do
       entries = [
-        %EyeInTheSky.ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code", default?: true}
+        %EyeInTheSky.ModelEntry{
+          provider: "claude",
+          slug: "claude-opus-4-8",
+          label: "Opus 5",
+          group: "Claude Code",
+          default?: true
+        }
       ]
 
       once = ModelHelpers.entries_with_current(entries, "claude", "sonnet-4-6")

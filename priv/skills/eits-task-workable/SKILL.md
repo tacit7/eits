@@ -1,17 +1,22 @@
 ---
-name: task-workable
+name: eits-task-workable
 description: Create a new task and tag it as workable for the auto-worker jobs. Takes model (haiku or sonnet) and description as arguments.
 user-invocable: true
 ---
 
-# task-workable
+# EITS Task Workable
 
 Create a new EITS task and tag it for the workable auto-worker.
+For Codex sessions, source `~/.eits/codex/sessions/<session_id>.env` in the
+same Bash command before using `$EITS_PROJECT_ID` shell expansion. Plain `eits`
+CLI calls auto-load the session-specific file only when `EITS_CODEX_SESSION_ID`,
+`CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set. If no session id is known, ask
+the user for it.
 
 ## Usage
 
 ```
-/task-workable <model> <description>
+/eits-task-workable <model> <description>
 ```
 
 - `model` — `haiku` or `sonnet`

@@ -141,6 +141,54 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert agent_msg.content == "hi there"
     end
 
+    test "reads current Codex response_item message records", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
+      write_jsonl(session_file, [
+        %{
+          "type" => "session_meta",
+          "payload" => %{"session_id" => thread_id, "model_provider" => "openai"}
+        },
+        %{
+          "type" => "response_item",
+          "timestamp" => "2026-08-14T19:36:36.356Z",
+          "payload" => %{
+            "type" => "message",
+            "id" => "msg_user_123",
+            "role" => "user",
+            "content" => [
+              %{"type" => "input_text", "text" => "new user message"}
+            ]
+          }
+        },
+        %{
+          "type" => "response_item",
+          "timestamp" => "2026-08-14T19:36:47.540Z",
+          "payload" => %{
+            "type" => "message",
+            "id" => "msg_assistant_123",
+            "role" => "assistant",
+            "content" => [
+              %{"type" => "output_text", "text" => "new assistant message"}
+            ]
+          }
+        }
+      ])
+
+      assert {:ok, [user_msg, assistant_msg]} = SessionReader.read_messages(thread_id)
+      assert user_msg.role == "user"
+      assert user_msg.content == "new user message"
+      assert user_msg.timestamp == "2026-08-14T19:36:36.356Z"
+      assert is_binary(user_msg.uuid)
+
+      assert assistant_msg.role == "assistant"
+      assert assistant_msg.content == "new assistant message"
+      assert assistant_msg.timestamp == "2026-08-14T19:36:47.540Z"
+      assert is_binary(assistant_msg.uuid)
+      assert assistant_msg.uuid != user_msg.uuid
+    end
+
     test "skips token_count and session_meta events", %{
       session_file: session_file,
       thread_id: thread_id

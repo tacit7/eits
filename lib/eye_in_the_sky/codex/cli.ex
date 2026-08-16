@@ -116,6 +116,7 @@ defmodule EyeInTheSky.Codex.CLI do
     # New session uses: codex exec [flags] [prompt]
     # NOT codex exec --resume <id> — that flag does not exist in the Codex CLI.
     resume_id = opts[:resume]
+    resume? = not is_nil(resume_id)
 
     base_args =
       if resume_id do
@@ -149,12 +150,12 @@ defmodule EyeInTheSky.Codex.CLI do
 
         full_auto ->
           args
-          |> add_sandbox("workspace-write")
+          |> add_sandbox("workspace-write", resume?)
           |> add_approval_policy("on-request")
 
         true ->
           args
-          |> add_sandbox(opts[:sandbox])
+          |> add_sandbox(opts[:sandbox], resume?)
           |> add_approval_policy(opts[:ask_for_approval])
       end
 
@@ -193,8 +194,13 @@ defmodule EyeInTheSky.Codex.CLI do
     end
   end
 
-  defp add_sandbox(args, nil), do: args
-  defp add_sandbox(args, sandbox), do: args ++ ["--sandbox", to_string(sandbox)]
+  defp add_sandbox(args, nil, _resume?), do: args
+
+  # `codex exec resume` does not accept the top-level --sandbox shortcut, but it
+  # does accept equivalent config overrides.
+  defp add_sandbox(args, sandbox, true), do: args ++ ["-c", ~s(sandbox_mode="#{sandbox}")]
+
+  defp add_sandbox(args, sandbox, false), do: args ++ ["--sandbox", to_string(sandbox)]
 
   defp add_approval_policy(args, nil), do: args
 

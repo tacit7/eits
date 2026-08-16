@@ -89,7 +89,12 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
               mode,
               sender,
               sender_role,
-              %{ctx: channel_ctx, id: channel_id, content_blocks: content_blocks, context: context}
+              %{
+                ctx: channel_ctx,
+                id: channel_id,
+                content_blocks: content_blocks,
+                context: context
+              }
             )
           end,
           max_concurrency: 10,

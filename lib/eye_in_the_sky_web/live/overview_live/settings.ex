@@ -287,8 +287,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     |> Enum.filter(fn {k, _} -> String.starts_with?(k, "pricing_") end)
     |> Enum.each(fn {k, _} -> Settings.reset(k) end)
 
-    {:noreply,
-     socket |> reload_settings() |> put_flash(:info, "Pricing reset to defaults")}
+    {:noreply, socket |> reload_settings() |> put_flash(:info, "Pricing reset to defaults")}
   end
 
   @impl true

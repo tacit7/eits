@@ -129,6 +129,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> Helpers.maybe_put(:model_name, params["model_name"])
     |> Helpers.maybe_put(:model_provider, params["model_provider"])
     |> Helpers.maybe_put(:model_version, params["model_version"])
+    |> Helpers.maybe_put(:compact_summary, params["compact_summary"])
     |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
     |> maybe_clear_entrypoint(params)
     |> maybe_clear_status_reason(status, params)
@@ -137,7 +138,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   end
 
   defp maybe_clear_entrypoint(attrs, params) do
-    if params["clear_entrypoint"] in [true, "true"], do: Map.put(attrs, :entrypoint, nil), else: attrs
+    if params["clear_entrypoint"] in [true, "true"],
+      do: Map.put(attrs, :entrypoint, nil),
+      else: attrs
   end
 
   defp maybe_clear_status_reason(attrs, status, params) do
@@ -157,7 +160,11 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
   defp maybe_clear_intent(attrs, status) do
     if status == "working" do
       now = DateTime.utc_now()
-      attrs |> Map.put(:intent, nil) |> Map.put(:intent_set_at, nil) |> Map.put(:turn_start_at, now)
+
+      attrs
+      |> Map.put(:intent, nil)
+      |> Map.put(:intent_set_at, nil)
+      |> Map.put(:turn_start_at, now)
     else
       attrs
     end

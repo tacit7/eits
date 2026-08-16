@@ -45,6 +45,29 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       assert Enum.all?(db_messages, &(&1.provider == "codex"))
     end
 
+    test "can suppress per-message broadcasts for batch reloads", %{session: session} do
+      Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session.id}")
+
+      messages = [
+        %{uuid: Ecto.UUID.generate(), role: "user", content: "Hello", timestamp: nil, usage: nil},
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "Hi",
+          timestamp: nil,
+          usage: nil
+        }
+      ]
+
+      count =
+        BulkImporter.import_messages(messages, session.id, provider: "codex", broadcast?: false)
+
+      assert total_count(count) == 2
+
+      assert length(Messages.list_messages_for_session(session.id)) == 2
+      refute_receive {:new_message, _message}, 100
+    end
+
     test "skips messages without uuid", %{session: session} do
       messages = [
         %{uuid: nil, role: "user", content: "No UUID", timestamp: nil, usage: nil}
@@ -566,9 +589,27 @@ defmodule EyeInTheSky.Messages.BulkImporterTest do
       # timestamp), simulating a tool call and its result landing in the same
       # second — the scenario that exposed reversed id assignment.
       messages = [
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "call", timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "user", content: "result", timestamp: nil, usage: nil},
-        %{uuid: Ecto.UUID.generate(), role: "assistant", content: "reply", timestamp: nil, usage: nil}
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "call",
+          timestamp: nil,
+          usage: nil
+        },
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "user",
+          content: "result",
+          timestamp: nil,
+          usage: nil
+        },
+        %{
+          uuid: Ecto.UUID.generate(),
+          role: "assistant",
+          content: "reply",
+          timestamp: nil,
+          usage: nil
+        }
       ]
 
       count = BulkImporter.import_messages(messages, session.id, provider: "claude")

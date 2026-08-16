@@ -38,6 +38,7 @@ defmodule EyeInTheSky.Codex.SessionReader do
         content
         |> String.split("\n", trim: true)
         |> Enum.flat_map(&extract_message/1)
+        |> dedupe_messages()
 
       {:ok, messages}
     end
@@ -104,6 +105,12 @@ defmodule EyeInTheSky.Codex.SessionReader do
 
   defp extract_message(line) do
     case Jason.decode(line) do
+      {:ok, %{"type" => "response_item", "payload" => payload, "timestamp" => timestamp}} ->
+        extract_response_item(payload, timestamp)
+
+      {:ok, %{"type" => "response_item", "payload" => payload}} ->
+        extract_response_item(payload, nil)
+
       {:ok, %{"type" => "event_msg", "payload" => payload, "timestamp" => timestamp}} ->
         extract_payload_message(payload, timestamp)
 
@@ -114,6 +121,31 @@ defmodule EyeInTheSky.Codex.SessionReader do
         []
     end
   end
+
+  defp extract_response_item(
+         %{"type" => "message", "role" => role, "content" => content} = payload,
+         timestamp
+       )
+       when role in ["user", "assistant"] do
+    text = content_text(content)
+
+    if text == "" do
+      []
+    else
+      [
+        %{
+          uuid: source_uuid(payload["id"], text, timestamp),
+          role: role,
+          content: text,
+          timestamp: timestamp,
+          usage: nil,
+          stream_type: nil
+        }
+      ]
+    end
+  end
+
+  defp extract_response_item(_payload, _timestamp), do: []
 
   defp extract_payload_message(%{"type" => "user_message", "message" => text}, timestamp)
        when is_binary(text) and text != "" do
@@ -145,9 +177,46 @@ defmodule EyeInTheSky.Codex.SessionReader do
 
   defp extract_payload_message(_payload, _timestamp), do: []
 
+  defp content_text(content) when is_binary(content), do: String.trim(content)
+
+  defp content_text(content) when is_list(content) do
+    content
+    |> Enum.flat_map(fn
+      %{"text" => text} when is_binary(text) -> [text]
+      _ -> []
+    end)
+    |> Enum.join("\n")
+    |> String.trim()
+  end
+
+  defp content_text(_content), do: ""
+
+  defp dedupe_messages(messages) do
+    {_seen, deduped} =
+      Enum.reduce(messages, {MapSet.new(), []}, fn msg, {seen, acc} ->
+        if MapSet.member?(seen, msg.uuid) do
+          {seen, acc}
+        else
+          {MapSet.put(seen, msg.uuid), [msg | acc]}
+        end
+      end)
+
+    Enum.reverse(deduped)
+  end
+
+  defp source_uuid(id, _content, _timestamp) when is_binary(id) and id != "" do
+    hash_to_uuid(id)
+  end
+
+  defp source_uuid(_id, content, timestamp), do: derive_uuid(content, timestamp)
+
   # Derive a stable UUID from content + timestamp so deduplication works across syncs.
   defp derive_uuid(content, timestamp) do
     seed = "#{timestamp}:#{content}"
+    hash_to_uuid(seed)
+  end
+
+  defp hash_to_uuid(seed) do
     hex = :crypto.hash(:sha, seed) |> Base.encode16(case: :lower)
 
     "#{String.slice(hex, 0, 8)}-#{String.slice(hex, 8, 4)}-#{String.slice(hex, 12, 4)}-#{String.slice(hex, 16, 4)}-#{String.slice(hex, 20, 12)}"

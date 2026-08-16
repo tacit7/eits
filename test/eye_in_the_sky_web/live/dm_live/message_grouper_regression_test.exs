@@ -94,7 +94,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperRegressionTest do
       events_16 = events_15 ++ [tool_msg(16)]
       {changed_16, _new_tail_16} = MessageGrouper.diff_from_cached_tail(cached_tail_15, events_16)
 
-      new_cluster_ids = Enum.map(changed_16, & &1.id) |> Enum.filter(&String.starts_with?(&1, "cluster-row-"))
+      new_cluster_ids =
+        Enum.map(changed_16, & &1.id) |> Enum.filter(&String.starts_with?(&1, "cluster-row-"))
 
       # The only changed cluster row id must be the same stable id (no shift).
       # Baseline will emit a NEW cluster-row-7 while cluster-row-6 becomes stale.

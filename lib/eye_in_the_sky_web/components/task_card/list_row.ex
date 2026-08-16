@@ -136,7 +136,10 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           </span>
 
           <%!-- Metadata line — extra dim when task is done --%>
-          <div class={["flex items-center gap-1.5 flex-wrap mt-1 text-mini", @task.completed_at && "opacity-70"]}>
+          <div class={[
+            "flex items-center gap-1.5 flex-wrap mt-1 text-mini",
+            @task.completed_at && "opacity-70"
+          ]}>
             <%!-- State pill --%>
             <%= if is_struct(@task.state, EyeInTheSky.Tasks.WorkflowState) do %>
               <span class={[

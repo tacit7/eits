@@ -289,7 +289,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       p = create_db_prompt()
       socket = build_socket()
 
-      {:noreply, result} = PromptsLive.handle_event("duplicate_prompt", %{"uuid" => p.uuid}, socket)
+      {:noreply, result} =
+        PromptsLive.handle_event("duplicate_prompt", %{"uuid" => p.uuid}, socket)
 
       assert result.assigns.flash["info"] == "Duplicated"
       assert Enum.any?(result.assigns.prompts, &(&1.slug == "#{p.slug}-copy"))
@@ -310,7 +311,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.PromptsTest do
       p = create_db_prompt()
       socket = build_socket(%{selected_prompt: p})
 
-      {:noreply, result} = PromptsLive.handle_event("deactivate_prompt", %{"uuid" => p.uuid}, socket)
+      {:noreply, result} =
+        PromptsLive.handle_event("deactivate_prompt", %{"uuid" => p.uuid}, socket)
 
       assert result.assigns.flash["info"] == "Deactivated"
       assert is_nil(result.assigns.selected_prompt)

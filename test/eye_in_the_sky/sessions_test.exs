@@ -408,8 +408,11 @@ defmodule EyeInTheSky.SessionsTest do
       agent = create_agent()
       for _ <- 1..4, do: create_session(agent)
 
-      all_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
-      offset_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
+      all_results =
+        OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
+
+      offset_results =
+        OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
 
       assert length(offset_results) < length(all_results)
     end

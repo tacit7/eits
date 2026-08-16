@@ -179,5 +179,4 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
       base
     end
   end
-
 end

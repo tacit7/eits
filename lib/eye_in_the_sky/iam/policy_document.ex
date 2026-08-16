@@ -23,8 +23,7 @@ defmodule EyeInTheSky.IAM.PolicyDocument do
 
     has_many :policies, through: [:document_policies, :policy]
 
-    has_many :agent_type_documents, AgentTypeDocument,
-      foreign_key: :document_id
+    has_many :agent_type_documents, AgentTypeDocument, foreign_key: :document_id
 
     timestamps(type: :utc_datetime_usec)
   end

@@ -4,7 +4,12 @@ defmodule EyeInTheSky.ModelEntryTest do
   alias EyeInTheSky.ModelEntry
 
   test "struct has the documented fields with correct defaults" do
-    entry = %ModelEntry{provider: "claude", slug: "claude-opus-4-8", label: "Opus 4.8", group: "Claude Code"}
+    entry = %ModelEntry{
+      provider: "claude",
+      slug: "claude-opus-4-8",
+      label: "Opus 4.8",
+      group: "Claude Code"
+    }
 
     assert entry.sub_provider == nil
     assert entry.premium? == false

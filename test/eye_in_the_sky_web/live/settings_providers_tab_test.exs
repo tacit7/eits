@@ -91,8 +91,12 @@ defmodule EyeInTheSkyWeb.SettingsProvidersTabTest do
     html = render(view)
 
     cond do
-      html =~ expect -> html
-      System.monotonic_time(:millisecond) > deadline -> flunk("timeout waiting for: #{expect}")
+      html =~ expect ->
+        html
+
+      System.monotonic_time(:millisecond) > deadline ->
+        flunk("timeout waiting for: #{expect}")
+
       true ->
         Process.sleep(25)
         do_render_until(view, expect, deadline)

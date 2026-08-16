@@ -1,6 +1,6 @@
 Session queries and mutations
 
-Usage: eitsr sessions [OPTIONS] <COMMAND>
+Usage: eits sessions [OPTIONS] <COMMAND>
 
 Commands:
   list        List sessions (project-scoped by default; see mutual-exclusion rules below)

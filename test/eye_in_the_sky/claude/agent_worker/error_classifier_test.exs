@@ -201,7 +201,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
     end
 
     test "auth -> :authentication_error" do
-      for msg <- ["HTTP 401 authentication_error", "invalid api key provided", "HTTP 403 forbidden"] do
+      for msg <- [
+            "HTTP 401 authentication_error",
+            "invalid api key provided",
+            "HTTP 403 forbidden"
+          ] do
         assert ErrorClassifier.classify({:pi_turn_error, msg}) == :authentication_error
       end
     end

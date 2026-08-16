@@ -134,7 +134,7 @@ Session status is driven by Claude Code hooks and explicit commands:
 | `working` | `UserPromptSubmit` hook | Claude is processing a message |
 | `idle` | `Stop` hook | Claude finished responding (resets to `working` on next message) |
 | `waiting` | `SessionEnd` hook (`sdk-cli`) | Headless session ended; can be resumed |
-| `completed` | `SessionEnd` hook (`cli`) or `/i-end-session` | Interactive session finished; or manually closed |
+| `completed` | `SessionEnd` hook (`cli`) or `/eits-end-session` | Interactive session finished; or manually closed |
 | `failed` | `SessionWorker` on non-zero exit | Process crashed |
 
 `CLAUDE_CODE_ENTRYPOINT` distinguishes `cli` (interactive) from `sdk-cli` (headless/spawned).

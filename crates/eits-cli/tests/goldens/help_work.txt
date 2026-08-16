@@ -1,0 +1,12 @@
+Report current work/session checkpoint status
+
+Usage: eits work [OPTIONS] <COMMAND>
+
+Commands:
+  status  Report the current work/session checkpoint
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

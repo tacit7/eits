@@ -14,6 +14,7 @@ use commands::dm::DmCmd;
 use commands::notes::NotesCmd;
 use commands::sessions::SessionsCmd;
 use commands::tasks::TasksCmd;
+use commands::work::WorkCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
 
@@ -73,6 +74,11 @@ enum Cmd {
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
+    /// Report current work/session checkpoint status
+    Work {
+        #[command(subcommand)]
+        cmd: WorkCmd,
+    },
     /// Anything not Rust-owned falls through to the legacy extras script
     #[command(external_subcommand)]
     External(Vec<OsString>),
@@ -176,6 +182,16 @@ fn main() {
             };
             let client = http::Client::new(cfg.clone());
             if let Err(err) = commands::whoami::run(&client, &cfg, pretty) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Work { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::work::run(&client, &cfg, cmd, pretty) {
                 error::exit_with(err, pretty);
             }
         }

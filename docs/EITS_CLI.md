@@ -12,6 +12,7 @@ The `eits` command is the Rust CLI. It provides better performance, JSON-native 
 - `commits` — commit tracking (list, create)
 - `notes` — note queries and mutations (list, get, create, update, add)
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
+- `work` — current work checkpoint, task/team/inbox/git health, and commit tracking status
 
 Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
@@ -831,6 +832,27 @@ Prints current session UUID, session ID, agent UUID, agent ID (integer), project
 **Output includes:**
 - **Identity block**: Session UUID, Session ID, Agent UUID, Agent ID (integer), Project ID, API URL
 - **Tracking Status block**: Shows whether each required environment variable is set; flags if Agent ID is missing (needed for `--parent-agent-id` spawns)
+
+---
+
+## work
+
+**Available in:** eits (Rust, JSON output)
+
+```bash
+eits work status
+eits work checkpoint   # alias for status
+```
+
+Reports the current checkpoint for the active session. The JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, worktree and git health, and commit-tracking status where feasible.
+
+**Output includes:**
+- **Identity block**: Session UUID, Session ID, Agent UUID, Agent ID, Project ID, creation timestamp, worktree path
+- **Health block**: Session resolution, task lookup, team lookup, inbox lookup, git repo status, commit-tracking status
+- **Task block**: Claimed tasks and the active subset (state 2 / 4)
+- **Team block**: Teams the current agent belongs to
+- **Inbox block**: Recent inbound DMs for the current session
+- **Git block**: Repository root, branch, HEAD, dirty paths, and unlogged commits where available
 
 ---
 

@@ -3,7 +3,16 @@ use crate::error::{Code, EitsError};
 use crate::http::Client;
 use serde_json::json;
 
-pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError> {
+pub struct IdentitySnapshot {
+    pub session: serde_json::Value,
+    pub session_uuid: serde_json::Value,
+    pub session_id: serde_json::Value,
+    pub agent_uuid: String,
+    pub agent_id: serde_json::Value,
+    pub project_id: serde_json::Value,
+}
+
+pub fn resolve(client: &Client, cfg: &Config) -> Result<IdentitySnapshot, EitsError> {
     let session_id = cfg
         .session_uuid
         .as_deref()
@@ -13,8 +22,9 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
         })?;
 
     let session_resp = client.get(&format!("/sessions/{session_id}"))?;
-    let session_uuid = session_resp.get("uuid").cloned().unwrap_or(json!(null));
-    let resolved_session_id = session_resp
+    let session = session_resp.get("session").cloned().unwrap_or(session_resp);
+    let session_uuid = session.get("uuid").cloned().unwrap_or(json!(null));
+    let resolved_session_id = session
         .get("id")
         .filter(|v| v.is_i64() || v.is_u64())
         .cloned()
@@ -25,7 +35,7 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
                 None,
             )
         })?;
-    let agent_uuid = session_resp
+    let agent_uuid = session
         .get("agent_id")
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
@@ -36,14 +46,11 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
             )
         })?
         .to_string();
-    let project_id = session_resp
-        .get("project_id")
-        .cloned()
-        .unwrap_or(json!(null));
+    let project_id = session.get("project_id").cloned().unwrap_or(json!(null));
 
     // The session response may already carry the agent's integer id, saving
     // the second round-trip; otherwise resolve it via GET /agents/{uuid}.
-    let agent_id = match session_resp
+    let agent_id = match session
         .get("agent_int_id")
         .filter(|v| v.is_i64() || v.is_u64())
     {
@@ -65,13 +72,26 @@ pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError>
         }
     };
 
+    Ok(IdentitySnapshot {
+        session,
+        session_uuid,
+        session_id: resolved_session_id,
+        agent_uuid,
+        agent_id,
+        project_id,
+    })
+}
+
+pub fn run(client: &Client, cfg: &Config, pretty: bool) -> Result<(), EitsError> {
+    let identity = resolve(client, cfg)?;
+
     crate::output::print_json(
         &json!({
-            "session_uuid": session_uuid,
-            "session_id": resolved_session_id,
-            "agent_uuid": agent_uuid,
-            "agent_id": agent_id,
-            "project_id": project_id,
+            "session_uuid": identity.session_uuid,
+            "session_id": identity.session_id,
+            "agent_uuid": identity.agent_uuid,
+            "agent_id": identity.agent_id,
+            "project_id": identity.project_id,
         }),
         pretty,
     );

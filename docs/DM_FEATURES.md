@@ -2673,23 +2673,21 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 
 ## DM Receivable Statuses
 
-**Commits:** `eb55f37c` (idle added), `870f3e3a` (waiting added)
+**Commits:** `eb55f37c` (idle added), `870f3e3a` (waiting added), `ee5b42e0` (terminated sessions now accepted)
 
-The `/api/v1/dm` endpoint accepts messages destined for sessions in any non-terminal status.
+The `/api/v1/dm` endpoint accepts messages destined for sessions in **any status**, including terminal ones.
 
-**Allowed statuses (`@receivable_statuses`):**
-- `working` — agent actively processing
-- `idle` — agent waiting for input
-- `waiting` — sdk-cli session ended and queued for resume; DM is persisted and delivered on next wakeup. Blocking this status caused false 422s when agents tried to reach headless sessions between turns.
+**All statuses accept DMs:**
+- `working` — message delivered live to the session worker
+- `idle` — message delivered live to the session worker
+- `waiting` — sdk-cli session queued for resume; DM is persisted and delivered on next wakeup
+- `completed` / `failed` — message persisted directly via `DMDelivery.persist/4` (no live worker required); available for later polling or inspection
 
-**Rejected statuses (terminal):**
-- `completed` — session finished; cannot receive DMs
-- `failed` — session errored; cannot receive DMs
-
-**Error message on rejection:** `"Target session is terminated (completed or failed) and cannot receive DMs"`
+**Removed behavior (commit `ee5b42e0`):** The `@receivable_statuses` allowlist and `check_receiver_reachable/1` guard have been removed from `MessagingController`. Previously, DMs to `completed` or `failed` sessions returned `422 "Target session is terminated and cannot receive DMs"`. Now `DMDelivery.deliver_or_persist/4` is called instead, which routes to live delivery or direct persistence based on session status.
 
 **File:**
-- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `@receivable_statuses` module attribute and `do_dm/4`
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4` routes based on status; `persist/4` for terminal sessions
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `do_dm/4` now calls `deliver_or_persist` with no status pre-check
 
 ---
 
@@ -2775,6 +2773,40 @@ Two dead-code wrappers were removed from `MessagingController`:
 
 ---
 
+## DMDelivery: deliver_or_persist and persist
+
+**Commit:** `ee5b42e0`
+
+Two new public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions whose status cannot accept live delivery.
+
+### deliver_or_persist/4
+
+```elixir
+def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{})
+```
+
+Routes a DM based on the target session's current status:
+
+- **Terminal session (`completed` or `failed`):** Calls `persist/4` directly. There is no live worker to accept the message, so it is stored straight to the durable inbox without attempting live delivery.
+- **Non-terminal session (or session not found):** Falls through to `deliver_and_persist/4`, which delivers to the live worker and persists as before.
+
+This replaces the previous behavior where DMs to terminated sessions were rejected outright at the API layer. Completed/failed sessions are still valid DM recipients — their messages are stored for later polling or inspection.
+
+### persist/4
+
+```elixir
+def persist(to_session_id, from_session_id, body, metadata \\ %{})
+```
+
+Persists a DM directly to the messages table and broadcasts a `session_new_dm` PubSub event, without requiring a live session worker. This is the write path for CLI/headless sessions that poll their durable inbox, and for any session where live delivery is not possible.
+
+Previously this logic was inlined inside `deliver_and_persist/4`; it is now a named public function so `deliver_or_persist/4` can call it independently.
+
+**Files:**
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4` and `persist/4`
+
+---
+
 ## DM Response Fields: reachable and metadata
 
 **Commit:** `15d2eb16` (reachable), `94215a51` (metadata)
@@ -2791,7 +2823,7 @@ The `/api/v1/dm` endpoint now includes two new fields in success responses:
 - `true` — session is in `working`, `idle`, or `waiting` status; message delivered to reachable session
 - `false` — (future) session is offline or in a non-receivable state; message queued or buffered
 
-**Current behavior:** All successful DM responses have `reachable: true` while only `completed` and `failed` statuses are rejected. Future iterations may support queue-to-unreachable sessions.
+**Current behavior:** All successful DM responses have `reachable: true`. Terminated sessions (`completed` and `failed`) are accepted — `reachable: true` is returned after the message is persisted via `deliver_or_persist/4`. The field was originally intended to distinguish live vs. queued delivery; this distinction is now handled internally by `DMDelivery`.
 
 ### metadata
 

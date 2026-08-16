@@ -121,6 +121,9 @@ Call \`/eits-init\` if this session needs a name, otherwise continue your work.
 # Create + start in one shot (session linked automatically via EITS_SESSION_UUID)
 eits tasks begin --title \"Task name\"
 
+# Inbox checkpoints
+eits dm inbox --since-session --team-only --json   # before claiming work, after major state transitions, before done, after completion DMs
+
 # Finish
 eits tasks complete <task_id> --message \"What happened\"
 # If complete fails, fall back to:

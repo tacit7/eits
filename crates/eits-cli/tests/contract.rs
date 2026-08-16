@@ -212,6 +212,36 @@ fn begin_accepts_string_task_id_from_server() {
 }
 
 #[test]
+fn begin_sends_team_id_when_team_flag_is_present() {
+    let srv = common::serve(vec![
+        (200, r#"{"task_id":42}"#),
+        (200, r#"{"task":{"id":42,"state":"In Progress"}}"#),
+    ]);
+    let out = Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env_remove("EITS_SESSION_UUID")
+        .env_remove("EITS_SESSION_ID")
+        .args([
+            "--quiet",
+            "tasks",
+            "begin",
+            "--title",
+            "Team-scoped work",
+            "--team",
+            "720",
+        ])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    assert_eq!(stdout.trim(), "42");
+
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["team_id"], "720");
+}
+
+#[test]
 fn create_sends_team_id_when_team_flag_is_present() {
     let srv = common::serve(vec![(201, r#"{"success":true,"task_id":"42"}"#)]);
     let mut cmd = Command::cargo_bin("eits").unwrap();
@@ -243,6 +273,26 @@ fn create_sends_team_id_when_team_flag_is_present() {
     assert_eq!(body["team_id"], "720");
     assert_eq!(body["project_id"], "7");
     assert_eq!(body["session_id"], "99");
+}
+
+#[test]
+fn claim_accepts_team_flag_without_changing_payload() {
+    let srv = common::serve(vec![(200, r#"{"success":true,"task":{"id":9001}}"#)]);
+    let out = Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .args(["tasks", "claim", "9001", "--team", "720"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["task"]["id"], 9001);
+
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["session_id"], "s-1");
+    assert!(body.get("team_id").is_none());
 }
 
 #[test]
@@ -890,6 +940,49 @@ fn dm_wait_defaults_session_from_identity_and_prints_arrived_dm() {
         reqs[0].path.contains("timeout=25"),
         "default timeout: {}",
         reqs[0].path
+    );
+}
+
+#[test]
+fn dm_wait_team_only_skips_non_team_messages_until_team_message_arrives() {
+    let srv = common::serve(vec![
+        (
+            200,
+            r#"{"teams":[{"id":720,"name":"cli-workflow-9025-9026"}]}"#,
+        ),
+        (200, r#"{"members":[{"session_id":222}]}"#),
+        (
+            200,
+            r#"{"items":[{"id":1,"body":"outside","from_session_id":111,"inserted_at":"2026-01-01T00:00:00Z"}],"count":1}"#,
+        ),
+        (
+            200,
+            r#"{"items":[{"id":2,"body":"inside","from_session_id":222,"inserted_at":"2026-01-01T00:00:01Z"}],"count":1}"#,
+        ),
+    ]);
+    let out = Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .env("EITS_AGENT_UUID", "agent-1")
+        .args(["dm", "wait", "--team-only", "--timeout", "3"])
+        .assert()
+        .success();
+    let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    assert_eq!(v["count"], 1);
+    assert_eq!(v["items"][0]["id"], 2);
+
+    let reqs = srv.finish();
+    assert_eq!(reqs.len(), 4);
+    assert_eq!(reqs[0].path, "/api/v1/teams?member_agent_uuid=agent-1");
+    assert_eq!(reqs[1].path, "/api/v1/teams/720/members");
+    assert!(reqs[2].path.contains("/api/v1/dm/wait?"));
+    assert!(reqs[2].path.contains("session=s-1"));
+    assert!(
+        reqs[3].path.contains("since=2026-01-01T00%3A00%3A00Z"),
+        "expected second wait to advance since past non-team DM: {}",
+        reqs[3].path
     );
 }
 

@@ -1,12 +1,11 @@
 ---
-name: team-worker
+name: eits-team-worker
 description: >
   Use when you are a spawned EITS team member executing an assigned task — claiming
   the task, working inside an isolated worktree, respecting file-ownership and contract
   boundaries, compiling, completing the task, and DMing the orchestrator back. Triggers
-  when spawned with team_id/--member-name in your instructions, or on "I'm a team worker",
+  when spawned with team_id/--member-name in your instructions, or on "I'm an EITS team worker",
   "I was spawned to", "claim my task", "DM back when done".
-user-invocable: false
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 
@@ -61,6 +60,12 @@ eits tasks begin --id <task_id>          # claims + links to your session + sets
 eits tasks begin --title "<what you're doing>"
 ```
 
+Poll the inbox before claiming and after the claim:
+
+```bash
+eits dm inbox --since-session --team-only --json
+```
+
 **Why this must come first, before any edit:**
 
 - The Stop hook (`.claude/hooks/eits-task-gate.sh`) blocks exit while a state-2 task is
@@ -99,6 +104,12 @@ eits commits create --hash <hash>        # log every commit you make
 eits tasks complete <task_id> --message "What was done — summary IS the handoff record"
 ```
 
+Before completing, poll the inbox again so late orchestrator feedback is not missed:
+
+```bash
+eits dm inbox --since-session --team-only --json
+```
+
 Fallback if `complete` fails:
 
 ```bash
@@ -110,6 +121,7 @@ eits tasks update <task_id> --state done
 
 ```bash
 eits dm --to <ORC_SESSION_ID> --message "done:<branch-name>"
+eits dm inbox --since-session --team-only --json   # catch any follow-up after the done DM
 ```
 
 - `tasks complete` does NOT send this. The Stop hook flips your `member_status` to `done`
@@ -125,6 +137,7 @@ eits dm --to <ORC_SESSION_ID> --message "done:<branch-name>"
 - **Claim a task before editing.** No exceptions — both gates enforce it, and it is the
   only thing that links the task to you for the team page.
 - **DM back explicitly when done.** `complete` + Stop hook ≠ a message to the orchestrator.
+- **Poll team DMs at checkpoints.** Run `eits dm inbox --since-session --team-only --json` before claiming, after major transitions, before completing, and after the done DM.
 - **`mix compile` must pass** before completing/DMing. Never hand off a broken branch.
 - **Respect file ownership.** Touch only the files you own; never the forbidden list.
 - **Build to the contract.** Interface drift is the #1 cause of integration rework.
@@ -145,6 +158,7 @@ eits dm --to <ORC_SESSION_ID> --message "done:<branch-name>"
 | Log commit | `eits commits create --hash <hash>` |
 | Complete task | `eits tasks complete <id> --message "..."` |
 | DM orchestrator | `eits dm --to <ORC_SESSION_ID> --message "done:<branch>"` |
+| Poll team inbox | `eits dm inbox --since-session --team-only --json` |
 
 See `eits-teams` for the orchestrator side, `eits-dm` for DM details, and `eits-workflow`
 for the full task/commit/note CLI.

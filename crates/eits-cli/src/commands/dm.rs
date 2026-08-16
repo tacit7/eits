@@ -37,7 +37,7 @@ pub enum DmCmd {
     /// Block until the next inbound DM arrives (or timeout), then print and exit.
     ///
     /// Meant for a background process that wants to be woken by a DM rather
-    /// than interval-polling `dm inbox`: launch `eitsr dm wait` detached, and
+    /// than interval-polling `dm inbox`: launch `eits dm wait` detached, and
     /// let its exit re-trigger whatever's watching for it. Exits 0 on arrival
     /// (with the DM as `items`) and 0 on timeout (`{"items":[],"count":0}`)
     /// so a shell `until` loop can re-invoke it freely.
@@ -46,6 +46,9 @@ pub enum DmCmd {
         session: Option<String>,
         #[arg(long)]
         since: Option<String>,
+        /// Only keep DMs from sessions that share a team with the current agent.
+        #[arg(long = "team-only")]
+        team_only: bool,
         /// Seconds to block for; passed straight to the server, which caps it.
         #[arg(short = 't', long, default_value = "25")]
         timeout: u64,
@@ -180,27 +183,8 @@ pub fn run(
             let mut resp = client.get(&format!("/dm?{query_string}"))?;
 
             if team_only {
-                match std::env::var("EITS_AGENT_UUID").ok() {
-                    None => {
-                        eprintln!("warning: --team-only requires EITS_AGENT_UUID; showing all DMs")
-                    }
-                    Some(agent_uuid) => {
-                        let allowed = resolve_team_session_ids(client, &agent_uuid);
-                        if let Some(messages) = resp.get("messages").and_then(|v| v.as_array()) {
-                            let filtered: Vec<Value> = messages
-                                .iter()
-                                .filter(|m| {
-                                    m.get("from_session_id")
-                                        .map(|fid| allowed.contains(&value_to_key(fid)))
-                                        .unwrap_or(false)
-                                })
-                                .cloned()
-                                .collect();
-                            let count = filtered.len();
-                            resp["messages"] = json!(filtered);
-                            resp["count"] = json!(count);
-                        }
-                    }
+                if let Some(allowed) = team_allowlist(client, cfg) {
+                    apply_team_filter(&mut resp, "messages", "from_session_id", &allowed);
                 }
             }
 
@@ -221,6 +205,7 @@ pub fn run(
         Some(DmCmd::Wait {
             session,
             since,
+            team_only,
             timeout,
         }) => {
             let session = session
@@ -231,21 +216,72 @@ pub fn run(
                     )
                 })?;
 
-            let mut qs: Vec<(String, String)> =
-                vec![("session".into(), session), ("timeout".into(), timeout.to_string())];
-            if let Some(s) = &since {
-                qs.push(("since".into(), uri_encode(s)));
-            }
-            let query_string = qs
-                .iter()
-                .map(|(k, v)| format!("{k}={v}"))
-                .collect::<Vec<_>>()
-                .join("&");
+            let allowed = if team_only {
+                team_allowlist(client, cfg)
+            } else {
+                None
+            };
 
-            // Give the client generous headroom over the server-side wait so
-            // the long-poll itself never gets cut short by our own timeout.
-            let client_timeout = std::time::Duration::from_secs(timeout + 15);
-            let resp = client.get_long_poll(&format!("/dm/wait?{query_string}"), client_timeout)?;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout);
+            let mut since = since;
+
+            let resp = loop {
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                if remaining.is_zero() {
+                    break json!({ "items": [], "count": 0 });
+                }
+
+                let wait_secs = remaining
+                    .as_secs()
+                    .saturating_add(u64::from(remaining.subsec_nanos() > 0))
+                    .max(1)
+                    .min(55);
+                let mut qs: Vec<(String, String)> = vec![
+                    ("session".into(), session.clone()),
+                    ("timeout".into(), wait_secs.to_string()),
+                ];
+                if let Some(s) = &since {
+                    qs.push(("since".into(), uri_encode(s)));
+                }
+                let query_string = qs
+                    .iter()
+                    .map(|(k, v)| format!("{k}={v}"))
+                    .collect::<Vec<_>>()
+                    .join("&");
+
+                // Give the client generous headroom over the server-side wait so
+                // the long-poll itself never gets cut short by our own timeout.
+                let client_timeout = std::time::Duration::from_secs(wait_secs + 15);
+                let mut resp =
+                    client.get_long_poll(&format!("/dm/wait?{query_string}"), client_timeout)?;
+
+                let Some(allowed) = &allowed else {
+                    break resp;
+                };
+
+                let raw_count = resp
+                    .get("items")
+                    .and_then(|v| v.as_array())
+                    .map(|items| items.len())
+                    .unwrap_or(0);
+                let next_since = resp
+                    .get("items")
+                    .and_then(|v| v.as_array())
+                    .and_then(|items| items.last())
+                    .and_then(|msg| msg.get("inserted_at"))
+                    .and_then(|t| t.as_str())
+                    .map(String::from);
+                let filtered_count =
+                    apply_team_filter(&mut resp, "items", "from_session_id", allowed);
+                if filtered_count > 0 || raw_count == 0 {
+                    break resp;
+                }
+                if let Some(next_since) = next_since {
+                    since = Some(next_since);
+                } else {
+                    break resp;
+                }
+            };
             output::print_json(&resp, pretty);
             Ok(())
         }
@@ -308,6 +344,41 @@ fn resolve_team_session_ids(client: &Client, agent_uuid: &str) -> HashSet<String
         }
     }
     allowed
+}
+
+fn team_allowlist(client: &Client, cfg: &Config) -> Option<HashSet<String>> {
+    match &cfg.agent_uuid {
+        None => {
+            eprintln!("warning: --team-only requires EITS_AGENT_UUID; showing all DMs");
+            None
+        }
+        Some(agent_uuid) => Some(resolve_team_session_ids(client, agent_uuid)),
+    }
+}
+
+fn apply_team_filter(
+    resp: &mut Value,
+    collection_key: &str,
+    session_key: &str,
+    allowed: &HashSet<String>,
+) -> usize {
+    let Some(items) = resp.get(collection_key).and_then(|v| v.as_array()) else {
+        return 0;
+    };
+
+    let filtered: Vec<Value> = items
+        .iter()
+        .filter(|m| {
+            m.get(session_key)
+                .map(|fid| allowed.contains(&value_to_key(fid)))
+                .unwrap_or(false)
+        })
+        .cloned()
+        .collect();
+    let count = filtered.len();
+    resp[collection_key] = json!(filtered);
+    resp["count"] = json!(count);
+    count
 }
 
 fn value_to_key(v: &Value) -> String {

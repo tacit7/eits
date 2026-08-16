@@ -45,6 +45,9 @@ pub enum TasksCmd {
         description: Option<String>,
         #[arg(short = 'p', long)]
         project: Option<String>,
+        /// Team id to attach when creating a new task.
+        #[arg(long)]
+        team: Option<String>,
         #[arg(long)]
         priority: Option<String>,
         #[arg(long = "tag")]
@@ -115,7 +118,12 @@ pub enum TasksCmd {
         priority: Option<String>,
     },
     /// Claim an existing task (link session + set In Progress)
-    Claim { id: String },
+    Claim {
+        id: String,
+        /// Accepted for orchestration parity; claim itself ignores team_id.
+        #[arg(long)]
+        team: Option<String>,
+    },
     /// Delete a task
     Delete { id: String },
     /// In Progress + In Review tasks for the current session
@@ -338,12 +346,14 @@ pub fn run(
             title,
             description,
             project,
+            team,
             priority,
             tags,
         } => {
             let identity = cfg.session_identity().unwrap_or("").to_string();
 
             if let Some(task_id) = id {
+                let _ = team;
                 let resp = client.post(
                     &format!("/tasks/{task_id}/claim"),
                     json!({ "session_id": identity }),
@@ -374,6 +384,7 @@ pub fn run(
                 "title": title,
                 "description": description.unwrap_or_default(),
                 "project_id": project_id,
+                "team_id": team,
                 "priority": priority,
                 "session_id": identity,
             });
@@ -602,7 +613,8 @@ pub fn run(
             Ok(())
         }
 
-        TasksCmd::Claim { id } => {
+        TasksCmd::Claim { id, team } => {
+            let _ = team;
             let identity = cfg.session_identity().unwrap_or("").to_string();
             let resp = client.post(
                 &format!("/tasks/{id}/claim"),

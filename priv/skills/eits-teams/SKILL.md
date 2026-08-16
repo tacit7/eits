@@ -1,7 +1,6 @@
 ---
 name: eits-teams
 description: Create and manage EITS agent teams for coordinated multi-agent work. Use this skill whenever the user wants to spawn multiple agents to work together, coordinate parallel tasks, run a swarm, delegate work across agents, or says things like "create a team", "spin up agents to", "have agents work on this together", "coordinate agents", or "run agents in parallel". EITS teams are fully server-owned — membership is tracked in Postgres, not local files.
-user-invocable: true
 allowed-tools: Bash
 ---
 
@@ -241,6 +240,8 @@ After merges are confirmed, collect results:
 eits dm inbox --since-session --team-only --json   # only current team DMs since this session started
 ```
 
+After a major state transition, before claiming more work, before closing a worker task, and after a completion DM, poll the inbox again with `eits dm inbox --since-session --team-only --json`.
+
 If a specific agent's DM is needed before the team is fully done:
 ```bash
 eits dm --to <agent_uuid_or_session_id> --message "Work complete. Run the task completion sequence and DM back."
@@ -262,6 +263,7 @@ Agents auto-receive team context. They are expected to:
 
 ```bash
 eits tasks claim <assigned_task_id>      # claim the orchestrator-created task
+# Poll the inbox first, then after major transitions, before closeout, and after the done DM.
 # ... do work ...
 mix compile                              # MUST pass before DM-back — never DM done with a broken branch
 eits tasks complete <task_id> --message "Summary of what was done"
@@ -269,6 +271,7 @@ eits tasks complete <task_id> --message "Summary of what was done"
 # team member_status → done fires automatically when the agent session ends (Stop hook)
 # DM-back to orchestrator must be explicit — it is NOT sent by tasks complete
 eits dm --to <ORC_SESSION_ID> --message "done task=<task_id> result=<summary> branch=<branch-or-pr>"
+eits dm inbox --since-session --team-only --json   # catch any follow-up work after the completion DM
 ```
 
 If no task id was assigned, the worker must DM the orchestrator and wait. It
@@ -296,7 +299,7 @@ eits tasks update <task_id> --state done
 - **`--worktree` names must be unique per spawn** — duplicates fail at the git layer with a confusing error.
 - **`EITS_PROJECT_ID` is not in spawned agent environments** — pass it explicitly in instructions or via `--interpolate-env`.
 - `--worktree` requires a clean working tree — commit or stash first.
-- **Poll inbound DMs without the browser**: use `eits dm inbox --since-session --team-only --json` for current-team replies.
+- **Poll inbound DMs without the browser**: use `eits dm inbox --since-session --team-only --json` for current-team replies, and re-run it at the claim/transition/closeout checkpoints.
 
 ---
 

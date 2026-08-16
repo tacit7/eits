@@ -66,6 +66,8 @@ With `--quiet`, only the ID:
 
 6. **Numeric string coercion** — Rust-owned commands do NOT coerce numeric-looking strings the way Bash did (only ID-suffixed fields are integers). This prevents ambiguity in responses.
 
+7. **Inbox polling is explicit** — use `eits dm inbox --since-session --team-only --json` before claiming work, after major state transitions, before `eits tasks complete`, and after completion DMs so handoffs stay current.
+
 ### Environment Variables
 
 The Rust CLI respects:
@@ -264,10 +266,10 @@ eits tasks create --title <t> [--description <d>] [--project <id>] \
 
 # Create + start in one shot
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
-  [--priority <p>] [--tag <id>] [--quiet|-q]
+  [--team <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
 # Or claim a pre-created task instead of creating new
 # On conflict (already_claimed), shows the holding session ID, UUID, and name
-eits tasks begin --id <task_id>
+eits tasks begin --id <task_id> [--team <id>]
 # --tag: apply one or more tags after creation/claim (repeatable: --tag 1 --tag 2)
 
 # Update
@@ -283,8 +285,9 @@ eits tasks bulk-update --session <uuid|id> [--state <id>] [--priority <p>] [--ti
 # --session: fetch all task IDs for the given session and apply the same update to all
 
 # State shorthands (canonical)
-eits tasks claim <id>          # → In Progress (state 2), transfers session ownership to claimer (preferred)
+eits tasks claim <id> [--team <id>]  # → In Progress (state 2), transfers session ownership to claimer (preferred)
                                # Removes all existing task_sessions links, adds claimer's session atomically
+                               # --team is accepted for orchestration parity and does not alter the existing task team
 eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 
 # Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
@@ -353,6 +356,7 @@ API JSON response includes both `session_id` (from first linked session) and `ag
 - `tasks update` and other state mutations **do not** change session linkage — they operate on existing task state only.
 - `tasks link-session` and `tasks unlink-session` provide explicit session management when needed.
 - **CRITICAL**: When no session context is available, these commands fail with a session-linkage error. Ensure `EITS_SESSION_UUID` or `EITS_SESSION_ID` is set before running task lifecycle commands.
+- Before claiming work, after major state transitions, before `tasks complete`, and after completion DMs, poll the inbox with `eits dm inbox --since-session --team-only --json`.
 
 **Option 1: Create new task (agent-initiated)**
 ```bash
@@ -609,25 +613,27 @@ eits jobs delete <id>
 **Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
-eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--json]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
 # The table lists an ID column first — copy it into `eits dm read <id>`
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
 # --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
+# --team-only: keep only messages from sessions that share a team with the current agent
 
 eits dm read <id> [--json]
 # Print a single DM's FULL body by message ID (the inbox table truncates bodies).
 # Recipient-scoped: 403 if the caller session is not the message recipient.
 # --json: machine-readable {id, uuid, body, from_session_id, to_session_id, inserted_at}
 
-eits dm wait [--session <uuid|id>] [--since <iso8601>] [--timeout <seconds>]
+eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout <seconds>]
 # Block until a new DM arrives (long-poll via GET /api/v1/dm/wait)
 # Returns {"items":[...],"count":N} on arrival or {"items":[],"count":0} after timeout
 # --session: target session (defaults to $EITS_SESSION_UUID or $EITS_SESSION_ID)
 # --since: return any DM already in inbox after this ISO8601 timestamp (useful for catching up)
+# --team-only: skip non-team messages and continue waiting until a shared-team DM arrives or timeout expires
 # --timeout: max seconds to wait (default 25s, max 55s); CLI client uses timeout + 15s headroom
 # Useful in background processes to exit instantly when a reply arrives instead of interval-polling
 

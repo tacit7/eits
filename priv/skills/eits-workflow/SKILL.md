@@ -1,9 +1,11 @@
 ---
 name: eits-workflow
-description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", or any task lifecycle questions.
-user-invocable: true
+description: >-
+  EITS task, commit, and note workflow for agents. Use when an agent needs to log
+  work, create/claim/complete tasks, log commits, or add notes during a session.
+  Triggers on: "begin a task", "log this commit", "mark task done", "add a
+  note", or any task lifecycle questions.
 allowed-tools: Bash
-argument-hint: "[task|commit|note|dm]"
 ---
 
 # EITS Workflow
@@ -43,6 +45,15 @@ eits tasks begin --title "..."
 # ... do work ...
 eits tasks complete <task_id> --message "What was done"
 ```
+
+## Inbox Polling
+
+Use `eits dm inbox --since-session --team-only --json`:
+
+- before claiming work
+- after major task state transitions
+- before `eits tasks complete`
+- after sending a completion DM, to catch follow-up work
 
 ### Manual fallback
 ```bash

@@ -3,9 +3,9 @@
 ## Tasks
 
 ```bash
-eits tasks begin --title "..." [--description "..."] [-p <project_id>] [--tag <id|name>] [--priority <p>]
-eits tasks claim <id>          # canonical: transfer ownership to current session, set In Progress
-eits tasks begin --id <id>     # compatibility alias for claim; --title/--description silently ignored; --tag still applies
+eits tasks begin --title "..." [--description "..."] [-p <project_id>] [--team <team_id>] [--tag <id|name>] [--priority <p>]
+eits tasks claim <id> [--team <team_id>]  # canonical: transfer ownership to current session, set In Progress; --team is accepted but does not mutate the existing task
+eits tasks begin --id <id> [--team <team_id>]  # compatibility alias for claim; --title/--description silently ignored; --tag still applies; --team accepted but ignored
 eits tasks start <id>          # DEPRECATED — prints a warning; use claim instead
 eits tasks complete <id> --message "Summary" [--commit <sha>] [--commit <sha2> ...]
 eits tasks annotate <id> --body "..."
@@ -84,7 +84,13 @@ eits dm --to <session_uuid_or_integer_id> --message "text"
 # Inbox — auto-resolves from $EITS_SESSION_UUID; omit --session
 eits dm inbox [--limit <n>] [--from <id>] [--since <iso8601>] [--since-session] [--team-only] [--json]
 # --session <uuid|id> is an override only — don't pass it when reading your own inbox
+# Poll at workflow checkpoints: before claiming work, after major state transitions,
+# before closing a task, and after completion DMs.
 # alias: eits dm list
+
+# Long-poll for a new DM. With --team-only, non-team messages are skipped
+# until a shared-team DM arrives or the timeout expires.
+eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout <seconds>]
 ```
 
 `--to` / `--from` accept UUID or integer session ID.

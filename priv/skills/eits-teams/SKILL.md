@@ -8,6 +8,11 @@ allowed-tools: Bash
 
 EITS teams coordinate multiple Claude agents in parallel. Membership is server-side — agents auto-join on spawn.
 
+Use `eits-team-member` in spawned-agent instructions for the mandatory member
+protocol: inbox checkpoints, task claim, no duplicate tasks, completion, explicit
+DM-back, and final inbox check. Use `eits-team-worker` when the member is doing
+code implementation in a worktree.
+
 ---
 
 ## CLI Reference
@@ -175,7 +180,7 @@ Pass `--parent-session-id` only — the server derives `parent_agent_id` from th
 ```bash
 eits agents spawn \
   --interpolate-env \
-  --instructions "Assigned task: <task_id>. Claim it with: eits tasks claim <task_id>. Do not create a duplicate task. team_id: <team_id>. Run mix compile before finishing. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=<task_id> result=<summary> branch=<branch-or-pr>'" \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: <task_id>. Claim it with: eits tasks claim <task_id>. Do not create a duplicate task. team_id: <team_id>. Run mix compile before finishing. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=<task_id> result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet \
   --team-name my-team \
   --member-name researcher \
@@ -196,6 +201,7 @@ Every worker instruction must include:
 - assigned task id
 - `eits tasks claim <task_id>`
 - "Do not create a duplicate task"
+- "Use `eits-team-member` and follow its required sequence"
 - the orchestrator session id to DM on completion
 - the expected DM format
 
@@ -262,10 +268,12 @@ eits teams delete <id>   # only when explicitly instructed
 Agents auto-receive team context. They are expected to:
 
 ```bash
+eits dm inbox --since-session --team-only --json
 eits tasks claim <assigned_task_id>      # claim the orchestrator-created task
-# Poll the inbox first, then after major transitions, before closeout, and after the done DM.
+eits dm inbox --since-session --team-only --json
 # ... do work ...
 mix compile                              # MUST pass before DM-back — never DM done with a broken branch
+eits dm inbox --since-session --team-only --json
 eits tasks complete <task_id> --message "Summary of what was done"
 # complete: annotates + marks task Done (one round-trip)
 # team member_status → done fires automatically when the agent session ends (Stop hook)
@@ -323,7 +331,7 @@ WRITE_TASK=$(eits tasks create --title "Write README from research" --team <team
 # 5a. Spawn researcher first
 eits agents spawn \
   --interpolate-env \
-  --instructions "Assigned task: $RESEARCH_TASK. Claim it with: eits tasks claim $RESEARCH_TASK. Do not create a duplicate task. Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$RESEARCH_TASK result=<summary> branch=<branch-or-pr>'" \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $RESEARCH_TASK. Claim it with: eits tasks claim $RESEARCH_TASK. Do not create a duplicate task. Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$RESEARCH_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet --team-name docs-team --member-name researcher \
   --parent-session-id $EITS_SESSION_ID
 
@@ -333,7 +341,7 @@ eits teams status <team_id> --wait
 # 5b. Only then spawn writer (producer/consumer — must be sequenced)
 eits agents spawn \
   --interpolate-env \
-  --instructions "Assigned task: $WRITE_TASK. Claim it with: eits tasks claim $WRITE_TASK. Do not create a duplicate task. Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$WRITE_TASK result=<summary> branch=<branch-or-pr>'" \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $WRITE_TASK. Claim it with: eits tasks claim $WRITE_TASK. Do not create a duplicate task. Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$WRITE_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet --team-name docs-team --member-name writer \
   --parent-session-id $EITS_SESSION_ID
 

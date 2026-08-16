@@ -505,6 +505,42 @@ fn commits_create_duplicate_reports_already_tracked_exit_0() {
 }
 
 #[test]
+fn commits_create_resolves_agent_from_session_and_sends_session_id() {
+    let srv = common::serve(vec![
+        (
+            200,
+            r#"{"uuid":"s-1","id":7,"agent_id":"agent-uuid-1","agent_int_id":9,"project_id":1}"#,
+        ),
+        (
+            201,
+            r#"{"commits":[{"id":9,"commit_hash":"abc123","commit_message":null}],"duplicates":[],"errors":[]}"#,
+        ),
+    ]);
+    Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .env_remove("EITS_AGENT_UUID")
+        .env_remove("EITS_CODEX_ENV_FILE")
+        .env_remove("EITS_CODEX_SESSION_ID")
+        .env_remove("CODEX_THREAD_ID")
+        .env_remove("CODEX_SESSION_ID")
+        .args(["commits", "create", "--hash", "abc123"])
+        .assert()
+        .success();
+
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].method, "GET");
+    assert!(reqs[0].path.ends_with("/api/v1/sessions/s-1"));
+    assert_eq!(reqs[1].method, "POST");
+    assert!(reqs[1].path.ends_with("/api/v1/commits"));
+    let body: serde_json::Value = serde_json::from_str(&reqs[1].body).unwrap();
+    assert_eq!(body["agent_id"], "agent-uuid-1");
+    assert_eq!(body["session_id"], "s-1");
+    assert_eq!(body["commit_hashes"][0], "abc123");
+}
+
+#[test]
 fn commits_create_mixed_batch_reports_partial_with_both_arrays_exit_0() {
     let srv = common::serve(vec![(
         200,

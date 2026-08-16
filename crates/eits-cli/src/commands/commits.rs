@@ -58,7 +58,12 @@ fn resolve_agent_id(
     }
     if let Some(uuid) = &cfg.session_uuid {
         if let Ok(resp) = client.get(&format!("/sessions/{uuid}")) {
-            if let Some(a) = resp.get("agent_uuid").and_then(|v| v.as_str()) {
+            let session = resp.get("session").unwrap_or(&resp);
+            if let Some(a) = session
+                .get("agent_uuid")
+                .or_else(|| session.get("agent_id"))
+                .and_then(|v| v.as_str())
+            {
                 if !a.is_empty() {
                     return Ok(a.to_string());
                 }
@@ -175,6 +180,9 @@ pub fn run(
                 "agent_id": agent_id,
                 "commit_hashes": hashes,
             });
+            if let Some(identity) = cfg.session_identity() {
+                payload["session_id"] = json!(identity);
+            }
             if !messages.is_empty() {
                 payload["commit_messages"] = json!(messages);
             }

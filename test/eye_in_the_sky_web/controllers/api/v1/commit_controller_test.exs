@@ -136,6 +136,40 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
       assert length(resp["commits"]) == 1
     end
 
+    test "creates commits for explicit session_id without agent_id", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.uuid,
+          "commit_hashes" => ["sessionhash123"]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert commit["commit_hash"] == "sessionhash123"
+      assert commit["session_id"] == session.id
+      assert commit["agent_id"] == agent.id
+    end
+
+    test "creates commits for explicit integer session_id", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.id,
+          "commit_hashes" => ["integer-session-hash"]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert commit["commit_hash"] == "integer-session-hash"
+      assert commit["session_id"] == session.id
+      assert commit["agent_id"] == agent.id
+    end
+
     test "returns 400 when commit_hashes is not a list", %{conn: conn} do
       agent = create_agent()
       _session = create_session(agent)
@@ -151,7 +185,17 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
 
     test "returns 400 when agent_id is missing", %{conn: conn} do
       conn = post(conn, ~p"/api/v1/commits", %{"commit_hashes" => ["abc"]})
-      assert json_response(conn, 400)["error"] == "agent_id is required"
+      assert json_response(conn, 400)["error"] == "session_id or agent_id is required"
+    end
+
+    test "returns 404 when explicit session_id is unknown", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => Ecto.UUID.generate(),
+          "commit_hashes" => ["abc"]
+        })
+
+      assert json_response(conn, 404)["error"] == "Session not found"
     end
 
     test "returns 400 when commit_hashes is empty", %{conn: conn} do

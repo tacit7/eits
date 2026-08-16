@@ -96,17 +96,20 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   @doc """
   POST /api/v1/commits - Track one or more git commits.
 
-  Accepts agent_id (UUID), commit_hashes (list), commit_messages (optional list).
-  Looks up the agent by UUID to get the session_id integer FK for the commits table.
+  Accepts session_id (UUID or integer), agent_id (UUID), commit_hashes (list),
+  commit_messages (optional list). When session_id is present, it is used as
+  the authoritative commit target; otherwise the latest session for agent_id is
+  used for compatibility.
   """
   def create(conn, params) do
+    session_identity = params["session_id"]
     agent_uuid = params["agent_id"]
     hashes = params["commit_hashes"] || []
     messages = params["commit_messages"] || []
 
     cond do
-      is_nil(agent_uuid) or agent_uuid == "" ->
-        {:error, :bad_request, "agent_id is required"}
+      blank?(session_identity) and blank?(agent_uuid) ->
+        {:error, :bad_request, "session_id or agent_id is required"}
 
       not is_list(hashes) ->
         {:error, :bad_request, "commit_hashes must be a list"}
@@ -115,13 +118,12 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
         {:error, :bad_request, "commit_hashes is required"}
 
       true ->
-        do_create_commits(conn, agent_uuid, hashes, messages)
+        do_create_commits(conn, session_identity, agent_uuid, hashes, messages)
     end
   end
 
-  defp do_create_commits(conn, agent_uuid, hashes, messages) do
-    with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
-         [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+  defp do_create_commits(conn, session_identity, agent_uuid, hashes, messages) do
+    with {:ok, session, agent_id} <- resolve_commit_target(session_identity, agent_uuid) do
       results =
         hashes
         |> Enum.with_index()
@@ -130,7 +132,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
           Commits.create_commit(%{
             session_id: session.id,
-            agent_id: agent.id,
+            agent_id: agent_id,
             commit_hash: hash,
             commit_message: message
           })
@@ -162,6 +164,9 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
         already_tracked: duplicates != [] and created == [] and errors == []
       })
     else
+      {:error, :session_not_found} ->
+        {:error, :not_found, "Session not found"}
+
       {:error, :not_found} ->
         {:error, :not_found, "Agent not found"}
 
@@ -169,4 +174,28 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
         {:error, :not_found, "No session found for agent"}
     end
   end
+
+  defp resolve_commit_target(session_identity, _agent_uuid)
+       when is_binary(session_identity) and session_identity != "" do
+    case SessionResolver.resolve(session_identity) do
+      {:ok, session} -> {:ok, session, session.agent_id}
+      _ -> {:error, :session_not_found}
+    end
+  end
+
+  defp resolve_commit_target(session_identity, _agent_uuid) when is_integer(session_identity) do
+    case SessionResolver.resolve(session_identity) do
+      {:ok, session} -> {:ok, session, session.agent_id}
+      _ -> {:error, :session_not_found}
+    end
+  end
+
+  defp resolve_commit_target(_session_identity, agent_uuid) do
+    with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
+         [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
+      {:ok, session, agent.id}
+    end
+  end
+
+  defp blank?(value), do: is_nil(value) or value == ""
 end

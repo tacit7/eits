@@ -13,6 +13,14 @@ protocol: inbox checkpoints, task claim, no duplicate tasks, completion, explici
 DM-back, and final inbox check. Use `eits-team-worker` when the member is doing
 code implementation in a worktree.
 
+For the spawned agent's own session snapshot, use `eits work status` or
+`eits work checkpoint`. That command is the agent-local view of claimed tasks,
+team memberships, inbox summary, git/worktree health, and commit tracking.
+Use it at session start/resume, after task claim, after major handoff points,
+and before DM-back or completion. Use `eits teams status <team_id> --wait` for
+whole-team completion tracking instead of trying to infer team state from the
+work checkpoint alone.
+
 ---
 
 ## CLI Reference
@@ -237,6 +245,10 @@ git log --oneline main..<worktree-branch>
 # Or just check the merge commit exists
 git log --oneline --merges | head -5
 ```
+
+If you need the current agent's own session snapshot during this review, run
+`eits work checkpoint` rather than re-polling every team command. It gives the
+claimed-task and git context that `teams status` does not.
 
 ### 8. Review and close out
 

@@ -75,10 +75,13 @@ eits dm --to $UUID_2 --message "..."
 
 Use `eits dm inbox --since-session --team-only --json`:
 
+- after resuming a session, run `eits work checkpoint` first to confirm your current task/team/git context, then poll the inbox
 - before claiming work
 - after major state transitions
 - before `eits tasks complete`
 - after sending a completion DM, to catch follow-up work
+
+Use `eits work status` or `eits work checkpoint` when the message flow changes your ownership, team membership, or git state. It is the fast local snapshot; inbox polling is still the durable source of team messages.
 
 ---
 

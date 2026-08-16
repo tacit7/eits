@@ -55,6 +55,19 @@ Use `eits dm inbox --since-session --team-only --json`:
 - before `eits tasks complete`
 - after sending a completion DM, to catch follow-up work
 
+## Work Checkpoints
+
+Use `eits work status` or `eits work checkpoint` when you need one session-level snapshot instead of piecing together multiple commands.
+
+Run it:
+
+- at session start or resume, before touching files
+- immediately after `eits tasks claim`
+- after a major state transition that may affect ownership, team membership, or git state
+- before `eits tasks complete` or handing the work off
+
+Prefer the checkpoint command for a quick local audit of your current session. It summarizes the active session, claimed tasks, team memberships, inbound DMs, git/worktree health, and commit-tracking status, while `eits dm inbox --since-session --team-only --json` remains the durable team-message check.
+
 ### Manual fallback
 ```bash
 eits tasks annotate <id> --body "Summary"

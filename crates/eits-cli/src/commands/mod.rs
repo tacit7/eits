@@ -4,6 +4,7 @@ pub mod notes;
 pub mod sessions;
 pub mod tasks;
 pub mod whoami;
+pub mod work;
 
 use serde_json::{json, Value};
 

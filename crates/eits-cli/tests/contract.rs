@@ -62,6 +62,7 @@ fn help_output_matches_goldens() {
         (&["commits", "--help"], "help_commits.txt"),
         (&["notes", "--help"], "help_notes.txt"),
         (&["whoami", "--help"], "help_whoami.txt"),
+        (&["work", "--help"], "help_work.txt"),
     ];
     for (args, golden) in cases {
         let out = Command::cargo_bin("eits")

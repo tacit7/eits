@@ -99,6 +99,22 @@ eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout 
 
 ---
 
+## Work
+
+```bash
+eits work status
+eits work checkpoint   # alias for status
+```
+
+Reports the current checkpoint for the active session. JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, git/worktree health, and commit-tracking status where feasible.
+
+**Best uses:**
+- Resume and handoff check: verify the current session is linked to the right project and task set
+- Team context: inspect memberships before sending DMs or spawning follow-up work
+- Git hygiene: confirm whether HEAD is already logged to EITS commits
+
+---
+
 ## Notes
 
 ```bash

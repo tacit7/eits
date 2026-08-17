@@ -66,6 +66,15 @@ end
 
 The pin (`^workspace_id`) makes the match fail silently for foreign projects. The error message is identical to "not found" to avoid leaking information about the existence of other workspaces' projects.
 
+When the caller already knows the workspace boundary, prefer the scoped helper instead:
+
+```elixir
+Projects.get_project_for_workspace(project_id, workspace_id)
+# → {:ok, %Project{}} | {:error, :not_found}
+```
+
+This helper treats both missing projects and foreign-workspace projects as `:not_found`, which keeps the contract aligned with user-facing not-found behavior.
+
 ### Layer 2 — Component guard (MapSet lookup)
 
 `NewSessionModal.handle_event("project_changed", ...)` re-validates the incoming `project_id` against the set of projects the component was given:
@@ -109,6 +118,13 @@ Projects.list_projects_for_workspace(workspace_id)
 ```
 
 Use this everywhere a workspace LiveView needs the project dropdown or project list. Never query `Project` directly with a `workspace_id` filter outside this function.
+
+For user-supplied project IDs that must not cross workspace boundaries, use:
+
+```elixir
+Projects.get_project_for_workspace(project_id, workspace_id)
+# → {:ok, %Project{}} | {:error, :not_found}
+```
 
 ### Sessions scoped to a workspace
 

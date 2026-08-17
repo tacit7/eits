@@ -53,10 +53,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   }
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    rail_context_topic = session["rail_context_topic"] || "rail:context"
+
     socket =
       assign(socket,
         projects: [],
+        rail_context_topic: rail_context_topic,
         flyout_open: true,
         proj_picker_open: false,
         active_section: nil,
@@ -118,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # Skip DB queries on the dead render (mount runs twice — static + connected).
     # This LiveView mounts once and persists across navigation.
     if connected?(socket) do
-      Events.subscribe_rail_context()
+      Events.subscribe_rail_context(rail_context_topic)
       Events.subscribe_rail_unread_counts()
       Events.subscribe_rail_session_update()
       Events.subscribe_rail_notifications_refresh()

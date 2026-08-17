@@ -455,8 +455,26 @@ defmodule EyeInTheSky.Events do
   # LiveView process. RailLive is now a standalone process; PubSub is the
   # correct cross-process channel.
 
+  @doc """
+  Build a browser-session-scoped topic for rail context updates.
+
+  The rail is rendered as a sticky child LiveView while the page content is a
+  separate LiveView process. A global rail context topic lets one window's page
+  broadcasts overwrite another window's selected project, so routed views pass
+  this scoped topic into the embedded rail.
+  """
+  def rail_context_topic(%{"_csrf_token" => token}) when is_binary(token) and token != "" do
+    digest =
+      :crypto.hash(:sha256, token)
+      |> Base.url_encode64(padding: false)
+
+    "rail:context:#{digest}"
+  end
+
+  def rail_context_topic(_session), do: "rail:context"
+
   @doc "Subscribe to rail context updates. Call from RailLive.mount/3 (connected? guard)."
-  def subscribe_rail_context, do: sub("rail:context")
+  def subscribe_rail_context(topic \\ "rail:context"), do: sub(topic)
 
   @doc """
   Broadcast current rail context from a page LiveView.
@@ -465,7 +483,9 @@ defmodule EyeInTheSky.Events do
   Reads sidebar_tab, sidebar_project, and active_channel_id from socket.assigns.
   """
   def broadcast_rail_context(socket) do
-    broadcast("rail:context", {
+    topic = socket.assigns[:rail_context_topic] || "rail:context"
+
+    broadcast(topic, {
       :rail_context,
       %{
         sidebar_tab: socket.assigns[:sidebar_tab] || :sessions,

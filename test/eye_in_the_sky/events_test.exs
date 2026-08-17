@@ -93,6 +93,32 @@ defmodule EyeInTheSky.EventsTest do
     end
   end
 
+  describe "rail context" do
+    test "broadcast_rail_context/1 uses the socket rail context topic when present" do
+      topic = "rail:context:test:#{System.unique_integer([:positive])}"
+      sub(topic)
+
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          rail_context_topic: topic,
+          sidebar_tab: :tasks,
+          sidebar_project: %{id: 2, name: "Other project"},
+          active_channel_id: nil
+        }
+      }
+
+      Events.broadcast_rail_context(socket)
+
+      assert_receive {:rail_context,
+                      %{
+                        sidebar_tab: :tasks,
+                        sidebar_project: %{id: 2, name: "Other project"},
+                        active_channel_id: nil
+                      }},
+                     500
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Agent identity events
   # ---------------------------------------------------------------------------

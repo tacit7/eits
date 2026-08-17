@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.NavHook do
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
   alias EyeInTheSkyWeb.NavHook.PaletteHandlers
 
-  def on_mount(:default, _params, _session, socket) do
+  def on_mount(:default, _params, session, socket) do
     if connected?(socket), do: Events.subscribe_agents()
 
     projects =
@@ -37,6 +37,7 @@ defmodule EyeInTheSkyWeb.NavHook do
       socket
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
+      |> assign(:rail_context_topic, Events.rail_context_topic(session))
       |> assign(:palette_projects, projects)
       |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> then(fn s ->

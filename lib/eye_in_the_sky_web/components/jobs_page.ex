@@ -543,6 +543,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
         module={AgentScheduleSection}
         id="agent-schedule-section"
         project_id={@project_id}
+        workspace_id={if @project, do: @project.workspace_id}
         active_tab={@active_tab}
       />
 

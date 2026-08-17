@@ -295,6 +295,7 @@ window.addEventListener("dblclick", (e) => {
 // Since ES modules are keyed by URL, these are treated as distinct module instances.
 // The guard ensures the second evaluation is a no-op — the first LiveSocket wins.
 if (!window.liveSocket) {
+  liveSocket.enableDebug()
   liveSocket.connect()
   window.liveSocket = liveSocket
 }

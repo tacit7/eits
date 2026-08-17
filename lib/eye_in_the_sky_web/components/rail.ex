@@ -55,6 +55,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   @impl true
   def mount(_params, session, socket) do
     rail_context_topic = session["rail_context_topic"] || "rail:context"
+    sidebar_tab = Loader.parse_section(session["sidebar_tab"])
+    sidebar_project = initial_sidebar_project(session["sidebar_project_id"])
 
     socket =
       assign(socket,
@@ -71,8 +73,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         renaming_project_id: nil,
         rename_value: "",
         mobile_open: false,
-        sidebar_project: nil,
-        sidebar_tab: :sessions,
+        sidebar_project: sidebar_project,
+        sidebar_tab: sidebar_tab,
         active_channel_id: nil,
         workspace: nil,
         scope_type: :project,
@@ -137,6 +139,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
        ), layout: false}
     else
       {:ok, socket, layout: false}
+    end
+  end
+
+  defp initial_sidebar_project(nil), do: nil
+
+  defp initial_sidebar_project(id) do
+    case Projects.get_project(id) do
+      {:ok, project} -> project
+      {:error, _} -> nil
     end
   end
 

@@ -103,5 +103,22 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
 
       refute has_element?(view3, "[phx-click='select_project']")
     end
+
+    test "selecting a different project from a project page navigates to that project", %{
+      conn: conn
+    } do
+      p1 = build_project()
+      p2 = build_project()
+      {:ok, view, _html} = live(conn, ~p"/projects/#{p1.id}/tasks")
+      rail = get_rail(view)
+
+      rail |> element("[phx-click='toggle_proj_picker']") |> render_click()
+
+      {:ok, _view2, _html} =
+        rail
+        |> element("[phx-click='select_project'][phx-value-project_id='#{p2.id}']")
+        |> render_click()
+        |> follow_redirect(conn, ~p"/projects/#{p2.id}/tasks")
+    end
   end
 end

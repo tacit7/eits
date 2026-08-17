@@ -273,5 +273,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   end
 
   defp list_projects_for_context(nil), do: Projects.list_projects()
-  defp list_projects_for_context(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
+
+  defp list_projects_for_context(workspace_id),
+    do: Projects.list_projects_for_workspace(workspace_id)
 end

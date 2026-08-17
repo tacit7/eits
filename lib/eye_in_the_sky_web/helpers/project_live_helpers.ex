@@ -11,6 +11,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
   import Phoenix.LiveView, only: [connected?: 1, put_flash: 3]
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Workspaces
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
 
   @doc """
@@ -36,28 +37,20 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
     preload = Keyword.get(opts, :preload, [])
 
     project_id = parse_id(id)
-
-    project =
-      if project_id,
-        do:
-          (case Projects.get_project(project_id) do
-             {:ok, p} -> p
-             {:error, :not_found} -> nil
-           end),
-        else: nil
-
-    project =
-      if not is_nil(project) && preload != [] && connected?(socket),
-        do: Projects.preload_project(project, preload),
-        else: project
+    project = load_project_for_socket(socket, project_id, preload)
 
     if project do
+      workspace = Workspaces.get_workspace(project.workspace_id)
+
       socket
       |> assign(:project, project)
-      |> assign(:project_id, project_id)
+      |> assign(:project_id, project.id)
       |> assign(:page_title, "#{page_title_prefix} - #{project.name}")
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, project)
+      |> assign(:workspace, workspace)
+      |> assign(:workspace_id, workspace && workspace.id)
+      |> assign(:palette_projects, palette_projects_for_workspace(workspace))
     else
       socket
       |> assign(:project, nil)
@@ -65,7 +58,43 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       |> assign(:page_title, "Project Not Found")
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:sidebar_project, nil)
-      |> put_flash(:error, "Invalid project ID")
+      |> put_flash(:error, "Project not found")
     end
   end
+
+  @doc """
+  Loads a project for a project route.
+
+  Project routes are the source of truth for the active workspace. This allows
+  direct navigation and command-palette jumps to projects outside the currently
+  selected workspace while still updating the rail/palette scope to match the
+  routed project.
+  """
+  def load_project_for_socket(socket, project_id, preload \\ [])
+
+  def load_project_for_socket(socket, project_id, preload) when not is_nil(project_id) do
+    case Projects.get_project(project_id) do
+      {:ok, project} ->
+        maybe_preload_project(socket, project, preload)
+
+      {:error, :not_found} ->
+        nil
+    end
+  end
+
+  def load_project_for_socket(_socket, _project_id, _preload), do: nil
+
+  defp maybe_preload_project(socket, project, preload) do
+    if preload != [] and connected?(socket),
+      do: Projects.preload_project(project, preload),
+      else: project
+  end
+
+  defp palette_projects_for_workspace(%Workspaces.Workspace{id: workspace_id}) do
+    workspace_id
+    |> Projects.list_projects_for_workspace()
+    |> Enum.map(&%{id: &1.id, name: &1.name})
+  end
+
+  defp palette_projects_for_workspace(_workspace), do: []
 end

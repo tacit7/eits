@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
   alias EyeInTheSky.Notes
   alias EyeInTheSky.Tasks
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
@@ -19,43 +20,49 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     starred_only = params["starred"] in ["true", "1"]
     source_session_uuid = params["source_session_uuid"]
 
-    notes =
-      cond do
-        source_session_uuid ->
-          Notes.list_notes_by_source_session(source_session_uuid,
-            starred: starred_only,
-            parent_type: params["parent_type"],
-            parent_id: params["parent_id"],
-            limit: limit
-          )
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      notes =
+        cond do
+          source_session_uuid ->
+            Notes.list_notes_by_source_session(source_session_uuid,
+              starred: starred_only,
+              parent_type: params["parent_type"],
+              parent_id: params["parent_id"],
+              limit: limit
+            )
 
-        params["session_id"] ->
-          Notes.list_notes_for_session(params["session_id"], limit: limit, starred: starred_only)
+          params["session_id"] ->
+            Notes.list_notes_for_session(params["session_id"],
+              limit: limit,
+              starred: starred_only
+            )
 
-        params["task_id"] ->
-          case Tasks.get_task_ids(params["task_id"]) do
-            {:ok, {task_id, _uuid}} ->
-              Notes.list_notes_for_task(task_id, starred: starred_only)
+          params["task_id"] ->
+            case Tasks.get_task_ids(params["task_id"]) do
+              {:ok, {task_id, _uuid}} ->
+                Notes.list_notes_for_task(task_id, starred: starred_only)
 
-            {:error, :not_found} ->
-              []
-          end
+              {:error, :not_found} ->
+                []
+            end
 
-        true ->
-          query = params["q"] || ""
+          true ->
+            query = params["q"] || ""
 
-          Notes.search_notes(query, [],
-            limit: limit,
-            project_id: params["project_id"],
-            starred: starred_only
-          )
-      end
+            Notes.search_notes(query, [],
+              limit: limit,
+              project_id: project_id,
+              starred: starred_only
+            )
+        end
 
-    json(conn, %{
-      success: true,
-      message: "Found #{length(notes)} note(s)",
-      results: Enum.map(notes, &ApiPresenter.present_note/1)
-    })
+      json(conn, %{
+        success: true,
+        message: "Found #{length(notes)} note(s)",
+        results: Enum.map(notes, &ApiPresenter.present_note/1)
+      })
+    end
   end
 
   @doc """

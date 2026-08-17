@@ -347,11 +347,12 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
           workspace_id: other_workspace.id
         })
 
-      socket = bare_socket(%{
-        workspace_id: workspace.id,
-        project_id: allowed_project.id,
-        projects: [allowed_project]
-      })
+      socket =
+        bare_socket(%{
+          workspace_id: workspace.id,
+          project_id: allowed_project.id,
+          projects: [allowed_project]
+        })
 
       params = %{
         "schedule" => %{

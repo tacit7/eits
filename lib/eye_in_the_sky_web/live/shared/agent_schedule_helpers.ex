@@ -225,7 +225,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   defp put_bool_if_true(map, _key, _), do: map
 
   defp list_projects_for_context(nil), do: Projects.list_projects()
-  defp list_projects_for_context(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
+
+  defp list_projects_for_context(workspace_id),
+    do: Projects.list_projects_for_workspace(workspace_id)
 
   # 4-step resolution: form override -> prompt default -> page context -> error
   defp resolve_project_path(params, prompt, socket) do

@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   alias EyeInTheSky.Agents
   alias EyeInTheSky.Agents.{AgentManager, SpawnValidator}
   alias EyeInTheSky.Git.Worktrees
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   require Logger
@@ -19,7 +20,16 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
 
-    with {:ok, agents} <- resolve_agents(params, limit) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+         {:ok, agents} <-
+           resolve_agents(
+             if(project_id,
+               do: Map.put(params, "project_id", project_id),
+               else: Map.delete(params, "project_id")
+             ),
+             limit
+           ) do
       json(conn, %{
         success: true,
         agents: Enum.map(agents, &ApiPresenter.present_agent/1)

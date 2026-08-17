@@ -3,11 +3,10 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
-  import EyeInTheSkyWeb.ControllerHelpers
-
   alias EyeInTheSky.{Channels, Sessions}
   alias EyeInTheSky.Channels.Channel
   alias EyeInTheSky.Messaging.DMDelivery
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSky.Utils.ToolHelpers
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -24,7 +23,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
     name = String.trim(params["name"] || "")
 
     with :ok <- validate_name(name),
-         {:ok, project_id} <- resolve_project_id(params["project_id"]),
+         {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
          {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
       channel_type = params["channel_type"] || "public"
       channel_id = Channel.generate_id(project_id, name)
@@ -97,22 +97,19 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
   @doc "GET /api/v1/channels - List available chat channels."
   def index(conn, params) do
-    channels =
-      if params["project_id"] do
-        project_id = parse_int(params["project_id"])
-
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      channels =
         if project_id,
           do: Channels.list_channels_for_project(project_id),
           else: Channels.list_channels()
-      else
-        Channels.list_channels()
-      end
 
-    json(conn, %{
-      success: true,
-      message: "#{length(channels)} channel(s) found",
-      channels: Enum.map(channels, &ApiPresenter.present_channel/1)
-    })
+      json(conn, %{
+        success: true,
+        message: "#{length(channels)} channel(s) found",
+        channels: Enum.map(channels, &ApiPresenter.present_channel/1)
+      })
+    end
   end
 
   @doc """
@@ -240,15 +237,6 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
   defp validate_name(""), do: {:error, :bad_request, "name is required"}
   defp validate_name(_), do: :ok
-
-  defp resolve_project_id(nil), do: {:ok, nil}
-
-  defp resolve_project_id(raw) do
-    case parse_int(raw) do
-      nil -> {:error, :bad_request, "project_id must be an integer"}
-      id -> {:ok, id}
-    end
-  end
 
   defp resolve_creator_session(nil), do: {:ok, nil}
 

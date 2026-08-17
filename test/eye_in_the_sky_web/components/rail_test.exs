@@ -120,5 +120,17 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
         |> render_click()
         |> follow_redirect(conn, ~p"/projects/#{p2.id}/tasks")
     end
+
+    test "restored project selection wins over a stale project route", %{conn: conn} do
+      p1 = build_project()
+      p2 = build_project()
+      {:ok, view, _html} = live(conn, ~p"/projects/#{p1.id}/tasks")
+      rail = get_rail(view)
+
+      {:ok, _view2, _html} =
+        rail
+        |> render_hook("restore_rail_state", %{"project_id" => p2.id, "section" => "tasks"})
+        |> follow_redirect(conn, ~p"/projects/#{p2.id}/tasks")
+    end
   end
 end

@@ -402,7 +402,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Maps the current sidebar_tab to the equivalent project-scoped route.
   # Returns nil for global tabs (:usage, :chat, :canvas, :notifications, :dm)
   # so the caller can skip navigation and leave the user on their current page.
-  defp project_path(id, tab) do
+  def project_path(id, tab) do
     case tab do
       :sessions -> "/projects/#{id}/sessions"
       :tasks -> "/projects/#{id}/tasks"

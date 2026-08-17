@@ -219,17 +219,41 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   # corrupted localStorage entry never crashes the LiveComponent.
 
   defp maybe_restore_project(socket, %{"project_id" => id}) when not is_nil(id) do
-    # Only restore when the parent LiveView hasn't already set a project.
-    # update/2 runs before the hook fires, so a route-scoped project wins.
-    if is_nil(socket.assigns.sidebar_project) do
-      ProjectActions.handle_restore_project(to_string(id), socket)
-      |> then(fn {:noreply, s} -> s end)
-    else
-      socket
+    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    case parse_int(to_string(id)) do
+      nil ->
+        socket
+
+      ^current_id ->
+        socket
+
+      project_id ->
+        ProjectActions.handle_restore_project(to_string(project_id), socket)
+        |> then(fn {:noreply, restored_socket} ->
+          maybe_navigate_to_restored_project(restored_socket, current_id, project_id)
+        end)
     end
   end
 
   defp maybe_restore_project(socket, _), do: socket
+
+  defp maybe_navigate_to_restored_project(socket, nil, _project_id), do: socket
+
+  defp maybe_navigate_to_restored_project(socket, _current_id, project_id) do
+    restored_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    if restored_id == project_id do
+      sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
+
+      case ProjectActions.project_path(project_id, sidebar_tab) do
+        nil -> socket
+        path -> push_navigate(socket, to: path)
+      end
+    else
+      socket
+    end
+  end
 
   defp maybe_restore_section(socket, %{"section" => section}) when is_binary(section) do
     assign(socket, :active_section, Loader.parse_section(section))

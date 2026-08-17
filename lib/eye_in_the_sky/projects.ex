@@ -57,6 +57,23 @@ defmodule EyeInTheSky.Projects do
   end
 
   @doc """
+  Gets a single project scoped to a workspace.
+
+  Returns {:ok, project} when the project belongs to the given workspace.
+  Foreign-workspace projects are treated the same as missing records.
+  """
+  def get_project_for_workspace(project_id, workspace_id) do
+    with project_id when not is_nil(project_id) <- parse_project_id(project_id),
+         workspace_id when not is_nil(workspace_id) <- parse_project_id(workspace_id),
+         {:ok, project} <- get_project(project_id),
+         true <- project.workspace_id == workspace_id do
+      {:ok, project}
+    else
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
   Gets a project with agents preloaded. Raises if not found.
   """
   def get_project_with_agents!(id) do

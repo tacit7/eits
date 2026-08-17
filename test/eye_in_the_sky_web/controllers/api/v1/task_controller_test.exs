@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
   import Ecto.Query, only: [from: 2]
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.{Repo, Tasks, Teams}
+  alias EyeInTheSky.{Projects, Repo, Tasks, Teams, Workspaces}
   alias EyeInTheSky.Tasks.WorkflowState
 
   import EyeInTheSky.Factory
@@ -34,6 +34,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       )
 
     task
+  end
+
+  defp create_project_in_workspace(workspace_id, overrides \\ %{}) do
+    n = uniq()
+
+    {:ok, project} =
+      Projects.create_project(
+        Map.merge(
+          %{
+            name: "Task Project #{n}",
+            slug: "task-project-#{n}",
+            path: "/tmp/task-project-#{n}",
+            workspace_id: workspace_id
+          },
+          overrides
+        )
+      )
+
+    project
   end
 
   # ---- GET /api/v1/tasks ----
@@ -604,6 +623,32 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       resp = json_response(conn, 201)
       assert resp["success"] == true
       assert resp["task_id"] != nil
+    end
+  end
+
+  describe "project scope enforcement" do
+    test "rejects task creation for a project outside the current workspace when session scope is present",
+         %{conn: conn} do
+      current_user = user_fixture()
+      current_workspace = Workspaces.default_workspace_for_user!(current_user)
+      own_project = create_project_in_workspace(current_workspace.id)
+      agent = create_agent()
+      session = create_session(agent, %{project_id: own_project.id})
+
+      foreign_user = user_fixture()
+      foreign_workspace = Workspaces.default_workspace_for_user!(foreign_user)
+      foreign_project = create_project_in_workspace(foreign_workspace.id)
+
+      conn =
+        conn
+        |> put_req_header("x-eits-session", session.uuid)
+        |> post(~p"/api/v1/tasks", %{
+          "title" => "Foreign task",
+          "project_id" => foreign_project.id
+        })
+
+      resp = json_response(conn, 403)
+      assert resp["error"] == "Access denied"
     end
   end
 

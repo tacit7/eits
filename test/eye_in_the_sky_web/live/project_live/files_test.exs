@@ -2,14 +2,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
   use EyeInTheSkyWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import EyeInTheSky.Factory
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Workspaces
 
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp create_project_with_dir do
+  defp create_project_with_dir(workspace_id) do
     tmp_dir = Path.join(System.tmp_dir!(), "eits_test_#{System.unique_integer([:positive])}")
     # Clean up any leftovers from killed test runs before creating fresh
     File.rm_rf(tmp_dir)
@@ -17,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
     on_exit(fn -> File.rm_rf(tmp_dir) end)
 
     {:ok, project} =
-      Projects.create_project(%{name: "Test Project", path: tmp_dir})
+      Projects.create_project(%{name: "Test Project", path: tmp_dir, workspace_id: workspace_id})
 
     {project, tmp_dir}
   end
@@ -27,8 +29,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
   # ---------------------------------------------------------------------------
 
   describe "file_changed event" do
-    test "saves file content to disk", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "saves file content to disk", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
       File.write!(Path.join(dir, "hello.ex"), "# old")
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=hello.ex")
@@ -38,8 +41,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(Path.join(dir, "hello.ex")) == "# new content"
     end
 
-    test "handle_params rejects path traversal via ../", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "handle_params rejects path traversal via ../", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
 
       # Create a file outside project root
       parent = Path.dirname(dir)
@@ -56,8 +60,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(secret) == "do not touch"
     end
 
-    test "handle_params rejects symlink escape", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "handle_params rejects symlink escape", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
 
       # Create a file outside project root and a symlink inside pointing to it
       parent = Path.dirname(dir)
@@ -75,11 +80,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(secret) == "do not touch"
     end
 
-    test "navigating to path=. (Back from top-level file) shows root listing", %{conn: conn} do
+    test "navigating to path=. (Back from top-level file) shows root listing", %{conn: conn, user: user} do
       # When viewing a top-level file like "hello.ex", the Back link computes
       # Path.dirname("hello.ex") = "." and patches to ?path=.
       # path_within?(project_root, project_root) must be true so we get the listing.
-      {project, dir} = create_project_with_dir()
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
       File.write!(Path.join(dir, "hello.ex"), "# hello")
       File.write!(Path.join(dir, "world.ex"), "# world")
 
@@ -91,8 +97,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert html =~ "hello.ex"
     end
 
-    test "returns error flash on write failure", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "returns error flash on write failure", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
       file_path = Path.join(dir, "readonly.ex")
       File.write!(file_path, "content")
 
@@ -117,8 +124,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
   end
 
   describe "handle_params — error paths" do
-    test "non-existent file path assigns an error", %{conn: conn} do
-      {project, _dir} = create_project_with_dir()
+    test "non-existent file path assigns an error", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, _dir} = create_project_with_dir(workspace.id)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=does_not_exist.ex")
 
@@ -128,8 +136,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert html =~ "File not found" or html =~ "Access denied"
     end
 
-    test "directory path loads listing without error", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "directory path loads listing without error", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
       subdir = Path.join(dir, "src")
       File.mkdir_p!(subdir)
       File.write!(Path.join(subdir, "app.ex"), "# app")
@@ -141,8 +150,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert html =~ "app.ex"
     end
 
-    test "valid file path renders content pane without error", %{conn: conn} do
-      {project, dir} = create_project_with_dir()
+    test "valid file path renders content pane without error", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir} = create_project_with_dir(workspace.id)
       File.write!(Path.join(dir, "main.ex"), "defmodule Main, do: nil")
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/files?path=main.ex")
@@ -150,6 +160,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       html = render(view)
       refute html =~ "Access denied"
       refute html =~ "No files"
+    end
+  end
+
+  describe "cross-project access guard" do
+    test "rejects files page for a project in another workspace", %{conn: conn, user: user} do
+      current_workspace = Workspaces.default_workspace_for_user!(user)
+      other_user = user_fixture()
+      other_workspace = Workspaces.default_workspace_for_user!(other_user)
+      n = uniq()
+
+      {:ok, foreign_project} =
+        Projects.create_project(%{
+          name: "Foreign Files #{n}",
+          slug: "foreign-files-#{n}",
+          path: "/tmp/foreign-files-#{n}",
+          workspace_id: other_workspace.id
+        })
+
+      assert current_workspace.id != other_workspace.id
+
+      assert {:error, {:live_redirect, %{to: "/"}}} =
+               live(conn, ~p"/projects/#{foreign_project.id}/files")
     end
   end
 end

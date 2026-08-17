@@ -18,10 +18,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     only: [read_file_safe_detailed: 1, path_within?: 2]
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
 
   require Logger
 
-  alias EyeInTheSky.{Editors, Events, Projects, Settings}
+  alias EyeInTheSky.{Editors, Events, Settings}
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
@@ -29,6 +30,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
+
     socket =
       socket
       |> assign(:file_path, nil)
@@ -44,7 +48,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:installed_editors, Editors.detect_installed())
       |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
-    case parse_int(id) do
+    case project_id do
       nil ->
         {:ok,
          socket
@@ -53,9 +57,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:error, "Invalid project ID")
          |> put_flash(:error, "Invalid project ID")}
 
-      project_id ->
-        case Projects.get_project(project_id) do
-          {:error, :not_found} ->
+      _ ->
+        case project do
+          nil ->
             {:ok,
              socket
              |> assign(:page_title, "Project Not Found")
@@ -63,7 +67,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
              |> assign(:error, "Project not found")
              |> put_flash(:error, "Project not found")}
 
-          {:ok, project} ->
+          project ->
             socket =
               socket
               |> assign(:page_title, "Files - #{project.name}")

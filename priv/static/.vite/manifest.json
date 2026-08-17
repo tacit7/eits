@@ -1,0 +1,7 @@
+{
+  "js/app.js": {
+    "file": "assets/js/app.js",
+    "isEntry": true,
+    "css": []
+  }
+}

@@ -6,15 +6,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
   import EyeInTheSkyWeb.Components.ConfigBrowser
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
 
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
 
     socket =
       socket
@@ -29,8 +30,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       {:ok, redirect(socket, to: "/projects")}
     else
       socket =
-        if connected?(socket) do
-          project = Projects.get_project!(project_id)
+        if project do
           claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
           socket
@@ -40,6 +40,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
           |> assign(:claude_dir, claude_dir)
         else
           socket
+          |> put_flash(:error, "Project not found")
         end
 
       if connected?(socket), do: Events.broadcast_rail_context(socket)

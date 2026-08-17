@@ -3,33 +3,33 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
 
   action_fallback EyeInTheSkyWeb.Api.V1.FallbackController
 
-  import EyeInTheSkyWeb.ControllerHelpers
-
   alias EyeInTheSky.Prompts
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
+  import EyeInTheSkyWeb.ControllerHelpers, only: [translate_errors: 1]
 
   @doc """
   GET /api/v1/prompts - List prompts. Supports ?query= for search, ?project_id= for scoping.
   """
   def index(conn, params) do
-    project_id = parse_int(params["project_id"])
+    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      prompts =
+        cond do
+          params["query"] && params["query"] != "" ->
+            Prompts.search_prompts(params["query"], project_id)
 
-    prompts =
-      cond do
-        params["query"] && params["query"] != "" ->
-          Prompts.search_prompts(params["query"], project_id)
+          project_id ->
+            Prompts.list_project_prompts(project_id)
 
-        project_id ->
-          Prompts.list_project_prompts(project_id)
+          true ->
+            Prompts.list_global_prompts()
+        end
 
-        true ->
-          Prompts.list_global_prompts()
-      end
-
-    json(conn, %{
-      success: true,
-      prompts: Enum.map(prompts, &ApiPresenter.present_prompt/1)
-    })
+      json(conn, %{
+        success: true,
+        prompts: Enum.map(prompts, &ApiPresenter.present_prompt/1)
+      })
+    end
   end
 
   @doc """
@@ -39,19 +39,21 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   def show(conn, %{"id" => id} = params) do
     include_text = params["include_text"] not in ["false", false]
 
-    case Prompts.get_prompt_by_ref(id, parse_int(params["project_id"])) do
-      {:error, :not_found} ->
-        {:error, :not_found, "Prompt not found"}
+    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      case Prompts.get_prompt_by_ref(id, project_id) do
+        {:error, :not_found} ->
+          {:error, :not_found, "Prompt not found"}
 
-      {:ok, prompt} ->
-        base = %{success: true, prompt: ApiPresenter.present_prompt(prompt)}
+        {:ok, prompt} ->
+          base = %{success: true, prompt: ApiPresenter.present_prompt(prompt)}
 
-        response =
-          if include_text,
-            do: put_in(base, [:prompt, :prompt_text], prompt.prompt_text),
-            else: base
+          response =
+            if include_text,
+              do: put_in(base, [:prompt, :prompt_text], prompt.prompt_text),
+              else: base
 
-        json(conn, response)
+          json(conn, response)
+      end
     end
   end
 
@@ -62,33 +64,35 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   Optional: description, project_id, tags, created_by
   """
   def create(conn, params) do
-    attrs = %{
-      name: params["name"],
-      slug: params["slug"],
-      description: params["description"],
-      prompt_text: params["prompt_text"],
-      project_id: params["project_id"],
-      tags: params["tags"],
-      created_by: params["created_by"]
-    }
+    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      attrs = %{
+        name: params["name"],
+        slug: params["slug"],
+        description: params["description"],
+        prompt_text: params["prompt_text"],
+        project_id: project_id,
+        tags: params["tags"],
+        created_by: params["created_by"]
+      }
 
-    case Prompts.create_prompt(attrs) do
-      {:ok, prompt} ->
-        conn
-        |> put_status(:created)
-        |> json(%{
-          id: prompt.id,
-          uuid: prompt.uuid,
-          name: prompt.name,
-          slug: prompt.slug,
-          description: prompt.description,
-          version: prompt.version
-        })
+      case Prompts.create_prompt(attrs) do
+        {:ok, prompt} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            id: prompt.id,
+            uuid: prompt.uuid,
+            name: prompt.name,
+            slug: prompt.slug,
+            description: prompt.description,
+            version: prompt.version
+          })
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Failed to create prompt", details: translate_errors(changeset)})
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to create prompt", details: translate_errors(changeset)})
+      end
     end
   end
 end

@@ -10,6 +10,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   alias EyeInTheSky.{Notes, Sessions, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -21,7 +22,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def index(conn, params) do
     limit = params["limit"] |> parse_int(50) |> max(1) |> min(1000)
 
-    with {:ok, time_opts} <- resolve_time_opts(params) do
+    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+         {:ok, time_opts} <- resolve_time_opts(params) do
+      params =
+        if project_id,
+          do: Map.put(params, "project_id", project_id),
+          else: Map.delete(params, "project_id")
+
       tasks = fetch_tasks(params, limit, time_opts)
 
       json(conn, %{
@@ -129,40 +136,42 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do
-    creator_session_int_id =
-      case params["session_id"] do
-        sid when is_binary(sid) and sid != "" ->
-          case Helpers.resolve_session_int_id(sid) do
-            {:ok, id} -> id
-            _ -> nil
-          end
+    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      creator_session_int_id =
+        case params["session_id"] do
+          sid when is_binary(sid) and sid != "" ->
+            case Helpers.resolve_session_int_id(sid) do
+              {:ok, id} -> id
+              _ -> nil
+            end
 
-        _ ->
-          nil
+          _ ->
+            nil
+        end
+
+      attrs = %{
+        uuid: Ecto.UUID.generate(),
+        title: trim_param(params["title"]),
+        description: trim_param(params["description"]),
+        priority: params["priority"],
+        state_id: params["state_id"] || WorkflowState.todo_id(),
+        project_id: project_id,
+        team_id: parse_int(params["team_id"], nil),
+        agent_id: resolve_agent_int_id(params["agent_id"]),
+        created_by_session_id: creator_session_int_id,
+        due_at: params["due_at"],
+        created_at: DateTime.utc_now()
+      }
+
+      case Tasks.create_with_associations(attrs, params) do
+        {:ok, task} ->
+          conn
+          |> put_status(:created)
+          |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
+
+        {:error, changeset} ->
+          {:error, changeset}
       end
-
-    attrs = %{
-      uuid: Ecto.UUID.generate(),
-      title: trim_param(params["title"]),
-      description: trim_param(params["description"]),
-      priority: params["priority"],
-      state_id: params["state_id"] || WorkflowState.todo_id(),
-      project_id: params["project_id"],
-      team_id: parse_int(params["team_id"], nil),
-      agent_id: resolve_agent_int_id(params["agent_id"]),
-      created_by_session_id: creator_session_int_id,
-      due_at: params["due_at"],
-      created_at: DateTime.utc_now()
-    }
-
-    case Tasks.create_with_associations(attrs, params) do
-      {:ok, task} ->
-        conn
-        |> put_status(:created)
-        |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
-
-      {:error, changeset} ->
-        {:error, changeset}
     end
   end
 

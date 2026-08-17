@@ -5,34 +5,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Commits
   alias EyeInTheSky.Events
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
 
     socket =
-      if project_id do
-        project = Projects.get_project!(project_id)
-
-        socket =
-          socket
-          |> assign(:page_title, "Project: #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_tab, :overview)
-          |> assign(:sidebar_project, project)
-          |> assign_empty_project_data()
-
-        if connected?(socket) do
-          load_project_data(socket, project)
-        else
-          socket
-        end
+      if project do
+        socket
+        |> assign(:page_title, "Project: #{project.name}")
+        |> assign(:project, project)
+        |> assign(:sidebar_tab, :overview)
+        |> assign(:sidebar_project, project)
+        |> assign_empty_project_data()
       else
         socket
         |> assign(:page_title, "Project Not Found")
@@ -40,7 +32,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> assign(:sidebar_tab, :overview)
         |> assign(:sidebar_project, nil)
         |> assign_empty_project_data()
-        |> put_flash(:error, "Invalid project ID")
+        |> put_flash(:error, "Project not found")
+      end
+
+    socket =
+      if project && connected?(socket) do
+        load_project_data(socket, project)
+      else
+        socket
       end
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)

@@ -2,20 +2,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
   use EyeInTheSkyWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
+  import EyeInTheSky.Factory
 
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Workspaces
 
   # ---------------------------------------------------------------------------
   # Helpers
   # ---------------------------------------------------------------------------
 
-  defp create_project_with_claude_dir do
+  defp create_project_with_claude_dir(workspace_id) do
     tmp_dir = Path.join(System.tmp_dir!(), "eits_cfg_test_#{System.unique_integer([:positive])}")
     claude_dir = Path.join(tmp_dir, ".claude")
     File.mkdir_p!(claude_dir)
 
     {:ok, project} =
-      Projects.create_project(%{name: "Config Test Project", path: tmp_dir})
+      Projects.create_project(%{
+        name: "Config Test Project",
+        path: tmp_dir,
+        workspace_id: workspace_id
+      })
 
     {project, tmp_dir, claude_dir}
   end
@@ -26,8 +32,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
 
   describe "file_changed event" do
     @tag :skip
-    test "saves config file content to disk", %{conn: conn} do
-      {project, _dir, claude_dir} = create_project_with_claude_dir()
+    test "saves config file content to disk", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, _dir, claude_dir} = create_project_with_claude_dir(workspace.id)
       File.write!(Path.join(claude_dir, "settings.json"), "{}")
 
       {:ok, view, _html} =
@@ -38,8 +45,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
       assert File.read!(Path.join(claude_dir, "settings.json")) == ~s({"key": "value"})
     end
 
-    test "handle_params rejects path traversal via ../", %{conn: conn} do
-      {project, dir, _claude_dir} = create_project_with_claude_dir()
+    test "handle_params rejects path traversal via ../", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir, _claude_dir} = create_project_with_claude_dir(workspace.id)
 
       # Create a file outside .claude/
       secret = Path.join(dir, "secret.txt")
@@ -53,8 +61,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
       assert File.read!(secret) == "do not touch"
     end
 
-    test "handle_params rejects symlink escape via resolve_list_target", %{conn: conn} do
-      {project, dir, claude_dir} = create_project_with_claude_dir()
+    test "handle_params rejects symlink escape via resolve_list_target", %{conn: conn, user: user} do
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, dir, claude_dir} = create_project_with_claude_dir(workspace.id)
 
       # Create a secret file outside .claude/
       secret = Path.join(dir, "secret.txt")
@@ -70,11 +79,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
       assert File.read!(secret) == "do not touch"
     end
 
-    test "read error in list mode clears the directory listing", %{conn: conn} do
+    test "read error in list mode clears the directory listing", %{conn: conn, user: user} do
       # ProjectLive.Config (list mode) always clears :files when navigating to a
       # file path, regardless of whether the read succeeds or fails. This test
       # asserts that pre-refactor behavior is preserved.
-      {project, _dir, claude_dir} = create_project_with_claude_dir()
+      workspace = Workspaces.default_workspace_for_user!(user)
+      {project, _dir, claude_dir} = create_project_with_claude_dir(workspace.id)
 
       # Create a readable file first so the listing is populated
       File.write!(Path.join(claude_dir, "settings.json"), "{}")
@@ -93,6 +103,28 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
 
       # Restore permissions for cleanup
       File.chmod!(locked, 0o644)
+    end
+  end
+
+  describe "cross-project access guard" do
+    test "rejects config page for a project in another workspace", %{conn: conn, user: user} do
+      current_workspace = Workspaces.default_workspace_for_user!(user)
+      other_user = user_fixture()
+      other_workspace = Workspaces.default_workspace_for_user!(other_user)
+      n = uniq()
+
+      {:ok, foreign_project} =
+        Projects.create_project(%{
+          name: "Foreign Config #{n}",
+          slug: "foreign-config-#{n}",
+          path: "/tmp/foreign-config-#{n}",
+          workspace_id: other_workspace.id
+        })
+
+      assert current_workspace.id != other_workspace.id
+
+      assert {:error, {:live_redirect, %{to: "/"}}} =
+               live(conn, ~p"/projects/#{foreign_project.id}/config")
     end
   end
 end

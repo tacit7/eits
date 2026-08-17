@@ -750,15 +750,18 @@ curl localhost:5001/api/v1/commits?session_id=abc-123&since_hash=a1b2c3
 
 ### POST /commits
 
-Track one or more git commits. Looks up the Agent by UUID to get the integer `session_id` FK.
+Track one or more git commits. When `session_id` is present it is used as the authoritative commit target; otherwise the latest session for `agent_id` is used (backwards-compatible fallback).
 
 **Request body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent UUID |
+| `session_id` | string \| integer | no | Session UUID or integer ID — authoritative target when present |
+| `agent_id` | string | no* | Agent UUID — required when `session_id` is absent |
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
+
+\* At least one of `session_id` or `agent_id` must be provided. If both are omitted the request fails with `400 "session_id or agent_id is required"`.
 
 **Response:** `201 Created` (or `207 Multi-Status` if some duplicates)
 
@@ -788,12 +791,28 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
 }
 ```
 
-**Example:**
+**Error responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Neither `session_id` nor `agent_id` provided |
+| `404` | `session_id` provided but resolves to no session |
+| `404` | `agent_id` provided but agent not found or has no session |
+
+**Example — via agent_id (legacy):**
 
 ```bash
 curl -X POST localhost:5001/api/v1/commits \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
+```
+
+**Example — via session_id (preferred):**
+
+```bash
+curl -X POST localhost:5001/api/v1/commits \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"d475b275-d827-40de-9748-5f2335c38be2","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
 ```
 
 ---

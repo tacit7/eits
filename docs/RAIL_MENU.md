@@ -1,11 +1,11 @@
 # Rail Menu
 
-The rail is a persistent LiveComponent (`EyeInTheSkyWeb.Components.Rail`) mounted in `app.html.heex`. It is shared across all pages in the `:app` live session and provides navigation, flyout panels, and project context.
+The rail is a persistent LiveView (`EyeInTheSkyWeb.Components.Rail`) mounted via `live_render` in `app.html.heex` with `sticky: true`. It is shared across all pages in the `:app` live session and provides navigation, flyout panels, and project context.
 
 ## Files
 
 ```
-lib/eye_in_the_sky_web/components/rail.ex                     # Main LiveComponent — state machine, event handlers, lazy loaders
+lib/eye_in_the_sky_web/components/rail.ex                     # Main LiveView — state machine, event handlers, lazy loaders
 lib/eye_in_the_sky_web/components/rail/flyout.ex              # Flyout panel rendering (all sections)
 lib/eye_in_the_sky_web/components/rail/project_switcher.ex    # Project picker overlay
 lib/eye_in_the_sky_web/components/rail/project_actions.ex     # Project CRUD + select event handlers
@@ -372,17 +372,17 @@ Helper functions:
 
 Project-scoped pages (`/projects/:id/*`) set `sidebar_project` to the project struct in `mount/3`. Global pages (`/usage`, `/jobs`, `/tasks`, `/canvases`, etc.) set it to `nil`.
 
-The layout passes it directly to the rail:
+The layout embeds the rail as a sticky child LiveView:
 
 ```heex
-<.live_component
-  module={EyeInTheSkyWeb.Components.Rail}
-  id="app-rail"
-  sidebar_tab={assigns[:sidebar_tab] || :sessions}
-  sidebar_project={assigns[:sidebar_project]}
-  ...
-/>
+{live_render(@socket, EyeInTheSkyWeb.Components.Rail,
+  id: "app-rail",
+  sticky: true,
+  session: %{"rail_context_topic" => assigns[:rail_context_topic]}
+)}
 ```
+
+Context is communicated from the page LiveView to the rail via PubSub (`Events.broadcast_rail_context/1`) rather than props, because they are separate processes.
 
 ### The Nil-Guard
 
@@ -417,6 +417,49 @@ sidebar_project =
 **Guard**: restore only runs when `sidebar_project` is nil. Project-scoped pages set a non-nil project first (via `update/2`), so the restore is a no-op on those pages — route-derived project is never overridden.
 
 Result: Project selection now persists across all page navigations.
+
+### Browser-Session-Scoped `rail:context` PubSub Topic (Cross-Window Isolation)
+
+**Problem**: The rail is a standalone `LiveView` process, so page LiveViews communicate project selection to it via a PubSub broadcast (`Events.broadcast_rail_context/1`). With a single global `"rail:context"` topic, opening the app in two browser windows let one window's project selection overwrite the other window's rail — both rails were subscribed to the same topic.
+
+**Fix** (`32a3bee6`): The topic is now scoped per browser session using the CSRF token as a stable, per-tab identifier.
+
+**`Events.rail_context_topic/1`** derives the topic from the session map:
+
+```elixir
+def rail_context_topic(%{"_csrf_token" => token}) when is_binary(token) and token != "" do
+  digest =
+    :crypto.hash(:sha256, token)
+    |> Base.url_encode64(padding: false)
+
+  "rail:context:#{digest}"
+end
+
+def rail_context_topic(_session), do: "rail:context"   # fallback
+```
+
+**Flow**:
+
+1. **`NavHook.on_mount/4`** computes the topic at mount time:
+   ```elixir
+   |> assign(:rail_context_topic, Events.rail_context_topic(session))
+   ```
+2. **`app.html.heex`** passes it as a `live_render` session key into the Rail LiveView:
+   ```heex
+   session: %{"rail_context_topic" => assigns[:rail_context_topic]}
+   ```
+3. **`Rail.mount/3`** reads it from the session and stores it as an assign:
+   ```elixir
+   rail_context_topic = session["rail_context_topic"] || "rail:context"
+   assign(socket, rail_context_topic: rail_context_topic, ...)
+   ```
+4. **`Rail.mount/3`** subscribes to the scoped topic:
+   ```elixir
+   Events.subscribe_rail_context(rail_context_topic)
+   ```
+5. **`Events.broadcast_rail_context/1`** reads `socket.assigns[:rail_context_topic]` and broadcasts on the same scoped topic, so only the rail in the same browser window receives it.
+
+Result: Each browser tab/window has its own isolated `rail:context:<digest>` topic. Project selection in one window never bleeds into another.
 
 ---
 

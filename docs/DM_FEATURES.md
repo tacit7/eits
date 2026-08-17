@@ -1749,7 +1749,7 @@ Event-driven endpoint that blocks until a new DM arrives for a session, eliminat
 - After `timeout` with no DM, returns `{"items":[],"count":0}`
 - Client HTTP timeout is set to server timeout + 15s headroom to avoid cutting the long-poll short locally
 
-**CLI equivalent:** `eitsr dm wait [--session] [--since] [--timeout]` — prints the result and exits when a DM lands.
+**CLI equivalent:** `eits dm wait [--session] [--since] [--timeout] [--team-only]` — prints the result and exits when a DM lands. With `--team-only`, each long-poll iteration filters results to messages from sessions that share a team with the current agent (requires `EITS_AGENT_UUID`). If all polled messages are filtered out and time remains, the loop re-polls with an updated `since` cursor (taken from the last message's `inserted_at`) until a team message arrives or the overall timeout elapses; on timeout it returns `{"items":[],"count":0}` as usual.
 
 **Use case:** Orchestrators and background scripts can block on this endpoint instead of interval-polling `GET /api/v1/dm`, reducing latency and server load.
 
@@ -3222,12 +3222,12 @@ When user presses Cmd+S or clicks the Save button, the hook:
 
 No busy-polling: the connection is held open until a PubSub event fires or the timeout fires. The client HTTP timeout should be set to at least `timeout + 15` seconds to avoid cutting the long-poll short locally.
 
-**`eitsr dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`.
+**`eits dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`. Pass `--team-only` to restrict delivery to messages from sessions sharing a team with the current agent: the subcommand loops internally — each long-poll iteration filters by team membership, and if all polled messages are filtered out with time remaining, it advances the `since` cursor to the last message's `inserted_at` and re-polls until a team message arrives or the timeout elapses.
 
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait_for_dm/2` action
 - `lib/eye_in_the_sky_web/router.ex` — `GET /api/v1/dm/wait`
-- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+- `crates/eits-cli/src/commands/dm.rs` — `eits dm wait` subcommand
 
 ---
 

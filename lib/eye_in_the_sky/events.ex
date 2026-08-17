@@ -40,6 +40,8 @@ defmodule EyeInTheSky.Events do
   """
 
   @pubsub EyeInTheSky.PubSub
+  alias EyeInTheSky.Workspaces
+  alias EyeInTheSky.Workspaces.Workspace
 
   # ---------------------------------------------------------------------------
   # Subscribe helpers
@@ -484,13 +486,15 @@ defmodule EyeInTheSky.Events do
   """
   def broadcast_rail_context(socket) do
     topic = socket.assigns[:rail_context_topic] || "rail:context"
+    workspace = workspace_for_assigns(socket.assigns)
 
     broadcast(topic, {
       :rail_context,
       %{
         sidebar_tab: socket.assigns[:sidebar_tab] || :sessions,
         sidebar_project: socket.assigns[:sidebar_project],
-        active_channel_id: socket.assigns[:active_channel_id]
+        active_channel_id: socket.assigns[:active_channel_id],
+        workspace_id: workspace && workspace.id
       }
     })
   end
@@ -529,6 +533,39 @@ defmodule EyeInTheSky.Events do
   @doc "Signal RailLive to refresh its flyout channel list."
   def broadcast_rail_refresh_channels,
     do: broadcast("rail:refresh:channels", :rail_refresh_channels)
+
+  @doc """
+  Resolve the current workspace from LiveView assigns.
+
+  Prefers an explicit `:workspace`, then derives from `:sidebar_project`, then
+  falls back to the current user's default workspace when available.
+  """
+  def workspace_for_assigns(assigns) when is_map(assigns) do
+    case Map.get(assigns, :workspace) || Map.get(assigns, "workspace") do
+      %Workspace{} = workspace ->
+        workspace
+
+      _ ->
+        case Map.get(assigns, :sidebar_project) || Map.get(assigns, "sidebar_project") do
+          %{workspace_id: workspace_id} when is_integer(workspace_id) ->
+            Workspaces.get_workspace(workspace_id)
+
+          _ ->
+            case Map.get(assigns, :current_user) || Map.get(assigns, "current_user") do
+              nil -> nil
+              user -> Workspaces.default_workspace_for_user(user)
+            end
+        end
+    end
+  end
+
+  @doc "Resolve the current workspace id from LiveView assigns."
+  def workspace_id_for_assigns(assigns) when is_map(assigns) do
+    case workspace_for_assigns(assigns) do
+      %Workspace{id: id} -> id
+      _ -> nil
+    end
+  end
 
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)

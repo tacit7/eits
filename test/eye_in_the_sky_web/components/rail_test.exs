@@ -2,10 +2,24 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   use EyeInTheSkyWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.Workspaces
 
-  defp build_project(name \\ nil) do
+  # Projects must belong to the logged-in test user's workspace — otherwise
+  # Projects.create_project/1's "first workspace in the DB" test fallback can
+  # attach the project to an unrelated workspace, and the rail's now
+  # workspace-scoped project list (task 9085) silently excludes it.
+  defp build_project(user, name \\ nil) do
     name = name || "rail-test-#{System.unique_integer([:positive])}"
-    {:ok, project} = Projects.create_project(%{name: name, path: "/tmp/#{name}", slug: name})
+    workspace = Workspaces.default_workspace_for_user!(user)
+
+    {:ok, project} =
+      Projects.create_project(%{
+        name: name,
+        path: "/tmp/#{name}",
+        slug: name,
+        workspace_id: workspace.id
+      })
+
     project
   end
 
@@ -16,8 +30,8 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   defp get_rail(view), do: find_live_child(view, "app-rail")
 
   describe "select_project — no-op reselect guard" do
-    test "closes proj_picker after selecting a project", %{conn: conn} do
-      project = build_project()
+    test "closes proj_picker after selecting a project", %{conn: conn, user: user} do
+      project = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/sessions")
       rail = get_rail(view)
 
@@ -35,8 +49,8 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       refute has_element?(view2, "[phx-click='select_project']")
     end
 
-    test "reselecting the same project closes picker without crash", %{conn: conn} do
-      project = build_project()
+    test "reselecting the same project closes picker without crash", %{conn: conn, user: user} do
+      project = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/sessions")
       rail = get_rail(view)
 
@@ -76,9 +90,9 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       end
     end
 
-    test "selecting a different project closes picker", %{conn: conn} do
-      p1 = build_project()
-      p2 = build_project()
+    test "selecting a different project closes picker", %{conn: conn, user: user} do
+      p1 = build_project(user)
+      p2 = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/sessions")
       rail = get_rail(view)
 
@@ -105,10 +119,11 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
     end
 
     test "selecting a different project from a project page navigates to that project", %{
-      conn: conn
+      conn: conn,
+      user: user
     } do
-      p1 = build_project()
-      p2 = build_project()
+      p1 = build_project(user)
+      p2 = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{p1.id}/tasks")
       rail = get_rail(view)
 
@@ -121,9 +136,9 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
         |> follow_redirect(conn, ~p"/projects/#{p2.id}/tasks")
     end
 
-    test "restored project selection wins over a stale project route", %{conn: conn} do
-      p1 = build_project()
-      p2 = build_project()
+    test "restored project selection wins over a stale project route", %{conn: conn, user: user} do
+      p1 = build_project(user)
+      p2 = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{p1.id}/tasks")
       rail = get_rail(view)
 

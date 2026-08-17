@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
+  alias EyeInTheSky.Workspaces
   alias EyeInTheSkyWeb.Components.Rail.Loader
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
@@ -23,8 +24,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
           {:noreply, assign(socket, :sidebar_project, nil)}
         else
           case Projects.get_project(id) do
-            {:ok, project} -> {:noreply, assign(socket, :sidebar_project, project)}
-            {:error, _} -> {:noreply, socket}
+            {:ok, project} ->
+              {:noreply, select_project(socket, project)}
+
+            {:error, _} ->
+              {:noreply, socket}
           end
         end
     end
@@ -58,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
           {:noreply,
            socket
            |> put_flash(:error, "Project not found")
-           |> assign(:projects, Projects.list_projects_for_sidebar())
+           |> assign(:projects, workspace_projects(socket))
            |> assign(:renaming_project_id, nil)
            |> assign(:rename_value, "")}
 
@@ -67,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
             {:ok, _} ->
               {:noreply,
                socket
-               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:projects, workspace_projects(socket))
                |> assign(:renaming_project_id, nil)
                |> assign(:rename_value, "")}
 
@@ -75,7 +79,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
               {:noreply,
                socket
                |> put_flash(:error, "Failed to rename project")
-               |> assign(:projects, Projects.list_projects_for_sidebar())
+               |> assign(:projects, workspace_projects(socket))
                |> assign(:renaming_project_id, nil)
                |> assign(:rename_value, "")}
           end
@@ -93,7 +97,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
           {:ok, project} ->
             case Projects.delete_project(project) do
               {:ok, _} ->
-                {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+                {:noreply, assign(socket, :projects, workspace_projects(socket))}
 
               {:error, _} ->
                 {:noreply, put_flash(socket, :error, "Failed to delete project")}
@@ -116,7 +120,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
          true <- trimmed != "",
          {:ok, project} <- Projects.get_project(id),
          {:ok, _} <- Projects.update_project(project, %{name: trimmed}) do
-      {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+      {:noreply, assign(socket, :projects, workspace_projects(socket))}
     else
       {:error, :not_found} -> {:noreply, put_flash(socket, :error, "Project not found")}
       _ -> {:noreply, socket}
@@ -169,7 +173,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
          value when value in ["true", "false"] <- Map.get(params, "bookmarked"),
          project_id when not is_nil(project_id) <- parse_int(id),
          {:ok, _project} <- Projects.set_bookmarked(project_id, value == "true") do
-      {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+      {:noreply, assign(socket, :projects, workspace_projects(socket))}
     else
       _ -> {:noreply, socket}
     end
@@ -199,12 +203,16 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
 
     if path != "" do
       name = basename_from_path(path)
+      workspace_id = current_workspace_id(socket)
 
-      case Projects.create_project(%{name: name, path: path}) do
+      attrs = %{name: name, path: path}
+      attrs = if workspace_id, do: Map.put(attrs, :workspace_id, workspace_id), else: attrs
+
+      case Projects.create_project(attrs) do
         {:ok, _} ->
           {:noreply,
            socket
-           |> assign(:projects, Projects.list_projects_for_sidebar())
+           |> assign(:projects, workspace_projects(socket))
            |> assign(:new_project_path, nil)}
 
         {:error, _} ->
@@ -248,10 +256,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
     path = String.trim(path)
     name = basename_from_path(path)
+    workspace_id = current_workspace_id(socket)
 
-    case Projects.create_project(%{name: name, path: path}) do
+    attrs = %{name: name, path: path}
+    attrs = if workspace_id, do: Map.put(attrs, :workspace_id, workspace_id), else: attrs
+
+    case Projects.create_project(attrs) do
       {:ok, _} ->
-        {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+        {:noreply, assign(socket, :projects, workspace_projects(socket))}
 
       {:error, changeset} ->
         if path_taken?(changeset) do
@@ -261,8 +273,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
               {:noreply,
                socket
                |> put_flash(:info, "\"#{project.name}\" is already in your projects")
-               |> assign(:projects, Projects.list_projects_for_sidebar())
-               |> assign(:sidebar_project, project)}
+               |> select_project(project)}
 
             {:error, _} ->
               {:noreply, put_flash(socket, :error, "Could not add project at #{path}")}
@@ -282,6 +293,29 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
   def handle_folder_picked(_params, socket),
     do: {:noreply, assign(socket, :new_project_path, "")}
+
+  defp current_workspace_id(socket) do
+    socket.assigns[:workspace_id] ||
+      get_in(socket.assigns, [:workspace, Access.key(:id)]) ||
+      get_in(socket.assigns, [:sidebar_project, Access.key(:workspace_id)])
+  end
+
+  defp workspace_projects(socket) do
+    case current_workspace_id(socket) do
+      nil -> []
+      workspace_id -> Projects.list_projects_for_workspace(workspace_id)
+    end
+  end
+
+  defp select_project(socket, project) do
+    workspace = Workspaces.get_workspace(project.workspace_id)
+
+    socket
+    |> assign(:sidebar_project, project)
+    |> assign(:workspace, workspace)
+    |> assign(:workspace_id, workspace && workspace.id)
+    |> assign(:projects, Projects.list_projects_for_workspace(project.workspace_id))
+  end
 
   defp basename_from_path(path) do
     path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
@@ -315,35 +349,63 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   # Only called when sidebar_project is nil (guarded in rail.ex handle_event clause).
   # Restores the project from a localStorage-persisted project_id after cross-LiveView nav.
   def handle_restore_project(id_str, socket) do
+    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+    workspace_id = current_workspace_id(socket)
+
     case parse_int(id_str) do
       nil ->
-        {:noreply, socket}
+        {:noreply, persist_selected_project(socket, current_id)}
 
       id ->
         case Projects.get_project(id) do
-          {:ok, project} ->
-            socket =
-              socket
-              |> assign(
-                :sidebar_project,
-                project
-              )
-              |> assign(
-                :flyout_sessions,
-                Loader.load_flyout_sessions(
-                  project,
-                  socket.assigns.session_sort,
-                  socket.assigns.session_name_filter
-                )
-              )
-
-            {:noreply, socket}
+          {:ok, project} when not is_nil(workspace_id) and project.workspace_id == workspace_id ->
+            {:noreply,
+             socket
+             |> restore_project(project)
+             |> persist_selected_project(project.id)}
 
           {:error, _} ->
-            # Project was deleted or inaccessible — clear the stale localStorage entry.
-            {:noreply, push_event(socket, "save_rail_state", %{project_id: nil})}
+            {:noreply, fallback_restored_project(socket, current_id)}
+
+          {:ok, _foreign} ->
+            {:noreply, fallback_restored_project(socket, current_id)}
         end
     end
+  end
+
+  defp restore_project(socket, project) do
+    socket
+    |> select_project(project)
+    |> assign(
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        project,
+        socket.assigns.session_sort,
+        socket.assigns.session_name_filter
+      )
+    )
+  end
+
+  defp fallback_restored_project(socket, current_id) when not is_nil(current_id) do
+    socket
+    |> assign(:projects, workspace_projects(socket))
+    |> persist_selected_project(current_id)
+  end
+
+  defp fallback_restored_project(socket, _current_id) do
+    case workspace_projects(socket) do
+      [project | _] ->
+        socket
+        |> restore_project(project)
+        |> persist_selected_project(project.id)
+
+      [] ->
+        persist_selected_project(socket, nil)
+    end
+  end
+
+  defp persist_selected_project(socket, project_id) do
+    push_event(socket, "save_rail_state", %{project_id: project_id})
   end
 
   # Full select_project flow: delegates to handle_select_project/2 for the project

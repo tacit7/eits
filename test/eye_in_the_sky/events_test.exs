@@ -1,7 +1,7 @@
 defmodule EyeInTheSky.EventsTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
-  alias EyeInTheSky.Events
+  alias EyeInTheSky.{Events, Factory, Projects, Workspaces}
 
   @pubsub EyeInTheSky.PubSub
 
@@ -98,11 +98,25 @@ defmodule EyeInTheSky.EventsTest do
       topic = "rail:context:test:#{System.unique_integer([:positive])}"
       sub(topic)
 
+      user = Factory.user_fixture()
+      workspace = Workspaces.default_workspace_for_user!(user)
+
+      {:ok, project} =
+        Projects.create_project(%{
+          name: "Rail Event Project #{System.unique_integer([:positive])}",
+          path: "/tmp/rail-event-project",
+          slug: "rail-event-project",
+          workspace_id: workspace.id
+        })
+
+      project_id = project.id
+      workspace_id = workspace.id
+
       socket = %Phoenix.LiveView.Socket{
         assigns: %{
           rail_context_topic: topic,
           sidebar_tab: :tasks,
-          sidebar_project: %{id: 2, name: "Other project"},
+          sidebar_project: project,
           active_channel_id: nil
         }
       }
@@ -112,8 +126,9 @@ defmodule EyeInTheSky.EventsTest do
       assert_receive {:rail_context,
                       %{
                         sidebar_tab: :tasks,
-                        sidebar_project: %{id: 2, name: "Other project"},
-                        active_channel_id: nil
+                        sidebar_project: %Projects.Project{id: ^project_id},
+                        active_channel_id: nil,
+                        workspace_id: ^workspace_id
                       }},
                      500
     end

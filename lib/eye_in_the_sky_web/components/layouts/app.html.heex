@@ -119,7 +119,8 @@
       session: %{
         "rail_context_topic" => assigns[:rail_context_topic],
         "sidebar_tab" => assigns[:sidebar_tab] && Atom.to_string(assigns[:sidebar_tab]),
-        "sidebar_project_id" => assigns[:sidebar_project] && assigns[:sidebar_project].id
+        "sidebar_project_id" => assigns[:sidebar_project] && assigns[:sidebar_project].id,
+        "workspace_id" => assigns[:workspace_id]
       }
     )}
     <%!-- Grab handle for swipe-to-open sidebar on mobile.

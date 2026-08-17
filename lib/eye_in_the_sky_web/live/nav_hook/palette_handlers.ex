@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   # ---------------------------------------------------------------------------
 
   def handle_palette_event("palette:projects", _params, socket) do
-    projects = Projects.list_projects()
+    projects = socket.assigns[:palette_projects] || []
 
     results =
       Enum.map(projects, fn p ->

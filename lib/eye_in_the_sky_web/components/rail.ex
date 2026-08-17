@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
   import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   # Modals previously embedded inside flyout.ex — now rendered at rail top level
   # so the flyout component stays focused on navigation concerns only.
@@ -18,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.{Editors, Notifications, Projects, Settings}
+  alias EyeInTheSky.Workspaces
   alias EyeInTheSkyWeb.Components.NewSessionModal
 
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -57,10 +59,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     rail_context_topic = session["rail_context_topic"] || "rail:context"
     sidebar_tab = Loader.parse_section(session["sidebar_tab"])
     sidebar_project = initial_sidebar_project(session["sidebar_project_id"])
+    workspace_id = initial_workspace_id(session, sidebar_project)
+    workspace = initial_workspace(workspace_id)
 
     socket =
       assign(socket,
-        projects: [],
+        projects: workspace_projects(workspace_id),
         rail_context_topic: rail_context_topic,
         flyout_open: true,
         proj_picker_open: false,
@@ -74,9 +78,10 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         rename_value: "",
         mobile_open: false,
         sidebar_project: sidebar_project,
+        workspace: workspace,
+        workspace_id: workspace_id,
         sidebar_tab: sidebar_tab,
         active_channel_id: nil,
-        workspace: nil,
         scope_type: :project,
         flyout_canvases: [],
         flyout_teams: [],
@@ -133,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       {:ok,
        assign(socket,
-         projects: Projects.list_projects_for_sidebar(),
+         projects: workspace_projects(socket.assigns[:workspace_id]),
          flyout_sessions: Loader.load_flyout_sessions(nil),
          notification_count: Notifications.unread_count()
        ), layout: false}
@@ -151,25 +156,62 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
+  defp initial_workspace_id(session, sidebar_project) do
+    session
+    |> Map.get("workspace_id")
+    |> normalize_workspace_id()
+    |> case do
+      nil -> sidebar_project && sidebar_project.workspace_id
+      workspace_id -> workspace_id
+    end
+  end
+
+  defp normalize_workspace_id(id) when is_integer(id), do: id
+  defp normalize_workspace_id(id) when is_binary(id), do: parse_int(id)
+  defp normalize_workspace_id(_), do: nil
+
+  defp initial_workspace(nil), do: nil
+  defp initial_workspace(workspace_id), do: Workspaces.get_workspace(workspace_id)
+
+  defp workspace_projects(nil), do: []
+  defp workspace_projects(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
+
+  defp maybe_reload_projects(socket, previous_workspace_id, workspace_id)
+       when previous_workspace_id == workspace_id do
+    socket
+  end
+
+  defp maybe_reload_projects(socket, _previous_workspace_id, workspace_id) do
+    assign(socket, :projects, workspace_projects(workspace_id))
+  end
+
   # Page LiveView navigation — adopt new sidebar context broadcast by page LiveViews.
   @impl true
   def handle_info(
-        {:rail_context,
-         %{
-           sidebar_tab: sidebar_tab,
-           sidebar_project: sidebar_project,
-           active_channel_id: active_channel_id
-         }},
+        {:rail_context, payload},
         socket
       ) do
+    sidebar_tab = Map.get(payload, :sidebar_tab) || Map.get(payload, "sidebar_tab") || :sessions
+    sidebar_project = Map.get(payload, :sidebar_project) || Map.get(payload, "sidebar_project")
+
+    active_channel_id =
+      Map.get(payload, :active_channel_id) || Map.get(payload, "active_channel_id")
+
+    workspace_id = Map.get(payload, :workspace_id) || Map.get(payload, "workspace_id")
+
     previous_tab = socket.assigns[:sidebar_tab]
     previous_project = socket.assigns[:sidebar_project]
+    previous_workspace_id = socket.assigns[:workspace_id]
     next_section = Map.get(@section_map, sidebar_tab, :sessions)
+    workspace_id = normalize_workspace_id(workspace_id) || previous_workspace_id
+    workspace = initial_workspace(workspace_id)
 
     socket =
       socket
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:active_channel_id, active_channel_id)
+      |> assign(:workspace_id, workspace_id)
+      |> assign(:workspace, workspace)
 
     # Only adopt sidebar_project if non-nil — prevents pages without a project
     # from clearing a project locally selected via the rail's own project picker.
@@ -179,6 +221,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         else: assign(socket, :sidebar_project, sidebar_project)
 
     socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
+    socket = maybe_reload_projects(socket, previous_workspace_id, workspace_id)
     socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
 
     {:noreply, socket}
@@ -215,7 +258,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   # Project list refresh from floating_chat_live
   def handle_info(:rail_refresh_projects, socket) do
-    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    {:noreply, assign(socket, :projects, workspace_projects(socket.assigns[:workspace_id]))}
   end
 
   # Channel list refresh from floating_chat_live

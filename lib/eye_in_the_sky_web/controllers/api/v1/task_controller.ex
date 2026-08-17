@@ -22,7 +22,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def index(conn, params) do
     limit = params["limit"] |> parse_int(50) |> max(1) |> min(1000)
 
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
          {:ok, time_opts} <- resolve_time_opts(params) do
       params =
         if project_id,
@@ -136,7 +137,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       creator_session_int_id =
         case params["session_id"] do
           sid when is_binary(sid) and sid != "" ->

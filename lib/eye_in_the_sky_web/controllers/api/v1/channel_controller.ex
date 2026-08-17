@@ -23,7 +23,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
     name = String.trim(params["name"] || "")
 
     with :ok <- validate_name(name),
-         {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+         {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
          {:ok, creator_session_id} <- resolve_creator_session(params["session_id"]) do
       channel_type = params["channel_type"] || "public"
       channel_id = Channel.generate_id(project_id, name)
@@ -96,7 +97,8 @@ defmodule EyeInTheSkyWeb.Api.V1.ChannelController do
 
   @doc "GET /api/v1/channels - List available chat channels."
   def index(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       channels =
         if project_id,
           do: Channels.list_channels_for_project(project_id),

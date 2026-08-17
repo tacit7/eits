@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
 
   describe "handle_event/search" do
     test "search form is rendered on the page", %{conn: conn, project: project} do
-      {:ok, lv, html} = live(conn, ~p"/projects/#{project.id}/prompts")
+      {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/prompts")
 
       assert has_element?(lv, "#prompts-top-bar-search")
     end

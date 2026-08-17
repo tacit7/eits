@@ -12,7 +12,8 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   GET /api/v1/prompts - List prompts. Supports ?query= for search, ?project_id= for scoping.
   """
   def index(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       prompts =
         cond do
           params["query"] && params["query"] != "" ->
@@ -39,7 +40,8 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   def show(conn, %{"id" => id} = params) do
     include_text = params["include_text"] not in ["false", false]
 
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       case Prompts.get_prompt_by_ref(id, project_id) do
         {:error, :not_found} ->
           {:error, :not_found, "Prompt not found"}
@@ -64,7 +66,8 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptController do
   Optional: description, project_id, tags, created_by
   """
   def create(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       attrs = %{
         name: params["name"],
         slug: params["slug"],

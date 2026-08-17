@@ -572,7 +572,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </ul>
         </div>
       </div>
-
+      
     <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane

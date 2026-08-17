@@ -20,10 +20,14 @@ defmodule EyeInTheSkyWeb.Api.V1.AgentController do
   def index(conn, params) do
     limit = parse_int(params["limit"], 20)
 
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
          {:ok, agents} <-
            resolve_agents(
-             if(project_id, do: Map.put(params, "project_id", project_id), else: Map.delete(params, "project_id")),
+             if(project_id,
+               do: Map.put(params, "project_id", project_id),
+               else: Map.delete(params, "project_id")
+             ),
              limit
            ) do
       json(conn, %{

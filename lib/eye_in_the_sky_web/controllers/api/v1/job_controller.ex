@@ -11,7 +11,8 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
 
   @doc "GET /api/v1/jobs - List all scheduled jobs."
   def index(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       jobs =
         cond do
           project_id ->
@@ -42,7 +43,8 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
 
   @doc "POST /api/v1/jobs - Create a scheduled job."
   def create(conn, params) do
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       attrs = %{
         "name" => params["name"],
         "description" => params["description"],

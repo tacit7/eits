@@ -80,7 +80,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.FilesTest do
       assert File.read!(secret) == "do not touch"
     end
 
-    test "navigating to path=. (Back from top-level file) shows root listing", %{conn: conn, user: user} do
+    test "navigating to path=. (Back from top-level file) shows root listing", %{
+      conn: conn,
+      user: user
+    } do
       # When viewing a top-level file like "hello.ex", the Back link computes
       # Path.dirname("hello.ex") = "." and patches to ?path=.
       # path_within?(project_root, project_root) must be true so we get the listing.

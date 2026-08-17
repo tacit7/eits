@@ -20,7 +20,8 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
     starred_only = params["starred"] in ["true", "1"]
     source_session_uuid = params["source_session_uuid"]
 
-    with {:ok, project_id} <- ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
       notes =
         cond do
           source_session_uuid ->
@@ -32,7 +33,10 @@ defmodule EyeInTheSkyWeb.Api.V1.NoteController do
             )
 
           params["session_id"] ->
-            Notes.list_notes_for_session(params["session_id"], limit: limit, starred: starred_only)
+            Notes.list_notes_for_session(params["session_id"],
+              limit: limit,
+              starred: starred_only
+            )
 
           params["task_id"] ->
             case Tasks.get_task_ids(params["task_id"]) do

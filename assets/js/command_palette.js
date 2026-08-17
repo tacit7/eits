@@ -105,6 +105,21 @@ export function saveRecentCommand(cmd) {
   localStorage.setItem("command_palette_recent", JSON.stringify(next))
 }
 
+export function saveRailProjectSelection(projectId) {
+  if (projectId === undefined) return
+
+  const parsedProjectId = Number(projectId)
+  if (!Number.isFinite(parsedProjectId)) return
+
+  try {
+    const raw = localStorage.getItem("rail_state")
+    const state = raw ? JSON.parse(raw) : {}
+    localStorage.setItem("rail_state", JSON.stringify({ ...state, project_id: parsedProjectId }))
+  } catch (_) {
+    // A broken storage value should not block navigation.
+  }
+}
+
 /**
  * Detects the user's platform from navigator.userAgentData or navigator.platform.
  * @returns {boolean} true if the user is on macOS

@@ -5,6 +5,7 @@ import {
   highlightLabel,
   loadRecentCommands,
   saveRecentCommand,
+  saveRailProjectSelection,
   detectMacOS,
   matchesModifier,
 } from "../command_palette.js"
@@ -312,6 +313,7 @@ export const CommandPalette = {
 
   async activate(cmd) {
     if (cmd.type === "navigate") {
+      saveRailProjectSelection(cmd.railProjectId)
       this.saveRecent(cmd)
       this.el.close()
       window.location.assign(cmd.href)

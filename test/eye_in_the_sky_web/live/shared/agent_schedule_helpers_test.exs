@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
 
   import EyeInTheSky.Factory
 
-  alias EyeInTheSky.{Prompts, ScheduledJobs}
+  alias EyeInTheSky.{Prompts, Projects, ScheduledJobs, Workspaces}
   alias EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers
 
   # ---------------------------------------------------------------------------
@@ -100,13 +100,36 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
       assert result.assigns.orphaned_jobs == []
     end
 
-    test "populates projects from Projects.list_projects/0" do
-      # Create a project so there's at least one to list
-      project_fixture()
-      socket = bare_socket()
+    test "populates projects from the current workspace only" do
+      user = user_fixture()
+      workspace = Workspaces.default_workspace_for_user!(user)
+      n = unique_n()
+
+      {:ok, allowed_project} =
+        Projects.create_project(%{
+          name: "allowed-project-#{n}",
+          path: "/tmp/allowed-project-#{n}",
+          slug: "allowed-project-#{n}",
+          workspace_id: workspace.id
+        })
+
+      other_user = user_fixture()
+      other_workspace = Workspaces.default_workspace_for_user!(other_user)
+
+      {:ok, foreign_project} =
+        Projects.create_project(%{
+          name: "foreign-project-#{n}",
+          path: "/tmp/foreign-project-#{n}",
+          slug: "foreign-project-#{n}",
+          workspace_id: other_workspace.id
+        })
+
+      socket = bare_socket(%{workspace_id: workspace.id})
       result = AgentScheduleHelpers.assign_agent_schedule_defaults(socket)
+
       assert is_list(result.assigns.projects)
-      assert length(result.assigns.projects) > 0
+      assert Enum.any?(result.assigns.projects, &(&1.id == allowed_project.id))
+      refute Enum.any?(result.assigns.projects, &(&1.id == foreign_project.id))
     end
   end
 
@@ -290,6 +313,59 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpersTest do
 
       # Should not have an error flash for access
       refute Map.has_key?(result.assigns.flash, "error")
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # handle_save_schedule/2
+  # ---------------------------------------------------------------------------
+
+  describe "handle_save_schedule/2" do
+    test "rejects a project override from another workspace" do
+      user = user_fixture()
+      workspace = Workspaces.default_workspace_for_user!(user)
+      n = unique_n()
+
+      {:ok, allowed_project} =
+        Projects.create_project(%{
+          name: "allowed-project-#{n}",
+          path: "/tmp/allowed-project-#{n}",
+          slug: "allowed-project-#{n}",
+          workspace_id: workspace.id
+        })
+
+      {prompt, _} = create_prompt(%{project_id: allowed_project.id})
+
+      other_user = user_fixture()
+      other_workspace = Workspaces.default_workspace_for_user!(other_user)
+
+      {:ok, foreign_project} =
+        Projects.create_project(%{
+          name: "foreign-project-#{n}",
+          path: "/tmp/foreign-project-#{n}",
+          slug: "foreign-project-#{n}",
+          workspace_id: other_workspace.id
+        })
+
+      socket = bare_socket(%{
+        workspace_id: workspace.id,
+        project_id: allowed_project.id,
+        projects: [allowed_project]
+      })
+
+      params = %{
+        "schedule" => %{
+          "prompt_id" => to_string(prompt.id),
+          "project_override_id" => to_string(foreign_project.id),
+          "schedule_type" => "interval",
+          "schedule_value" => "3600",
+          "model" => "claude-sonnet-4-6"
+        }
+      }
+
+      {:noreply, result} = AgentScheduleHelpers.handle_save_schedule(params, socket)
+
+      assert result.assigns.flash["error"] =~ "Could not resolve project path"
     end
   end
 

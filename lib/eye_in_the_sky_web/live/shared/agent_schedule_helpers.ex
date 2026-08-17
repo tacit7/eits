@@ -14,6 +14,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
 
   @doc "Initialize agent schedule assigns. Call from mount/3."
   def assign_agent_schedule_defaults(socket) do
+    workspace_id = Map.get(socket.assigns, :workspace_id)
+
     assign(socket,
       active_tab: :all_jobs,
       prompts: [],
@@ -21,7 +23,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
       scheduling_prompt: nil,
       scheduling_job: nil,
       orphaned_jobs: [],
-      projects: Projects.list_projects()
+      projects: list_projects_for_context(workspace_id)
     )
   end
 
@@ -222,35 +224,42 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
   defp put_bool_if_true(map, key, "true"), do: Map.put(map, key, true)
   defp put_bool_if_true(map, _key, _), do: map
 
+  defp list_projects_for_context(nil), do: Projects.list_projects()
+  defp list_projects_for_context(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
+
   # 4-step resolution: form override -> prompt default -> page context -> error
   defp resolve_project_path(params, prompt, socket) do
-    override_id = params["project_override_id"]
+    project_id =
+      cond do
+        params["project_override_id"] && params["project_override_id"] != "" ->
+          parse_int(params["project_override_id"])
 
-    cond do
-      override_id && override_id != "" ->
-        project_path_by_id(parse_int(override_id))
+        Map.get(prompt, :project_id) ->
+          Map.get(prompt, :project_id)
 
-      Map.get(prompt, :project_id) ->
-        pid = Map.get(prompt, :project_id)
-        project_path_by_id(pid)
+        project_id = Map.get(socket.assigns, :project_id) ->
+          project_id
 
-      project_id = Map.get(socket.assigns, :project_id) ->
-        project_path_by_id(project_id)
+        true ->
+          nil
+      end
 
-      true ->
-        {:error, :no_project}
-    end
+    project_path_by_id(project_id, socket)
   end
 
-  defp project_path_by_id(nil), do: {:error, :no_project}
+  defp project_path_by_id(nil, _socket), do: {:error, :no_project}
 
-  defp project_path_by_id(id) do
-    case Projects.get_project(id) do
-      {:ok, project} when is_map(project) and not is_nil(project.path) ->
-        {:ok, project.path}
+  defp project_path_by_id(id, socket) do
+    if project_allowed?(socket, id) do
+      case Projects.get_project(id) do
+        {:ok, project} when is_map(project) and not is_nil(project.path) ->
+          {:ok, project.path}
 
-      _ ->
-        {:error, :no_project}
+        _ ->
+          {:error, :no_project}
+      end
+    else
+      {:error, :no_project}
     end
   end
 
@@ -303,6 +312,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers do
     case parse_int(prompt_id_raw) do
       nil -> config
       int_id -> Map.put(config, "prompt_id", int_id)
+    end
+  end
+
+  defp project_allowed?(socket, id) do
+    case Map.get(socket.assigns, :workspace_id) do
+      nil ->
+        true
+
+      _workspace_id ->
+        socket.assigns
+        |> Map.get(:projects, [])
+        |> Enum.any?(&(&1.id == id))
     end
   end
 

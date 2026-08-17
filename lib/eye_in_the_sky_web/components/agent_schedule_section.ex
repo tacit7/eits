@@ -19,6 +19,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
 
   use EyeInTheSkyWeb, :live_component
 
+  alias EyeInTheSky.Projects
   import EyeInTheSkyWeb.Live.Shared.AgentScheduleHelpers
 
   import EyeInTheSkyWeb.Live.Shared.JobsHelpers,
@@ -50,6 +51,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   def update(assigns, socket) do
     prev_tab = Map.get(socket.assigns, :active_tab, :all_jobs)
     prev_project_id = Map.get(socket.assigns, :project_id)
+    prev_workspace_id = Map.get(socket.assigns, :workspace_id)
     new_tab = assigns.active_tab
     initialized = Map.has_key?(socket.assigns, :initialized)
 
@@ -57,11 +59,13 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
       if initialized do
         socket
         |> assign(:project_id, assigns.project_id)
+        |> assign(:workspace_id, assigns.workspace_id)
         |> assign(:active_tab, new_tab)
       else
         socket
         |> assign(:initialized, true)
         |> assign(:project_id, assigns.project_id)
+        |> assign(:workspace_id, assigns.workspace_id)
         |> assign(:active_tab, new_tab)
         |> assign(
           prompts: [],
@@ -69,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
           scheduling_prompt: nil,
           scheduling_job: nil,
           orphaned_jobs: [],
-          projects: EyeInTheSky.Projects.list_projects()
+          projects: list_projects_for_context(assigns.workspace_id)
         )
       end
 
@@ -79,6 +83,16 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
 
     project_changed =
       initialized and new_tab == :agent_schedules and assigns.project_id != prev_project_id
+
+    workspace_changed =
+      initialized and assigns.workspace_id != prev_workspace_id
+
+    socket =
+      if workspace_changed do
+        assign(socket, :projects, list_projects_for_context(assigns.workspace_id))
+      else
+        socket
+      end
 
     socket =
       if tab_switched or project_changed do
@@ -257,4 +271,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
     </div>
     """
   end
+
+  defp list_projects_for_context(nil), do: Projects.list_projects()
+  defp list_projects_for_context(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
 end

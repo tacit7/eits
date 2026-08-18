@@ -137,6 +137,74 @@ Pass the `Scope` struct, not the workspace ID directly. This keeps scope-type br
 
 ---
 
+## Agent Schedule Components — Workspace-Scoped Project Lists
+
+`AgentScheduleHelpers`, `AgentScheduleSection`, and `JobsPage` scope their project lists to the current workspace when a `workspace_id` is available.
+
+### `AgentScheduleHelpers.assign_agent_schedule_defaults/1`
+
+Reads `workspace_id` from socket assigns and delegates to the right query:
+
+```elixir
+workspace_id = Map.get(socket.assigns, :workspace_id)
+projects: list_projects_for_context(workspace_id)
+```
+
+`list_projects_for_context/1` resolves to:
+- `Projects.list_projects()` — when `workspace_id` is `nil` (no workspace context)
+- `Projects.list_projects_for_workspace(workspace_id)` — otherwise
+
+### `AgentScheduleSection` LiveComponent
+
+Accepts a `workspace_id` assign. On first mount it populates `:projects` via `list_projects_for_context/1`. On subsequent updates it refreshes `:projects` whenever `workspace_id` changes:
+
+```elixir
+workspace_changed = initialized and assigns.workspace_id != prev_workspace_id
+
+socket =
+  if workspace_changed do
+    assign(socket, :projects, list_projects_for_context(assigns.workspace_id))
+  else
+    socket
+  end
+```
+
+### `JobsPage` — Propagating `workspace_id`
+
+`JobsPage` passes the project's workspace down to `AgentScheduleSection`:
+
+```heex
+<.live_component
+  module={AgentScheduleSection}
+  id="agent-schedule-section"
+  project_id={@project_id}
+  workspace_id={if @project, do: @project.workspace_id}
+  active_tab={@active_tab}
+/>
+```
+
+When no project is selected `workspace_id` is `nil` and the full project list is shown.
+
+### `project_allowed?/2` — Schedule Save Guard
+
+Before resolving a project path for a schedule save, `AgentScheduleHelpers` validates the selected project against the scoped `:projects` list:
+
+```elixir
+defp project_allowed?(socket, id) do
+  case Map.get(socket.assigns, :workspace_id) do
+    nil -> true
+    _workspace_id ->
+      socket.assigns
+      |> Map.get(:projects, [])
+      |> Enum.any?(&(&1.id == id))
+  end
+end
+```
+
+No `workspace_id` → always allowed (backward-compatible). With a `workspace_id`, a project override from another workspace is silently rejected as `:no_project`, resulting in a "Could not resolve project path" flash error.
+
+---
+
 ## Adding a New Workspace-Scoped LiveView
 
 1. Add the route under the workspace pipeline in `router.ex`.

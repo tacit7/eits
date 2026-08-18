@@ -1040,6 +1040,11 @@ All errors return JSON with an `error` field and optional `details`:
 {"error": "session_id is required"}
 ```
 
+**403 Forbidden** - Workspace scope violation (see below):
+```json
+{"error": "Access denied"}
+```
+
 **404 Not Found** - Entity lookup failed:
 ```json
 {"error": "Agent not found"}
@@ -1058,6 +1063,55 @@ Controllers can return errors in these formats, which FallbackController handles
 - `{:error, status, reason}` — Custom HTTP status with reason (e.g. `{:error, :unauthorized, "Invalid token"}`)
 - `{:error, status}` — Custom HTTP status with status atom as error message (e.g. `{:error, :forbidden}` → `{"error": "forbidden"}`)
 - `{:error, changeset}` — 422 Unprocessable Entity with changeset errors
+
+---
+
+## Workspace Scope Enforcement
+
+Project-scoped API routes enforce **workspace isolation** via `EyeInTheSkyWeb.Api.V1.ProjectScope`. When a `project_id` parameter is supplied to an affected endpoint, the server validates that the requested project belongs to the same workspace as the calling session before proceeding.
+
+**How scope is resolved (in priority order):**
+
+1. `session_id` query/body param → resolved to a session record
+2. `agent_id` query/body param → resolved to that agent's most-recent session
+3. `x-eits-session` request header → resolved to a session record
+4. No session context → **bearer-only** mode; workspace check is skipped
+
+**Validation rules:**
+
+- `project_id` absent or `nil` → no workspace check; request proceeds normally
+- Bearer-only (no session context) → no workspace check; request proceeds
+- Calling session has no project → `403 Forbidden` (session must be scoped to a project to access project-specific data cross-workspace)
+- Both projects share the same `workspace_id` → `200/201` as normal
+- Projects belong to different workspaces → `403 Forbidden`
+- `project_id` not found → `404 Not Found`
+
+**Affected endpoints** (those that accept `project_id`):
+
+| Endpoint | Effect |
+|----------|--------|
+| `GET /api/v1/agents` | Filters agent list to workspace-matching project |
+| `GET /api/v1/channels` | Lists channels for workspace-matching project only |
+| `POST /api/v1/channels` | Validates project before channel creation |
+| `GET /api/v1/jobs` | Filters jobs to workspace-matching project |
+| `POST /api/v1/jobs` | Validates project before job creation |
+| `GET /api/v1/notes` | Filters notes to workspace-matching project |
+| `GET /api/v1/prompts` | Filters prompts to workspace-matching project |
+| `POST /api/v1/prompts` | Validates project before prompt creation |
+| `GET /api/v1/tasks` | Filters tasks to workspace-matching project |
+| `POST /api/v1/tasks` | Validates project before task creation |
+
+**Error responses:**
+
+```json
+{ "error": "Access denied" }
+```
+`403 Forbidden` — `project_id` was provided, but it belongs to a different workspace than the calling session's project. No data is returned.
+
+```json
+{ "error": "not_found" }
+```
+`404 Not Found` — the `project_id` does not exist.
 
 ## PubSub Topics
 

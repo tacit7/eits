@@ -51,6 +51,7 @@ defmodule EyeInTheSky.Sessions.ModelInfo do
   Handles:
   - nil or "" → {"claude", nil}
   - "claude-*" → {"anthropic", model}
+  - "gpt-*" → {"openai", model}
   - "provider/name" → {provider, name}
   - other → {"anthropic", model}
   """
@@ -61,6 +62,9 @@ defmodule EyeInTheSky.Sessions.ModelInfo do
     cond do
       String.starts_with?(model, "claude-") ->
         {"anthropic", model}
+
+      String.starts_with?(model, "gpt-") ->
+        {"openai", model}
 
       String.contains?(model, "/") ->
         [provider | rest] = String.split(model, "/", parts: 2)

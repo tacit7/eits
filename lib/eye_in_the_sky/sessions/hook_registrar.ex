@@ -25,6 +25,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
     case Agents.find_or_create_agent(agent_attrs) do
       {:ok, agent} ->
         {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+        provider = params["provider"] || runtime_provider_for_model_provider(model_provider)
 
         session_attrs = %{
           uuid: session_uuid,
@@ -34,7 +35,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
           status: "working",
           started_at: DateTime.utc_now(),
           last_activity_at: DateTime.utc_now(),
-          provider: params["provider"] || "claude",
+          provider: provider,
           model: params["model"],
           model_provider: model_provider,
           model_name: model_name,
@@ -69,4 +70,11 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
         {:error, :agent, changeset}
     end
   end
+
+  defp runtime_provider_for_model_provider("openai"), do: "codex"
+  defp runtime_provider_for_model_provider("anthropic"), do: "claude"
+  defp runtime_provider_for_model_provider("claude"), do: "claude"
+  defp runtime_provider_for_model_provider("gemini"), do: "gemini"
+  defp runtime_provider_for_model_provider("pi"), do: "pi"
+  defp runtime_provider_for_model_provider(_), do: "claude"
 end

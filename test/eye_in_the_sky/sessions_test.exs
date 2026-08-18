@@ -92,6 +92,22 @@ defmodule EyeInTheSky.SessionsTest do
       assert session.model_name != nil
     end
 
+    test "infers Codex provider metadata from gpt model hook payload" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "codex startup",
+        "model" => "gpt-5",
+        "entrypoint" => "sdk-cli"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.provider == "codex"
+      assert session.model_provider == "openai"
+      assert session.model_name == "gpt-5"
+    end
+
     test "creates session without model info when model string is nil" do
       uuid = Ecto.UUID.generate()
 

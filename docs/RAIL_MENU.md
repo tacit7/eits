@@ -461,6 +461,29 @@ def rail_context_topic(_session), do: "rail:context"   # fallback
 
 Result: Each browser tab/window has its own isolated `rail:context:<digest>` topic. Project selection in one window never bleeds into another.
 
+### Workspace-Scoped Project List
+
+The rail's project list (used by the project switcher and command palette) is scoped to the current workspace rather than showing every project globally.
+
+**`rail.ex`** tracks `workspace_id`/`workspace` assigns alongside `sidebar_project`:
+
+- `initial_workspace_id/2` resolves workspace from the `session["workspace_id"]` passed via `live_render`, falling back to `sidebar_project.workspace_id` when present.
+- `workspace_projects/1` calls `Projects.list_projects_for_workspace/1` when a workspace is known, otherwise returns `[]` (previously defaulted to `Projects.list_projects_for_sidebar/0`, i.e. all projects).
+- The `{:rail_context, payload}` handler now also carries `workspace_id`; `maybe_reload_projects/3` reloads `:projects` only when the workspace actually changed, avoiding redundant queries on unrelated context updates.
+- `:rail_refresh_projects` and the disconnected-render fallback both re-derive the list via `workspace_projects(socket.assigns[:workspace_id])`.
+
+See [WORKSPACE_SCOPE.md](WORKSPACE_SCOPE.md) for the underlying `Projects.list_projects_for_workspace/1` contract.
+
+### Restored-Project Navigation Fix
+
+**Previously**: `maybe_restore_project/2` only restored a project from localStorage when `sidebar_project` was nil, but never navigated the route to match — so restoring project A while sitting on project B's URL left the rail and the address bar out of sync.
+
+**Now**: `maybe_restore_project/2` compares the restored `project_id` against the current `sidebar_project.id`; if they differ, it calls `ProjectActions.handle_restore_project/2` and then `maybe_navigate_to_restored_project/3`, which `push_navigate`s to the project-scoped path for the current `sidebar_tab` (via the now-public `ProjectActions.project_path/2`). No-op when the restored ID matches what's already selected, or when there was no prior project to navigate from.
+
+### Palette Project Selection Persistence
+
+Selecting a project from the command palette ("Switch Project" / "Go to Project" results) now writes the selected `project_id` into the `rail_state` localStorage entry (via `saveRailProjectSelection` in `assets/js/command_palette.js`) before navigating. This keeps the rail's restored-project state in sync with palette-driven navigation instead of only updating on rail-driven selection. See [COMMAND_PALETTE.md](COMMAND_PALETTE.md) for the palette-side details.
+
 ---
 
 ## State Ownership Rules

@@ -514,7 +514,7 @@ def register_from_hook(params, project_id)
 **Purpose:** Register a new session from a SessionStart hook payload (e.g., `eits-session-startup.sh`).
 
 **Input Parameters:**
-- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `read_only`
+- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `managed_by_app`, `process_owner`, `read_only`
 - `project_id` (integer | nil) — pre-resolved project ID (may be nil if project wasn't found during startup)
 
 **Workflow:**
@@ -531,6 +531,40 @@ def register_from_hook(params, project_id)
 - Either error short-circuits the workflow — both agent and session must succeed
 
 **Usage:** Called by the startup hook when initializing a new Claude Code session.
+
+**Provider inference (commit 7edaa2e3):** When the hook payload omits `provider`
+(Codex hooks don't always send it), `HookRegistrar` infers the runtime provider
+from the parsed `model_provider` instead of defaulting to `"claude"`:
+
+```elixir
+defp runtime_provider_for_model_provider("openai"), do: "codex"
+defp runtime_provider_for_model_provider("anthropic"), do: "claude"
+defp runtime_provider_for_model_provider("claude"), do: "claude"
+defp runtime_provider_for_model_provider("gemini"), do: "gemini"
+defp runtime_provider_for_model_provider("pi"), do: "pi"
+defp runtime_provider_for_model_provider(_), do: "claude"
+```
+
+This relies on `ModelInfo.parse_model_string/1` recognizing a `"gpt-*"` model
+string as `model_provider: "openai"` (added alongside this fix, previously only
+`"claude-*"` was pattern-matched to `"anthropic"`). Net effect: a Codex hook
+payload with `model: "gpt-5"` and no explicit `provider` now correctly registers
+`session.provider == "codex"` instead of falling back to `"claude"`.
+
+**Process ownership:** `sessions.managed_by_app` controls whether the Phoenix app
+may start an `AgentWorker` for a session. Hook payloads with `entrypoint=cli`
+default to `managed_by_app=false`, making terminal sessions inbox-only from the
+app's perspective. App-created sessions set `managed_by_app=true`.
+
+Ownership applies to both message delivery and lifecycle automation:
+- `managed_by_app=true` means Phoenix owns the worker lifecycle and may start or
+  resume an `AgentWorker` when a message arrives.
+- `managed_by_app=false` means the process is owned by an external terminal.
+  Phoenix may persist messages and status updates, but it must not start a
+  replacement process for that session.
+- `entrypoint=cli` is the terminal default for Codex startup hooks. Use
+  `managed_by_app=true` or `process_owner=app` only for sessions intentionally
+  spawned and controlled by the app.
 
 ---
 
@@ -1714,6 +1748,7 @@ end
 def list_idle_sessions_older_than(cutoff) do
   from(s in Session,
     where: s.status in ["idle", "waiting"],
+    where: s.managed_by_app == true,
     where: is_nil(s.archived_at),
     where: not is_nil(s.started_at),
     where:
@@ -1732,6 +1767,33 @@ Two separate OR branches allow PostgreSQL to use:
 A single `coalesce(last_activity_at, started_at)` expression would prevent index use and force a full table scan.
 
 The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at IS NULL` to avoid scanning completed or archived sessions.
+
+**Terminal-owned sessions:** A terminal-owned Codex session can be marked
+`idle` by `codex-session-stop.sh` between turns while still being resumable from
+the user's terminal. `AgentStatus` cleanup distinguishes that from a dead
+app-owned worker by filtering dead-idle archive and zombie sweep candidates to
+`managed_by_app=true`. In practice, `managed_by_app=false` sessions are not
+app-spawned and are not hidden by app-worker reclamation. If a session is later
+marked `working` while `archived_at` remains non-null, the session was resumed
+without being unarchived; use `eits sessions unarchive <uuid>` or clear
+`archived_at` as part of the resume/update path.
+
+### Idle Ticket Nudges
+
+`EyeInTheSky.Scheduler.IdleTicketNudger` checks idle sessions that still have
+open tasks linked through `task_sessions`. It sends a DM reminding the session
+to review the open ticket(s) and update status or notes if applicable. The
+worker does not directly mutate tasks.
+
+Candidate sessions must be `status="idle"`, unarchived, older than the worker's
+idle cutoff, and linked to at least one task that is neither Done nor archived.
+This is intentionally separate from dead-idle archival: sessions with open tasks
+are preserved and nudged instead of being reclaimed by the app-worker cleanup
+path.
+
+Terminal-owned sessions are allowed in the candidate set. Delivery goes through
+`DMDelivery.deliver_or_persist/4`, so terminal-owned sessions get a durable
+inbox record and no app worker is started.
 
 ---
 

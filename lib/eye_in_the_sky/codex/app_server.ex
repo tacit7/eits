@@ -686,7 +686,7 @@ defmodule EyeInTheSky.Codex.AppServer do
               :exit_status,
               :use_stdio,
               :stderr_to_stdout,
-              {:args, ["app-server", "--listen", "stdio://"]},
+              {:args, app_server_args(opts)},
               {:cd, project_path},
               {:env, build_env(opts)}
             ])
@@ -711,6 +711,15 @@ defmodule EyeInTheSky.Codex.AppServer do
     end
   end
 
+  defp app_server_args(opts) do
+    config_args =
+      opts
+      |> Keyword.get(:app_server_config_overrides, [])
+      |> Enum.flat_map(fn override -> ["-c", to_string(override)] end)
+
+    ["app-server"] ++ config_args ++ ["--listen", "stdio://"]
+  end
+
   defp build_env(opts) do
     base_env =
       for {key, value} <- System.get_env(),
@@ -727,6 +736,7 @@ defmodule EyeInTheSky.Codex.AppServer do
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_PROJECT_ID", opts[:eits_project_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
     |> EyeInTheSky.CLI.Port.maybe_add_env("ENTRYPOINT", opts[:entrypoint] || "cli")
+    |> EyeInTheSky.CLI.Port.maybe_add_env("CODEX_HOME", opts[:codex_home])
     |> EyeInTheSky.CLI.Port.maybe_add_env(
       "EITS_CODEX_APP_SERVER_HOOK_LOG",
       opts[:smoke_hook_log]

@@ -112,6 +112,12 @@ same app-server process and captures `hook/started` / `hook/completed`
 notifications so hook failures report whether hooks were undiscovered, untrusted,
 or executed without the expected EITS environment.
 
+For hook parity, the smoke test creates an isolated temporary `CODEX_HOME`,
+symlinks the existing Codex auth file, writes a temp project trust entry, probes
+`hooks/list` for the current hook keys and hashes, then writes matching
+`hooks.state` trust entries before running the two-turn app-server session. It
+does not mutate the user's global `~/.codex/config.toml`.
+
 The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
 `started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
 `turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,

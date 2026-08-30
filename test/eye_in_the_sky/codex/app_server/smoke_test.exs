@@ -17,13 +17,15 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     project_path = smoke_project!()
     hook_log = Path.join(project_path, "hook-events.ndjson")
     telemetry_ref = attach_hook_telemetry()
+    codex_home = trusted_smoke_codex_home!(project_path)
 
     {first_ref, app_server_pid} =
       start_and_wait!(
         "Reply with exactly: EITS_APP_SERVER_SMOKE_ONE",
         eits_session_id,
         project_path,
-        hook_log
+        hook_log,
+        codex_home: codex_home
       )
 
     assert_receive {:codex_session_id, ^first_ref, thread_id}, 120_000
@@ -43,7 +45,8 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
         "Reply with exactly: EITS_APP_SERVER_SMOKE_TWO",
         eits_session_id,
         project_path,
-        hook_log
+        hook_log,
+        codex_home: codex_home
       )
 
     second_result = wait_for_result!(second_ref)
@@ -53,7 +56,7 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     assert_hook_context!(hook_log, hook_list, collect_hook_notifications(telemetry_ref))
   end
 
-  defp start_and_wait!(prompt, eits_session_id, project_path, hook_log, extra_opts \\ []) do
+  defp start_and_wait!(prompt, eits_session_id, project_path, hook_log, extra_opts) do
     opts =
       Keyword.merge(
         [
@@ -124,6 +127,108 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
   end
 
   defp hook_command(command), do: %{"type" => "command", "command" => command, "timeout" => 5}
+
+  defp trusted_smoke_codex_home!(project_path) do
+    codex_home = Path.join(project_path, "codex-home")
+    File.mkdir_p!(codex_home)
+    link_codex_auth_file!(codex_home, "auth.json")
+    link_optional_codex_auth_file!(codex_home, "installation_id")
+
+    File.write!(Path.join(codex_home, "config.toml"), project_trust_config(project_path))
+
+    owner_key = {:smoke_hook_probe, make_ref()}
+
+    {:ok, pid} =
+      AppServer.lookup_or_start(owner_key, project_path: project_path, codex_home: codex_home)
+
+    try do
+      assert {:ok, hook_list} =
+               AppServer.list_hooks(pid, [project_path], app_server_call_timeout_ms: 120_000)
+
+      hooks = hooks_from_list(hook_list)
+      assert hooks != [], "trusted smoke project did not expose hooks through hooks/list"
+
+      File.write!(
+        Path.join(codex_home, "config.toml"),
+        project_trust_config(project_path) <> "\n" <> trusted_hook_config(hooks)
+      )
+
+      codex_home
+    after
+      AppServer.stop_owner(owner_key)
+    end
+  end
+
+  defp hooks_from_list(%{"data" => data}) when is_list(data) do
+    Enum.flat_map(data, &hooks_from_list/1)
+  end
+
+  defp hooks_from_list(%{"hooks" => hooks}) when is_list(hooks), do: hooks
+  defp hooks_from_list(_result), do: []
+
+  defp project_trust_config(project_path) do
+    """
+    [features]
+    hooks = true
+
+    [projects."#{escape_config_string(realpath!(project_path))}"]
+    trust_level = "trusted"
+    """
+  end
+
+  defp realpath!(path) do
+    case System.cmd("pwd", ["-P"], cd: path) do
+      {realpath, 0} -> String.trim(realpath)
+      {error, status} -> flunk("failed to resolve #{path}: #{inspect({status, error})}")
+    end
+  end
+
+  defp trusted_hook_config(hooks) do
+    state =
+      hooks
+      |> Enum.map(&trusted_hook_state_entry/1)
+      |> Enum.join("\n\n")
+
+    """
+    #{state}
+    """
+  end
+
+  defp trusted_hook_state_entry(%{"key" => key, "currentHash" => hash})
+       when is_binary(key) and is_binary(hash) do
+    """
+    [hooks.state."#{escape_config_string(key)}"]
+    trusted_hash = "#{escape_config_string(hash)}"
+    """
+  end
+
+  defp trusted_hook_state_entry(hook) do
+    flunk("hooks/list returned a hook without key/currentHash: #{inspect(hook)}")
+  end
+
+  defp escape_config_string(value) do
+    value
+    |> String.replace("\\", "\\\\")
+    |> String.replace(~s("), ~s(\\"))
+  end
+
+  defp link_codex_auth_file!(codex_home, relative_path) do
+    source = Path.join(Path.expand("~/.codex"), relative_path)
+
+    unless File.exists?(source) do
+      flunk("Codex app-server smoke requires #{relative_path} in ~/.codex")
+    end
+
+    File.ln_s!(source, Path.join(codex_home, relative_path))
+  end
+
+  defp link_optional_codex_auth_file!(codex_home, relative_path) do
+    source = Path.join(Path.expand("~/.codex"), relative_path)
+
+    if File.exists?(source) do
+      File.ln_s!(source, Path.join(codex_home, relative_path))
+    end
+  end
 
   defp assert_hook_context!(hook_log, hook_list, hook_notifications) do
     if File.exists?(hook_log) do

@@ -122,7 +122,16 @@ The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
 `started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
 `turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,
 `cancel_timeout`, `hooks_list`, `hook_started`, `hook_completed`,
-`server_request_replied`, and `exit`.
+`server_request_replied`, `server_request_resolved`, and `exit`.
+
+Server-initiated app-server requests are always answered so the long-lived
+bridge cannot hang waiting for host UI that EITS does not yet expose. Command
+and file-change approvals are declined, permission requests grant an empty
+turn-scoped subset, `tool/requestUserInput` and the older
+`item/tool/requestUserInput` form return empty answers, MCP elicitation is
+declined, and unknown request methods receive JSON-RPC method errors. This keeps
+the turn lifecycle terminal and observable without silently approving new
+capabilities.
 
 ## Session UUID Lifecycle
 

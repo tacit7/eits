@@ -53,6 +53,8 @@ defmodule EyeInTheSky.Codex.AppServerTest do
   end
 
   test "auto-responds to server requests so Codex cannot hang", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+
     send(
       pid,
       {:codex_app_server_output,
@@ -65,6 +67,89 @@ defmodule EyeInTheSky.Codex.AppServerTest do
     )
 
     assert_receive {:fake_response, "approval-1", %{"decision" => "decline"}}
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:server_request_replied],
+                    _measurements,
+                    %{
+                      request_id: "approval-1",
+                      method: "item/commandExecution/requestApproval",
+                      category: :command_approval,
+                      item_id: "cmd-1",
+                      response_type: :result
+                    }}
+  end
+
+  test "auto-responds to every supported app-server request shape", %{pid: pid} do
+    cases = [
+      {"file-1", "item/fileChange/requestApproval", %{"itemId" => "file-change-1"},
+       %{"decision" => "decline"}},
+      {"permissions-1", "item/permissions/requestApproval", %{"itemId" => "permissions-item"},
+       %{"permissions" => %{}, "scope" => "turn"}},
+      {"input-1", "tool/requestUserInput",
+       %{"questions" => [%{"id" => "choice", "question" => "Continue?"}]},
+       %{"answers" => %{"choice" => %{"answers" => []}}}},
+      {"input-legacy-1", "item/tool/requestUserInput",
+       %{"questions" => [%{"id" => "legacy-choice", "question" => "Continue?"}]},
+       %{"answers" => %{"legacy-choice" => %{"answers" => []}}}},
+      {"mcp-1", "mcpServer/elicitation/request", %{"serverName" => "example"},
+       %{"action" => "decline", "content" => nil, "_meta" => nil}}
+    ]
+
+    for {id, method, params, expected} <- cases do
+      send(
+        pid,
+        {:codex_app_server_output,
+         Jason.encode!(%{
+           "jsonrpc" => "2.0",
+           "id" => id,
+           "method" => method,
+           "params" => Map.merge(%{"threadId" => "thread-1", "turnId" => "turn-1"}, params)
+         })}
+      )
+
+      assert_receive {:fake_response, ^id, ^expected}
+    end
+  end
+
+  test "unknown server requests receive JSON-RPC method errors", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{
+         "jsonrpc" => "2.0",
+         "id" => "dynamic-tool-1",
+         "method" => "item/tool/call",
+         "params" => %{"threadId" => "thread-1", "turnId" => "turn-1"}
+       })}
+    )
+
+    assert_receive {:fake_error, "dynamic-tool-1", %{"code" => -32601, "message" => message}}
+    assert message =~ "item/tool/call"
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:server_request_replied],
+                    _measurements,
+                    %{
+                      request_id: "dynamic-tool-1",
+                      method: "item/tool/call",
+                      category: :unknown,
+                      response_type: :error
+                    }}
+  end
+
+  test "emits telemetry when app-server resolves a server request", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+
+    send_notification(pid, "serverRequest/resolved", %{
+      "threadId" => "thread-1",
+      "turnId" => "turn-1",
+      "requestId" => "approval-1"
+    })
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:server_request_resolved],
+                    _measurements,
+                    %{request_id: "approval-1", thread_id: "thread-1", turn_id: "turn-1"}}
   end
 
   test "JSON-RPC errors without ids fail the active turn once", %{pid: pid} do
@@ -292,6 +377,8 @@ defmodule EyeInTheSky.Codex.AppServerTest do
             :hook_started,
             :hook_completed,
             :hooks_list,
+            :server_request_replied,
+            :server_request_resolved,
             :turn_accepted,
             :turn_completed,
             :turn_failed,
@@ -332,6 +419,9 @@ defmodule FakeCodexAppServer do
     cond do
       Map.has_key?(message, "result") ->
         send(test_pid, {:fake_response, message["id"], message["result"]})
+
+      Map.has_key?(message, "error") ->
+        send(test_pid, {:fake_error, message["id"], message["error"]})
 
       Map.has_key?(message, "id") ->
         send(test_pid, {:fake_request, message["method"], message["id"]})

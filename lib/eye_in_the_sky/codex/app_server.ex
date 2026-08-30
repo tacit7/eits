@@ -435,6 +435,10 @@ defmodule EyeInTheSky.Codex.AppServer do
         emit_hook_telemetry(:hook_completed, params, state)
         state
 
+      method == "serverRequest/resolved" ->
+        emit_server_request_resolved_telemetry(params, state)
+        state
+
       stale_notification?(state, params) ->
         state
 
@@ -504,15 +508,28 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   defp handle_server_request(request, state) do
     response = Protocol.server_request_response(request)
+    metadata = Protocol.server_request_metadata(request)
     write_message(state, response)
 
     emit_telemetry(
       :server_request_replied,
       %{},
-      telemetry_meta(state, %{method: request["method"]})
+      telemetry_meta(state, metadata)
     )
 
     state
+  end
+
+  defp emit_server_request_resolved_telemetry(params, state) do
+    emit_telemetry(
+      :server_request_resolved,
+      %{},
+      telemetry_meta(state, %{
+        request_id: params["requestId"] || params["id"],
+        thread_id: params["threadId"],
+        turn_id: params["turnId"]
+      })
+    )
   end
 
   defp fail_request({:hooks_list, from}, state, reason) do

@@ -61,25 +61,90 @@ defmodule EyeInTheSky.Codex.AppServer.ProtocolTest do
     assert request["params"] == %{"cwds" => ["/tmp/project"]}
   end
 
-  test "server request responses decline approvals and answer user input" do
-    command =
-      Protocol.server_request_response(%{
-        "id" => 8,
+  test "server request responses decline approvals, user input, and MCP elicitation" do
+    assert Protocol.server_request_response(%{
+             "id" => 8,
+             "method" => "item/commandExecution/requestApproval",
+             "params" => %{}
+           })["result"] == %{"decision" => "decline"}
+
+    assert Protocol.server_request_response(%{
+             "id" => "file-1",
+             "method" => "item/fileChange/requestApproval",
+             "params" => %{}
+           })["result"] == %{"decision" => "decline"}
+
+    assert Protocol.server_request_response(%{
+             "id" => "permissions-1",
+             "method" => "item/permissions/requestApproval",
+             "params" => %{}
+           })["result"] == %{"permissions" => %{}, "scope" => "turn"}
+
+    assert Protocol.server_request_response(%{
+             "id" => "ask-1",
+             "method" => "tool/requestUserInput",
+             "params" => %{"questions" => [%{"id" => "q1", "question" => "Continue?"}]}
+           })["result"] == %{"answers" => %{"q1" => %{"answers" => []}}}
+
+    assert Protocol.server_request_response(%{
+             "id" => "ask-legacy",
+             "method" => "item/tool/requestUserInput",
+             "params" => %{"questions" => [%{"id" => "q2", "question" => "Continue?"}]}
+           })["result"] == %{"answers" => %{"q2" => %{"answers" => []}}}
+
+    assert Protocol.server_request_response(%{
+             "id" => "mcp-1",
+             "method" => "mcpServer/elicitation/request",
+             "params" => %{}
+           })["result"] == %{"action" => "decline", "content" => nil, "_meta" => nil}
+  end
+
+  test "server request metadata classifies known and unknown requests" do
+    metadata =
+      Protocol.server_request_metadata(%{
+        "id" => "approval-1",
         "method" => "item/commandExecution/requestApproval",
+        "params" => %{
+          "threadId" => "thread-1",
+          "turnId" => "turn-1",
+          "itemId" => "cmd-1",
+          "autoResolutionMs" => 1_000
+        }
+      })
+
+    assert metadata == %{
+             request_id: "approval-1",
+             method: "item/commandExecution/requestApproval",
+             category: :command_approval,
+             thread_id: "thread-1",
+             turn_id: "turn-1",
+             item_id: "cmd-1",
+             server_name: nil,
+             auto_resolution_ms: 1_000,
+             response_type: :result
+           }
+
+    assert %{
+             category: :unknown,
+             response_type: :error
+           } =
+             Protocol.server_request_metadata(%{
+               "id" => "unknown-1",
+               "method" => "item/tool/call",
+               "params" => %{}
+             })
+  end
+
+  test "unknown server requests produce JSON-RPC method errors" do
+    response =
+      Protocol.server_request_response(%{
+        "id" => "unknown-1",
+        "method" => "item/tool/call",
         "params" => %{}
       })
 
-    assert command["id"] == 8
-    assert command["result"] == %{"decision" => "decline"}
-
-    input =
-      Protocol.server_request_response(%{
-        "id" => "ask-1",
-        "method" => "item/tool/requestUserInput",
-        "params" => %{"questions" => [%{"id" => "q1", "question" => "Continue?"}]}
-      })
-
-    assert input["id"] == "ask-1"
-    assert input["result"] == %{"answers" => %{"q1" => %{"answers" => []}}}
+    assert response["id"] == "unknown-1"
+    assert response["error"]["code"] == -32601
+    assert response["error"]["message"] =~ "item/tool/call"
   end
 end

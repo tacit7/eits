@@ -113,6 +113,9 @@ defmodule EyeInTheSky.Codex.AppServer.Protocol do
         "item/permissions/requestApproval" ->
           %{"permissions" => %{}, "scope" => "turn"}
 
+        "tool/requestUserInput" ->
+          %{"answers" => empty_answers(params["questions"])}
+
         "item/tool/requestUserInput" ->
           %{"answers" => empty_answers(params["questions"])}
 
@@ -129,6 +132,42 @@ defmodule EyeInTheSky.Codex.AppServer.Protocol do
       error(id, -32601, "Codex app-server request `#{method}` is not implemented")
     end
   end
+
+  @spec server_request_metadata(map()) :: map()
+  def server_request_metadata(%{"id" => id, "method" => method} = request) do
+    params = request["params"] || %{}
+
+    %{
+      request_id: id,
+      method: method,
+      category: server_request_category(method),
+      thread_id: params["threadId"],
+      turn_id: params["turnId"],
+      item_id: params["itemId"],
+      server_name: params["serverName"],
+      auto_resolution_ms: params["autoResolutionMs"],
+      response_type: if(server_request_supported?(method), do: :result, else: :error)
+    }
+  end
+
+  defp server_request_supported?(method) do
+    method in [
+      "item/commandExecution/requestApproval",
+      "item/fileChange/requestApproval",
+      "item/permissions/requestApproval",
+      "tool/requestUserInput",
+      "item/tool/requestUserInput",
+      "mcpServer/elicitation/request"
+    ]
+  end
+
+  defp server_request_category("item/commandExecution/requestApproval"), do: :command_approval
+  defp server_request_category("item/fileChange/requestApproval"), do: :file_change_approval
+  defp server_request_category("item/permissions/requestApproval"), do: :permissions_approval
+  defp server_request_category("tool/requestUserInput"), do: :user_input
+  defp server_request_category("item/tool/requestUserInput"), do: :user_input
+  defp server_request_category("mcpServer/elicitation/request"), do: :mcp_elicitation
+  defp server_request_category(_method), do: :unknown
 
   defp route(%{"id" => _id, "method" => _method, "params" => _params} = message),
     do: {:ok, {:request, message}}

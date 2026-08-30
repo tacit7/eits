@@ -63,6 +63,7 @@ defmodule EyeInTheSky.Sessions.Session do
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
     field :entrypoint, :string
+    field :managed_by_app, :boolean, default: true
     field :status_reason, :string
     field :read_only, :boolean, default: false
     field :compact_summary, :string
@@ -137,6 +138,7 @@ defmodule EyeInTheSky.Sessions.Session do
       :parent_agent_id,
       :parent_session_id,
       :entrypoint,
+      :managed_by_app,
       :status_reason,
       :read_only,
       :settings,

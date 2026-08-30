@@ -82,6 +82,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       values = ModelHelpers.codex_models() |> Enum.map(&elem(&1, 0))
       assert Enum.uniq(values) == values
     end
+
+    test "returns the curated GPT selector options in display order" do
+      assert ModelHelpers.codex_models() == [
+               {"gpt-5.6-sol", "GPT-5.6 Sol"},
+               {"gpt-5.6-terra", "GPT-5.6 Terra"},
+               {"gpt-5.6-luna", "GPT-5.6 Luna"},
+               {"gpt-5.5", "GPT-5.5"},
+               {"gpt-5.2", "GPT-5.2"}
+             ]
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -112,6 +122,21 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
         ModelHelpers.codex_models_with_meta() |> Enum.map(&elem(&1, 0)) |> MapSet.new()
 
       assert meta_values == base_values
+    end
+
+    test "returns the curated GPT selector descriptions in display order" do
+      assert ModelHelpers.codex_models_with_meta() == [
+               {"gpt-5.6-sol", "GPT-5.6 Sol", "Latest frontier agentic coding model (default)",
+                "text-warning"},
+               {"gpt-5.6-terra", "GPT-5.6 Terra",
+                "Balanced agentic coding model for everyday work", "text-warning"},
+               {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model",
+                "text-info"},
+               {"gpt-5.5", "GPT-5.5",
+                "Frontier model for complex coding, research, and real-world work", "text-info"},
+               {"gpt-5.2", "GPT-5.2", "Optimized for professional work and long-running agents",
+                "text-info"}
+             ]
     end
   end
 
@@ -257,7 +282,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "known codex slug returns its label" do
       assert ModelHelpers.model_display_name("gpt-5.5") == "GPT-5.5"
-      assert ModelHelpers.model_display_name("gpt-5.4-mini") == "GPT-5.4 Mini"
+      assert ModelHelpers.model_display_name("gpt-5.6-terra") == "GPT-5.6 Terra"
+      assert ModelHelpers.model_display_name("gpt-5.2") == "GPT-5.2"
     end
 
     test "short alias \"opus\" returns \"Opus 5\"" do
@@ -354,16 +380,15 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       refute Enum.any?(entries, & &1.premium?)
     end
 
-    test "gpt-5.6-sol, gpt-5.6-tenna, gpt-5.6-luna are primary; rest are legacy", %{
+    test "gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna are primary; rest are legacy", %{
       entries: entries
     } do
       by_slug = Map.new(entries, &{&1.slug, &1})
       assert by_slug["gpt-5.6-sol"].legacy? == false
-      assert by_slug["gpt-5.6-tenna"].legacy? == false
+      assert by_slug["gpt-5.6-terra"].legacy? == false
       assert by_slug["gpt-5.6-luna"].legacy? == false
       assert by_slug["gpt-5.5"].legacy? == true
-      assert by_slug["gpt-5.4"].legacy? == true
-      assert by_slug["gpt-5.4-mini"].legacy? == true
+      assert by_slug["gpt-5.2"].legacy? == true
     end
 
     test "default is gpt-5.6-sol", %{entries: entries} do

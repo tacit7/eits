@@ -230,13 +230,13 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def to_utc_string(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt) <> "Z"
   def to_utc_string(_), do: ""
 
-  def format_checkpoint_time(nil), do: "—"
+  def format_checkpoint_time(nil), do: "-"
 
   def format_checkpoint_time(%DateTime{} = dt) do
     Calendar.strftime(dt, "%b %-d, %H:%M")
   end
 
-  def format_checkpoint_time(_), do: "—"
+  def format_checkpoint_time(_), do: "-"
 
   # ---------------------------------------------------------------------------
   # Text extraction
@@ -374,7 +374,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
     prompt =
       case Jason.decode(rest) do
         {:ok, %{"prompt" => p}} ->
-          String.slice(p, 0..80) <> if(String.length(p) > 81, do: "…", else: "")
+          String.slice(p, 0..80) <> if(String.length(p) > 81, do: "...", else: "")
 
         _ ->
           rest
@@ -473,7 +473,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
       n ->
         if is_binary(n) and String.starts_with?(n, "mcp") do
-          "text-slate-400 bg-slate-400/10"
+          "text-base-content/55 bg-base-content/[0.08]"
         else
           "text-base-content/40 bg-base-content/[0.06]"
         end

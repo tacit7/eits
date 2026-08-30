@@ -76,14 +76,14 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
           title={"Open in #{@preferred.label}"}
         >
           <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
-          <span class="text-xs font-normal">{@preferred.label}</span>
+          <span class="text-mini font-normal">{@preferred.label}</span>
         </button>
         <%= if @others != [] do %>
           <div class="dropdown dropdown-end join-item">
             <button
               tabindex="0"
               class="btn btn-ghost btn-xs join-item px-1 min-h-[30px] h-[30px] border-l border-base-content/10"
-              title="Open in…"
+              title="Open in..."
             >
               <.icon name="hero-chevron-down" class="size-3" />
             </button>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
               <%= for ed <- @others do %>
                 <li>
                   <button
-                    class="text-xs"
+                    class="text-mini"
                     phx-click="open_in_editor"
                     phx-value-editor={ed.id}
                     phx-value-path={@path}

@@ -117,6 +117,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.Tasks.Poller,
           # Process incoming GitHub webhook deliveries
           EyeInTheSky.Github.WebhookDispatcher,
+          # Nudge idle sessions that still own open tasks to update ticket state.
+          EyeInTheSky.Scheduler.IdleTicketNudger,
           # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min).
           # Holds a sandbox connection mid-query; must be skipped in test env
           # (start_pollers: false) or it crashes on SQL Sandbox OwnershipError.

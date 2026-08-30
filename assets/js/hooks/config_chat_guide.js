@@ -110,7 +110,7 @@ export const ConfigChatGuide = {
 
     const el = document.createElement('span')
     el.id = 'config-guide-btn-error'
-    el.className = 'text-error text-xs ml-2'
+    el.className = 'text-error text-mini ml-2'
     el.textContent = message
     this.el.insertAdjacentElement('afterend', el)
     setTimeout(() => el.remove(), 4000)

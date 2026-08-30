@@ -29,6 +29,7 @@ defmodule EyeInTheSky.Codex.Parser do
   """
 
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Codex.Error
   require Logger
 
   @doc """
@@ -239,23 +240,23 @@ defmodule EyeInTheSky.Codex.Parser do
 
   # Turn failed
   defp parse_event(%{"type" => "turn.failed"} = event) do
-    message = event["message"] || event["error"] || "Turn failed"
+    message = Error.normalize(event, "Turn failed").message
     {:error, {:turn_failed, message}}
   end
 
   # Top-level error
   defp parse_event(%{"type" => "error"} = event) do
-    message = event["message"] || event["error"] || "Unknown error"
+    message = Error.normalize(event, "Unknown error").message
     {:error, {:codex_error, message}}
   end
 
   # Error object without type
   defp parse_event(%{"error" => error}) when is_binary(error) do
-    {:error, {:codex_error, error}}
+    {:error, {:codex_error, Error.normalize(error, "Unknown error").message}}
   end
 
   defp parse_event(%{"error" => %{"message" => message}}) do
-    {:error, {:codex_error, message}}
+    {:error, {:codex_error, Error.normalize(%{"message" => message}, "Unknown error").message}}
   end
 
   # Unknown event type

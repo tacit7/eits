@@ -776,7 +776,7 @@ export const VimNav = {
 
     if (this.statusbarEl) {
       this.statusbarEl.textContent = "[ HINT ]"
-      this.statusbarEl.style.color = "var(--color-warning, #f59e0b)"
+      this.statusbarEl.style.color = "var(--color-warning)"
       this.statusbarEl.style.opacity = "1"
     }
   },
@@ -876,7 +876,7 @@ export const VimNav = {
     overlay.style.cssText = [
       "position:fixed", "inset:0", "z-index:10000",
       "display:flex", "align-items:center", "justify-content:center",
-      "background:rgba(0,0,0,0.6)",
+      "background:color-mix(in oklch, var(--color-base-content) 45%, transparent)",
     ].join(";")
     this.quickDmOverlayEl = overlay
     document.body.appendChild(overlay)
@@ -885,7 +885,7 @@ export const VimNav = {
 
   _showQuickDmCompose(): void {
     const overlay = this._quickDmOverlayBase()
-    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:16px 20px;width:420px;max-width:90vw;font-family:monospace;color:var(--color-base-content)"><div style="font-size:13px;font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:4px;font-family:monospace;font-size:12px;background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:9px;opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
+    overlay.innerHTML = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:var(--radius-box);padding:16px 20px;width:420px;max-width:90vw;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;color:var(--color-base-content)"><div style="font-size:var(--text-message);font-weight:600;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">DM: ${escapeHtml(this._quickDmTargetName)}</div><textarea id="vim-qdm-input" placeholder="Type your message…" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--color-base-300);border-radius:var(--radius-selector);font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;font-size:var(--text-mini);background:var(--color-base-200);color:var(--color-base-content);resize:none;min-height:72px" rows="3"></textarea><div style="margin-top:8px;font-size:var(--text-nano);opacity:0.4">Enter to send &nbsp;|&nbsp; Esc cancel</div></div>`
 
     const textarea = overlay.querySelector("#vim-qdm-input") as HTMLTextAreaElement | null
     if (textarea) {
@@ -923,12 +923,12 @@ export const VimNav = {
     overlay.style.cssText = [
       "position:fixed","inset:0","z-index:10000",
       "display:flex","align-items:center","justify-content:center",
-      "background:rgba(0,0,0,0.6)",
+      "background:color-mix(in oklch, var(--color-base-content) 45%, transparent)",
     ].join(";")
 
-    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:10px;background:var(--color-base-200);color:var(--color-base-content)"
+    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:var(--radius-selector);font-size:var(--text-micro);background:var(--color-base-200);color:var(--color-base-content)"
 
-    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:8px;padding:20px 24px;max-width:580px;width:90%;max-height:80vh;overflow-y:auto;font-family:monospace;color:var(--color-base-content)">`
+    let html = `<div style="background:var(--color-base-100);border:1px solid var(--color-base-300);border-radius:var(--radius-box);padding:20px 24px;max-width:580px;width:90%;max-height:80vh;overflow-y:auto;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;color:var(--color-base-content)">`
 
     if (prefix && prefix.length > 0) {
       // Scoped help: show all commands under the given prefix
@@ -938,13 +938,13 @@ export const VimNav = {
         isCommandActive(cmd)
       )
       const prefixLabel = prefix.join(" ")
-      html += `<div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">${escapeHtml(prefixLabel)} → Help</div>`
+      html += `<div style="font-size:var(--text-message);font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">${escapeHtml(prefixLabel)} → Help</div>`
 
       const useGrid = prefixCmds.length > 8
       if (useGrid) html += `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:16px">`
       for (const cmd of prefixCmds) {
         const relKeys = cmd.keys.slice(prefix.length).map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${relKeys}</span></div>`
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:var(--text-mini);opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${relKeys}</span></div>`
       }
       if (useGrid) html += `</div>`
     } else {
@@ -960,26 +960,26 @@ export const VimNav = {
         { label: "Context",      group: "context" },
       ]
 
-      html += `<div style="font-size:13px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Keyboard Shortcuts</div>`
+      html += `<div style="font-size:var(--text-message);font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--color-base-300)">Keyboard Shortcuts</div>`
 
       for (const section of sections) {
         const cmds = activeCmds.filter(c => c.group === section.group)
         if (cmds.length === 0) continue
 
-        html += `<div style="margin-bottom:10px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--color-primary,var(--color-base-content));opacity:.7;margin-bottom:5px;font-weight:600">${escapeHtml(section.label)}</div>`
+        html += `<div style="margin-bottom:10px"><div style="font-size:var(--text-nano);text-transform:uppercase;letter-spacing:0;color:var(--color-primary);opacity:.7;margin-bottom:5px;font-weight:600">${escapeHtml(section.label)}</div>`
 
         const useGrid = cmds.length > 6
         if (useGrid) html += `<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:16px">`
         for (const cmd of cmds) {
           const keys = cmd.keys.map(k => `<kbd style="${kbdStyle}">${escapeHtml(k)}</kbd>`).join(" ")
-          html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:11px;opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${keys}</span></div>`
+          html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0"><span style="font-size:var(--text-mini);opacity:.8">${escapeHtml(cmd.label)}</span><span style="white-space:nowrap;padding-left:8px">${keys}</span></div>`
         }
         if (useGrid) html += `</div>`
         html += `</div>`
       }
     }
 
-    html += `<div style="margin-top:8px;font-size:9px;opacity:.4;text-align:center">Press any key to close</div></div>`
+    html += `<div style="margin-top:8px;font-size:var(--text-nano);opacity:.4;text-align:center">Press any key to close</div></div>`
     overlay.innerHTML = html
 
     this._onHelpClose = (e: KeyboardEvent) => {
@@ -1070,11 +1070,11 @@ export const VimNav = {
       "left:50%",
       "transform:translate(-50%,-50%)",
       "z-index:9999",
-      "font-family:monospace",
-      "font-size:12px",
+      "font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      "font-size:var(--text-mini)",
       "background:var(--color-base-200)",
       "border:1px solid var(--color-base-300)",
-      "border-radius:6px",
+      "border-radius:var(--radius-field)",
       "padding:10px 14px",
       "pointer-events:none",
       "color:var(--color-base-content)",
@@ -1082,11 +1082,11 @@ export const VimNav = {
       "max-width:520px",
     ].join(";")
 
-    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:3px;font-size:11px;background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center"
+    const kbdStyle = "display:inline-block;padding:1px 5px;border:1px solid var(--color-base-300);border-radius:var(--radius-selector);font-size:var(--text-mini);background:var(--color-base-100);color:var(--color-base-content);min-width:18px;text-align:center"
     const arrowStyle = "opacity:.35;margin:0 4px"
 
     const header = document.createElement("div")
-    header.style.cssText = "font-size:10px;opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--color-base-300);padding-bottom:4px"
+    header.style.cssText = "font-size:var(--text-micro);opacity:.5;margin-bottom:6px;text-transform:uppercase;letter-spacing:0;border-bottom:1px solid var(--color-base-300);padding-bottom:4px"
     header.textContent = `${prefix.join(" ")} →`
     overlay.appendChild(header)
 

@@ -6,15 +6,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.WorkflowTab do
     ~H"""
     <div class="space-y-4">
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Workflow
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">EITS Workflow</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">EITS Workflow</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Enable EITS hook workflow (pre-tool-use, post-commit, session-start, etc.)
                 </p>
               </div>

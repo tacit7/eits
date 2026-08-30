@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
           <button
             phx-click="delete_selected_notes"
             data-confirm={"Delete #{MapSet.size(@selected_ids)} note#{if MapSet.size(@selected_ids) != 1, do: "s"}?"}
-            class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
+            class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-error/70 transition-colors hover:bg-error/10 hover:text-error"
           >
             <.icon name="hero-trash-mini" class="size-3.5" /> Delete
           </button>
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
         <% end %>
         <button
           phx-click="exit_select_mode_notes"
-          class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+          class="focus-ring ml-auto inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
           aria-label="Exit select mode"
         >
           <.icon name="hero-x-mark" class="size-4" />
@@ -102,30 +102,30 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     data-vim-item-title={note.title || extract_title(note.body)}
                     data-vim-item-url={"/notes/#{note.id}/edit"}
                     navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                    class="text-sm font-medium text-base-content/85 hover:text-base-content truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+                    class="text-message font-medium text-base-content/85 hover:text-base-content truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box"
                   >
                     {note.title || extract_title(note.body)}
                   </.link>
                 </div>
-                <%!-- Metadata: type badge • source ref • age --%>
+                <%!-- Metadata: type badge | source ref | age --%>
                 <div class="flex items-center gap-1.5 text-mini text-base-content/40">
                   <span class={[
-                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium",
+                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-box text-mini font-medium",
                     parent_type_class(note.parent_type)
                   ]}>
                     <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
                     {parent_type_label(note.parent_type)}
                   </span>
                   <%= if ref = format_parent_ref(note.parent_id) do %>
-                    <span class="text-base-content/20">&middot;</span>
+                    <span class="text-base-content/20">|</span>
                     <span class="font-mono text-base-content/30">{ref}</span>
                   <% end %>
-                  <span class="text-base-content/20">&middot;</span>
+                  <span class="text-base-content/20">|</span>
                   <span class="tabular-nums">{relative_time(note.created_at)}</span>
                 </div>
                 <%!-- Snippet preview --%>
                 <%= if snippet = extract_snippet(note.body) do %>
-                  <p class="text-xs text-base-content/35 truncate leading-snug mt-0.5 pr-6">
+                  <p class="text-mini text-base-content/35 truncate leading-snug mt-0.5 pr-6">
                     {snippet}
                   </p>
                 <% end %>
@@ -137,16 +137,16 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     phx-hook="NoteEditor"
                     data-note-id={note.id}
                     data-body={Base.encode64(note.body || "")}
-                    class="border border-base-content/10 rounded-lg overflow-hidden min-h-[200px] mb-2"
+                    class="border border-base-content/10 rounded-box overflow-hidden min-h-[200px] mb-2"
                   >
                   </div>
                   <div class="mb-2 flex items-center gap-3">
-                    <span class="text-xs text-base-content/40">⌘S to save</span>
+                    <span class="text-mini text-base-content/40">⌘S to save</span>
                     <button
                       type="button"
                       phx-click="note_edit_cancelled"
                       phx-value-note_id={note.id}
-                      class="flex items-center gap-1.5 text-xs text-base-content/30 hover:text-base-content/60 transition-colors px-1"
+                      class="flex items-center gap-1.5 text-mini text-base-content/30 hover:text-base-content/60 transition-colors px-1"
                     >
                       Cancel
                     </button>
@@ -154,7 +154,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <% else %>
                   <div
                     id={"note-body-#{note.id}"}
-                    class="dm-markdown text-sm text-base-content/70 leading-relaxed pb-2"
+                    class="dm-markdown text-message text-base-content/70 leading-relaxed pb-2"
                     phx-hook="MarkdownMessage"
                     data-raw-body={note.body}
                   >
@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 type="button"
                 phx-click="toggle_star"
                 phx-value-note_id={note.id}
-                class={"flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded transition-colors " <>
+                class={"flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded-box transition-colors " <>
                   if(starred?(note),
                     do: "text-warning",
                     else: "text-base-content/20 hover:text-warning"
@@ -185,21 +185,21 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 <button
                   tabindex="0"
                   role="button"
-                  class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
+                  class="flex items-center justify-center min-h-[44px] min-w-[44px] px-1 py-1 rounded-box text-base-content/20 hover:text-base-content/60 hover:bg-base-200/50 transition-colors sm:opacity-0 sm:group-hover:opacity-100"
                   aria-label="More actions"
                 >
                   <.icon name="hero-ellipsis-vertical" class="size-4" />
                 </button>
                 <ul
                   tabindex="0"
-                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-lg w-48 border border-base-content/8"
+                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-box w-48 border border-base-content/8"
                 >
                   <li>
                     <button
                       type="button"
                       phx-click="edit_note"
                       phx-value-note_id={note.id}
-                      class="flex items-center gap-2 text-xs"
+                      class="flex items-center gap-2 text-mini"
                     >
                       <.icon name="hero-pencil-square" class="size-3.5" /> Edit inline
                     </button>
@@ -207,7 +207,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   <li>
                     <.link
                       navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                      class="flex items-center gap-2 text-xs"
+                      class="flex items-center gap-2 text-mini"
                     >
                       <.icon name="hero-arrows-pointing-out" class="size-3.5" /> Open full editor
                     </.link>
@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                         phx-click="open_in_editor"
                         phx-value-editor={preferred && preferred.id}
                         phx-value-id={note.id}
-                        class="flex items-center gap-2 text-xs"
+                        class="flex items-center gap-2 text-mini"
                       >
                         <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
                         Open in {preferred && preferred.label}
@@ -235,7 +235,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                       phx-click="delete_note"
                       phx-value-note_id={note.id}
                       data-confirm="Delete this note?"
-                      class="flex items-center gap-2 text-xs text-error/70 hover:!text-error hover:!bg-error/10"
+                      class="flex items-center gap-2 text-mini text-error/70 hover:!text-error hover:!bg-error/10"
                     >
                       <.icon name="hero-trash" class="size-3.5" /> Delete
                     </button>

@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
                 phx-click="file_switch_tab"
                 phx-value-path={tab.path}
                 class={[
-                  "px-3 py-1.5 text-xs truncate max-w-[160px]",
+                  "px-3 py-1.5 text-mini truncate max-w-[160px]",
                   if(active,
                     do: "text-base-content/90 font-medium",
                     else: "text-base-content/45 hover:text-base-content/70"
@@ -95,7 +95,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
           />
         </div>
       <% else %>
-        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-sm text-base-content/50">
+        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-message text-base-content/50">
           <.icon name="hero-document-text" class="w-8 h-8 mb-2 opacity-40" />
           <p class="font-medium text-base-content/70">No file selected</p>
           <p class="mt-1">Choose a file from the file explorer to open it here.</p>

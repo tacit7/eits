@@ -221,13 +221,13 @@ export const CommandHistory = {
     const popup = document.createElement('div')
     popup.id = 'dm-history-popup'
     popup.style.cssText = 'position:fixed;z-index:9999;width:400px;max-width:90vw'
-    popup.className = 'rounded-xl border border-base-content/10 bg-base-100 shadow-xl overflow-hidden'
+    popup.className = 'rounded-box border border-base-content/10 bg-base-100 shadow-xl overflow-hidden'
     popup.innerHTML = `
       <div class="flex items-center px-3 py-2 border-b border-base-content/8">
         <input
           id="dm-history-search-input"
           type="text"
-          class="flex-1 bg-transparent text-sm outline-none placeholder:text-base-content/30 text-base-content min-w-0"
+          class="flex-1 bg-transparent text-message outline-none placeholder:text-base-content/30 text-base-content min-w-0"
           placeholder="Filter..."
           autocomplete="off"
           spellcheck="false"
@@ -312,7 +312,7 @@ export const CommandHistory = {
     this._filteredItems = filtered
 
     if (filtered.length === 0) {
-      container.innerHTML = '<div class="px-4 py-3 text-xs text-base-content/30 text-center select-none">No matches</div>'
+      container.innerHTML = '<div class="px-4 py-3 text-mini text-base-content/30 text-center select-none">No matches</div>'
       return
     }
 
@@ -320,14 +320,14 @@ export const CommandHistory = {
       const display = item.text.length > 100 ? item.text.slice(0, 100) + '…' : item.text
       const textHtml = highlightMatch(display, q)
       const badge = item.session
-        ? `<span class="shrink-0 font-mono text-xs text-base-content/25">${escapeHtml(item.session)}</span>`
+        ? `<span class="shrink-0 font-mono text-mini text-base-content/25">${escapeHtml(item.session)}</span>`
         : ''
       const activeClass = i === this._searchIndex ? 'bg-base-content/[0.06]' : ''
       // data-history-idx is used only for querying/active-state; text is never stored in attributes.
       return `<button
         type="button"
         data-history-idx="${i}"
-        class="w-full flex items-center gap-3 px-3 py-2 text-left text-sm hover:bg-base-content/[0.04] transition-colors ${activeClass}"
+        class="w-full flex items-center gap-3 px-3 py-2 text-left text-message hover:bg-base-content/[0.04] transition-colors ${activeClass}"
       ><span class="flex-1 truncate text-base-content/80">${textHtml}</span>${badge}</button>`
     }).join('')
 

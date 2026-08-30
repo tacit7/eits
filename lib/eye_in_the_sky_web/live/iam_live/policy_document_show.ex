@@ -314,7 +314,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
             <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-semibold flex items-center gap-2">
                 <.icon name="hero-shield-check" class="size-5" /> Policies in this document
-                <span class="badge badge-ghost text-xs font-mono">
+                <span class="badge badge-ghost text-mini font-mono">
                   {attached_count(@document)} policies
                 </span>
               </h2>
@@ -327,7 +327,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                     <th>Name</th>
                     <th>Effect</th>
                     <th>Action</th>
-                    <th>Agent type — ignored in document</th>
+                    <th>Agent type | ignored in document</th>
                     <th>Enabled</th>
                     <th class="text-right">Remove</th>
                   </tr>
@@ -355,15 +355,15 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                           {dp.policy.effect}
                         </span>
                       </td>
-                      <td class="font-mono text-xs">{dp.policy.action}</td>
-                      <td class="font-mono text-xs text-base-content/50">
+                      <td class="font-mono text-mini">{dp.policy.action}</td>
+                      <td class="font-mono text-mini text-base-content/50">
                         {dp.policy.agent_type}
                       </td>
                       <td>
                         <%= if dp.policy.enabled do %>
                           <.icon name="hero-check-circle" class="size-4 text-success" />
                         <% else %>
-                          <span class="text-base-content/40">—</span>
+                          <span class="text-base-content/40">-</span>
                         <% end %>
                       </td>
                       <td class="text-right">
@@ -387,7 +387,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
             <form phx-submit="add_policy" class="flex items-end gap-2">
               <div class="form-control flex-1">
                 <label class="label">
-                  <span class="label-text text-xs">Add policy</span>
+                  <span class="label-text text-mini">Add policy</span>
                 </label>
                 <select name="policy_id" class="select select-bordered select-sm">
                   <option value="">Select a policy...</option>
@@ -408,13 +408,13 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
           <div class="card-body p-4 space-y-4">
             <h2 class="text-lg font-semibold flex items-center gap-2">
               <.icon name="hero-cpu-chip" class="size-5" /> Attached agent types
-              <span class="badge badge-ghost text-xs">
+              <span class="badge badge-ghost text-mini">
                 {length(@document.agent_type_documents)}
               </span>
             </h2>
 
             <%= if @document.agent_type_documents == [] do %>
-              <p class="text-base-content/60 text-sm">
+              <p class="text-base-content/60 text-message">
                 No agent types attached. Add one below.
               </p>
             <% else %>
@@ -432,7 +432,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                         <td>
                           <.link
                             navigate={~p"/iam/agent-types/show?agent_type=#{atd.agent_type}"}
-                            class="font-mono text-sm link link-hover"
+                            class="font-mono text-message link link-hover"
                           >
                             {atd.agent_type}
                           </.link>
@@ -459,7 +459,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
             <form phx-submit="attach_agent_type" class="flex items-end gap-2">
               <div class="form-control flex-1">
                 <label class="label">
-                  <span class="label-text text-xs">Attach agent type</span>
+                  <span class="label-text text-mini">Attach agent type</span>
                 </label>
                 <input
                   type="text"

@@ -175,7 +175,7 @@ export const CommandPalette = {
     if (this.activeIndex >= items.length) this.activeIndex = 0
 
     if (items.length === 0) {
-      this.results.innerHTML = `<div class="px-3 py-4 text-sm text-base-content/50">No matches</div>`
+      this.results.innerHTML = `<div class="px-3 py-4 text-message text-base-content/50">No matches</div>`
       return
     }
 
@@ -206,7 +206,7 @@ export const CommandPalette = {
       })
       .map(([group, groupItems]) => {
         const buttons = groupItems.map(item => this.renderRow(item, idx++, null)).join("")
-        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-xs uppercase tracking-wider text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
+        return `<section class="px-1 py-1"><h3 class="px-2 py-1 text-mini uppercase tracking-normal text-base-content/40">${escapeHtml(group)}</h3><div>${buttons}</div></section>`
       }).join("")
   },
 
@@ -221,11 +221,11 @@ export const CommandPalette = {
       : escapeHtml(item.label)
 
     const hintHtml = item.hint
-      ? `<div class="text-xs text-base-content/45 truncate">${escapeHtml(item.hint)}</div>`
+      ? `<div class="text-mini text-base-content/45 truncate">${escapeHtml(item.hint)}</div>`
       : ""
 
     const shortcutHtml = item.shortcut
-      ? item.shortcut.split(" ").map(k => `<kbd class="text-xs px-1 py-0.5 rounded border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
+      ? item.shortcut.split(" ").map(k => `<kbd class="text-mini px-1 py-0.5 rounded-box border border-base-content/20 text-base-content/50">${escapeHtml(k)}</kbd>`).join(" ")
       : ""
 
     const chevronHtml = item.type === "submenu"
@@ -236,7 +236,7 @@ export const CommandPalette = {
       ? `<div class="flex items-center gap-1 ml-2 shrink-0">${shortcutHtml}${chevronHtml}</div>`
       : ""
 
-    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${escapeHtml(item.icon)} size-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
+    return `<button type="button" data-index="${idx}" role="option" aria-selected="${isActive}" class="w-full text-left rounded-box px-3 py-2 text-message flex items-center gap-2 transition-colors ${isActive ? "bg-base-content/8 text-base-content" : "hover:bg-base-content/5 text-base-content/80"}"><span class="${escapeHtml(item.icon)} size-4 shrink-0 text-base-content/50"></span><div class="flex-1 min-w-0"><div class="font-medium truncate">${labelHtml}</div>${hintHtml}</div>${rightHtml}</button>`
   },
 
   updateBreadcrumb() {
@@ -327,7 +327,7 @@ export const CommandPalette = {
       if (commands instanceof Promise) {
         this.stack.push({ id: cmd.id, label: cmd.label, commands: [] })
         this.updateBreadcrumb()
-        if (this.results) this.results.innerHTML = `<div class="px-3 py-4 text-sm text-base-content/50">Loading...</div>`
+        if (this.results) this.results.innerHTML = `<div class="px-3 py-4 text-message text-base-content/50">Loading...</div>`
         commands = await commands
         this.stack[this.stack.length - 1].commands = commands
       } else {

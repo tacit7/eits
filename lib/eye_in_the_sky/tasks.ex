@@ -52,6 +52,7 @@ defmodule EyeInTheSky.Tasks do
     to: EyeInTheSky.Tasks.Queries
 
   defdelegate get_current_task_for_session(session_id), to: EyeInTheSky.Tasks.Queries
+  defdelegate list_open_tasks_for_idle_sessions(cutoff, opts \\ []), to: EyeInTheSky.Tasks.Queries
   defdelegate count_tasks_for_session(session_id), to: EyeInTheSky.Tasks.Queries
   defdelegate list_tasks_created_by_session(session_id, opts \\ []), to: EyeInTheSky.Tasks.Queries
 

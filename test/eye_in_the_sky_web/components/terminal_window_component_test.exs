@@ -62,10 +62,10 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponentTest do
     test "renders with correct styling classes" do
       html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
-      assert html =~ "bg-zinc-950"
-      assert html =~ "rounded-xl"
+      assert html =~ "bg-base-300"
+      assert html =~ "rounded-lg"
       assert html =~ "shadow-2xl"
-      assert html =~ "border border-zinc-800"
+      assert html =~ "border border-base-content/10"
     end
 
     test "renders with TerminalWindowHook" do

@@ -180,6 +180,18 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
       assert html =~ ~s(aria-label="Open session: Test Session - Idle")
     end
 
+    test "failed row renders a red status dot and failed aria status" do
+      session = sample_session(%{status: "failed", status_reason: "retry_exhausted"})
+
+      html =
+        render_component(&SessionCard.session_row/1,
+          session: session
+        )
+
+      assert html =~ "bg-error"
+      assert html =~ ~s(aria-label="Open session: Test Session - Failed")
+    end
+
     test "row is keyboard accessible with role=button and tabindex" do
       session = sample_session()
 

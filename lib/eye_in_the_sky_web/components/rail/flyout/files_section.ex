@@ -27,11 +27,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
 
     ~H"""
     <%= if is_nil(@sidebar_project) || is_nil(@sidebar_project.path) do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No project path configured</div>
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">
+        No project path configured
+      </div>
     <% else %>
       <%!-- Error state --%>
       <%= if @file_error do %>
-        <div class="px-3 py-2 text-xs text-error/70">{@file_error}</div>
+        <div class="px-3 py-2 text-mini text-error/70">{@file_error}</div>
       <% end %>
 
       <%!-- Tree rows --%>
@@ -48,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
               data-ctx-name={node.name}
               data-ctx-is-dir="true"
               data-ctx-abs-path={Path.join(@sidebar_project.path, node.path)}
-              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
+              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-mini text-base-content/70 hover:text-base-content/90 hover:bg-base-content/5 transition-colors"
               style={"padding-left: #{indent + 8}px"}
             >
               <.icon
@@ -71,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
               data-ctx-name={node.name}
               data-ctx-abs-path={Path.join(@sidebar_project.path, node.path)}
               data-ctx-editor-label={@preferred_editor_label}
-              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-xs text-base-content/55 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
+              class="w-full flex items-center gap-1.5 pr-3 py-[3px] text-left text-mini text-base-content/55 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
               style={"padding-left: #{indent + 20}px"}
             >
               <%= if node.sensitive? do %>
@@ -97,7 +99,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.FilesSection do
       <% end %>
 
       <%= if @flat_rows == [] && is_nil(@file_error) do %>
-        <div class="px-3 py-4 text-xs text-base-content/35 text-center">Empty</div>
+        <div class="px-3 py-4 text-mini text-base-content/35 text-center">Empty</div>
       <% end %>
 
       <%!-- Footer --%>

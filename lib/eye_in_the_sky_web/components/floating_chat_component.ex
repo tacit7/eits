@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
             data-agent-name={agent["name"]}
             data-agent-status={agent_live_status(agent, @statuses)}
           >
-            <span class="font-bold text-xs text-base-content/70">
+            <span class="font-bold text-mini text-base-content/70">
               {initials(agent["name"])}
             </span>
 
@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
             </span>
 
             <%!-- Tooltip --%>
-            <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-mini rounded-box shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               {agent["name"] || "Agent"}
             </span>
           </a>

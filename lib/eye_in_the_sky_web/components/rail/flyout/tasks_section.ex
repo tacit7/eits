@@ -18,10 +18,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
         <input
           type="text"
           value={@task_search}
-          placeholder="Search tasks…"
+          placeholder="Search tasks..."
           phx-keyup="update_task_search"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="w-full pl-6 pr-2 py-1 text-mini bg-base-content/5 border border-base-content/10 rounded-box focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
       </div>
 
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
     <%= if @tasks == [] do %>
       <% filtering = @task_search != "" or not is_nil(@state_filter) %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">
         {if filtering, do: "No matching tasks", else: "No tasks"}
       </div>
     <% end %>
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
       phx-click="set_task_state_filter"
       phx-value-state={if active, do: "all", else: @value}
       class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
+        "text-nano px-1.5 py-0.5 rounded-box transition-colors",
         if(active,
           do: "bg-primary/15 text-primary font-medium",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
       phx-click="open_task_detail"
       phx-value-task_id={@task.id}
       data-vim-flyout-item
-      class="w-full flex items-center gap-2 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="w-full flex items-center gap-2 px-3 py-2 text-mini text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box"
     >
       <span class={["w-1.5 h-1.5 rounded-full flex-shrink-0 mt-px", task_state_dot(@task.state_id)]} />
       <span class="truncate">{@task.title}</span>
@@ -94,9 +94,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   end
 
   def task_state_dot(1), do: "bg-base-content/30"
-  def task_state_dot(2), do: "bg-blue-500"
-  def task_state_dot(3), do: "bg-green-500"
-  def task_state_dot(4), do: "bg-amber-400"
+  def task_state_dot(2), do: "bg-info"
+  def task_state_dot(3), do: "bg-success"
+  def task_state_dot(4), do: "bg-warning"
   def task_state_dot(_), do: "bg-base-content/20"
 
   attr :project, :any, default: nil
@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
 
   def nav_links(%{project: nil} = assigns) do
     ~H"""
-    <div class="px-3 py-4 text-xs text-base-content/35 text-center">Select a project</div>
+    <div class="px-3 py-4 text-mini text-base-content/35 text-center">Select a project</div>
     """
   end
 

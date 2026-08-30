@@ -497,6 +497,44 @@ A periodic scheduler detects and cleans up sessions stuck in `working` status wi
 
 ---
 
+## Idle Ticket Nudger
+
+`EyeInTheSky.Scheduler.IdleTicketNudger` runs with the app pollers and checks
+for sessions that are idle while still owning open tasks through
+`task_sessions`.
+
+**Behavior:**
+- Runs every 5 minutes.
+- Selects sessions in `idle` status with activity older than 5 minutes. The
+  activity cutoff uses `last_activity_at`, falling back to `started_at` when no
+  activity heartbeat exists.
+- Requires at least one linked open task (`state_id != Done`, `archived = false`).
+- Sends one DM per qualifying session asking it to review the linked ticket(s)
+  and update status or add notes if applicable.
+- Uses a 30-minute cooldown keyed by `{session_id, task_ids}` plus recent-message
+  dedupe so the same open-ticket set is not repeatedly nudged.
+- Uses `DMDelivery.deliver_or_persist/4`; terminal-owned sessions (`managed_by_app=false`) receive a durable inbox message without starting an app worker.
+
+**Non-goals:**
+- It does not mutate tasks, change workflow state, or add task notes itself.
+- It does not archive or fail sessions; `AgentStatus` owns cleanup lifecycle decisions.
+- It does not target `waiting`, `working`, `completed`, `failed`, or archived sessions.
+
+**Message shape:**
+The DM body starts with `DM from:EITS Scheduler` and includes up to 10 open task
+IDs/titles. If more tasks are linked, the message includes a summarized overflow
+line. Metadata includes `source: "idle_ticket_nudger"`, `response_required:
+false`, `task_ids`, and `session_uuid`.
+
+**Code locations:**
+- `lib/eye_in_the_sky/scheduler/idle_ticket_nudger.ex` — scheduler and message construction
+- `lib/eye_in_the_sky/tasks/queries.ex` — `list_open_tasks_for_idle_sessions/2`
+- `lib/eye_in_the_sky/application.ex` — started when `:start_pollers` is enabled
+- `test/eye_in_the_sky/scheduler/idle_ticket_nudger_test.exs` — selection,
+  cooldown, open-task, and terminal-owned persistence coverage
+
+---
+
 ## Spawn Failure Tracking
 
 When an agent spawn request fails, the error is logged to disk and recorded in the team membership table.
@@ -952,11 +990,26 @@ Agents can be checked for liveness via the `/api/v1/sessions/:id/worker` endpoin
 
 **AgentWorker.alive?/1:**
 - Registry lookup that returns true if a worker process is currently registered and alive for a given session_id
-- Used by the worker status controller to determine if a session has an active worker
+
+**AgentWorker.processing?/1:**
+- GenServer call that returns true when the worker's internal status is `:running`
+- This means the worker believes an SDK run is active, but it does not prove CLI output is making progress
+
+**AgentWorker.health/1:**
+- Use `AgentWorker.health(session_id)` to inspect the worker, SDK handler, and active CLI port in one snapshot
+- Returns `alive`, `provider`, `status`, `processing`, `handler_alive`, `sdk_active`, `port_alive`, `port_type`, `os_pid`, `current_job_active`, `current_job_id`, and `queue_depth`
+- `handler_alive` checks the parser/port-handler process with `Process.alive?/1`
+- `port_alive` checks the registered SDK Port with `Port.info/1`; tests may use a PID-backed mock port, which is checked with `Process.alive?/1`
+- `os_pid` is populated only for real Ports when the runtime exposes `Port.info(port, :os_pid)`
 
 **GET /api/v1/sessions/:id/worker endpoint:**
-- Response: `{alive: boolean, last_activity_at: ISO8601|null, hung: boolean}`
+- Response includes the `AgentWorker.health/1` snapshot plus `last_activity_at` and `hung`
 - `alive`: true if `AgentWorker.alive?/1` found a registered process
+- `processing`: true if the worker is in `:running`
+- `handler_alive`: true if the SDK output handler process is alive
+- `port_alive`: true if the active CLI port/test PID is alive
+- `os_pid`: OS process ID for the active CLI Port when available
+- `current_job_active`: true if the worker has an in-flight job
 - `last_activity_at`: session's last known activity timestamp
 - `hung`: true when `alive && stale?(last_activity_at, 10)` — worker is alive but inactive for >10 minutes
 - Returns 404 if session not found
@@ -968,9 +1021,17 @@ Agents can be checked for liveness via the `/api/v1/sessions/:id/worker` endpoin
 - Used to detect hung workers that are registered but producing no output
 
 **Code locations:**
-- `lib/eye_in_the_sky/claude/agent_worker.ex` — `alive?/1` function
+- `lib/eye_in_the_sky/claude/agent_worker.ex` — `alive?/1`, `processing?/1`, and `health/1`
 - `lib/eye_in_the_sky_web/controllers/api/v1/session_controller.ex` — `worker_status/2` action and `stale?/2` helper
 - `lib/eye_in_the_sky_web/router.ex` — route registration
+
+**Entrypoint Environment:**
+- App-spawned Codex CLI processes receive `ENTRYPOINT=cli` in their OS environment and Codex shell environment policy
+- Terminal-launched Codex sessions persist the hook `ENTRYPOINT` value when present, or `ENTRYPOINT=cli` by default, through the Codex startup env file
+- Terminal-launched Codex sessions persist the EITS session `entrypoint` as `EITS_ENTRYPOINT` when supplied, or `cli` by default so scheduler/archive logic can identify CLI-originated sessions
+- The plain Codex `ENTRYPOINT` marker and persisted session `entrypoint` both use `cli` for terminal-launched Codex by default; legacy `EITS_ENTRYPOINT` remains the override for the persisted session field
+- App worker ownership is tracked separately with `sessions.managed_by_app`. Hook/API updates with `entrypoint=cli` mark the session `managed_by_app=false` unless explicitly overridden. DMs to those terminal-owned sessions are persisted to the inbox, but the app does not spawn or resume a Codex worker for them.
+- `managed_by_app=false` also means lifecycle cleanup does not treat idle or stale-working terminal sessions as dead app-owned workers. If a terminal session is resumed and becomes `working`, clear any stale `archived_at` value so active-session lists do not continue hiding it.
 
 **Commits:** d2719936 (worker liveness endpoint)
 

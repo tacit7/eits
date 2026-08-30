@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
         <div class="px-4 sm:px-6 pt-4 pb-2 border-b border-base-content/8">
           <.link
             navigate={back_path(assigns)}
-            class="inline-flex items-center gap-1.5 text-xs text-base-content/45 hover:text-base-content/70 transition-colors mb-2"
+            class="inline-flex items-center gap-1.5 text-mini text-base-content/45 hover:text-base-content/70 transition-colors mb-2"
           >
             <.icon name="hero-arrow-left" class="size-3.5" /> Teams
           </.link>
@@ -189,7 +189,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShow do
         <div class="px-4 sm:px-6 pt-4">
           <.link
             navigate={back_path(assigns)}
-            class="inline-flex items-center gap-1.5 text-xs text-base-content/45 hover:text-base-content/70 transition-colors mb-4"
+            class="inline-flex items-center gap-1.5 text-mini text-base-content/45 hover:text-base-content/70 transition-colors mb-4"
           >
             <.icon name="hero-arrow-left" class="size-3.5" /> Teams
           </.link>

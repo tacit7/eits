@@ -33,7 +33,7 @@ defmodule EyeInTheSky.Messaging.DMDelivery do
   def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{}) do
     case Sessions.get_session(to_session_id) do
       {:ok, session} ->
-        if session.status in Sessions.terminated_statuses() do
+        if session.status in Sessions.terminated_statuses() or not Sessions.app_managed?(session) do
           persist(to_session_id, from_session_id, body, metadata)
         else
           deliver_and_persist(to_session_id, from_session_id, body, metadata)

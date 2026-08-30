@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       class={[
         "group/row relative",
         @task.completed_at && "opacity-60 hover:opacity-80",
-        @selected && @select_mode && "bg-primary/8 rounded-lg"
+        @selected && @select_mode && "bg-primary/8 rounded-box"
       ]}
     >
       <%!-- Left accent bar — visible when this row is open in the drawer --%>
@@ -86,7 +86,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
       <%!-- Row body --%>
       <div
         class={[
-          "flex items-center gap-4 py-2.5 pr-2 pl-2 rounded-lg cursor-pointer",
+          "flex items-center gap-4 py-2.5 pr-2 pl-2 rounded-box cursor-pointer",
           "hover:bg-base-200/40",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
           "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
         <%!-- Content --%>
         <div class="flex-1 min-w-0">
           <span class={[
-            "text-[13px] font-medium truncate block",
+            "text-message font-medium truncate block",
             if(@task.completed_at,
               do: "text-base-content/45 line-through",
               else: "text-base-content/85 group-hover/row:text-base-content"
@@ -162,7 +162,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
             <%!-- Agent ID --%>
             <%= if @task.agent_id do %>
-              <span class="text-base-content/15">&middot;</span>
+              <span class="text-base-content/15">|</span>
               <span class="flex items-center gap-0.5 text-base-content/40">
                 <.custom_icon name="lucide-robot" class="size-3 shrink-0" />
                 <span class="font-mono">#{@task.agent_id}</span>
@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
             <%!-- Due date --%>
             <%= if @task.due_at do %>
-              <span class="text-base-content/15">&middot;</span>
+              <span class="text-base-content/15">|</span>
               <span class={[
                 "flex items-center gap-0.5 text-micro font-medium",
                 cond do
@@ -188,8 +188,8 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             <%!-- Tags --%>
             <%= if is_list(@task.tags) && @task.tags != [] do %>
               <%= for tag <- Enum.take(@task.tags, 3) do %>
-                <span class="text-base-content/15">&middot;</span>
-                <span class="px-1 py-px rounded text-micro bg-base-content/8 text-base-content/40">
+                <span class="text-base-content/15">|</span>
+                <span class="px-1 py-px rounded-box text-micro bg-base-content/8 text-base-content/40">
                   {tag.name}
                 </span>
               <% end %>
@@ -197,7 +197,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
 
             <%!-- Notes count --%>
             <%= if @task.notes_count > 0 do %>
-              <span class="text-base-content/15">&middot;</span>
+              <span class="text-base-content/15">|</span>
               <span class="flex items-center gap-0.5 text-base-content/35">
                 <.icon name="hero-chat-bubble-left-mini" class="size-3" />
                 {@task.notes_count}
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
             <% end %>
 
             <%!-- Updated time --%>
-            <span class="text-base-content/15">&middot;</span>
+            <span class="text-base-content/15">|</span>
             <span class="tabular-nums text-base-content/35">
               {relative_time(@task.updated_at || @task.created_at)}
             </span>
@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
           <%= if @dm_session do %>
             <.link
               navigate={"/dm/#{@dm_session.uuid}"}
-              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-primary focus-ring"
+              class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-primary/10 hover:text-primary"
               title="Open agent DM"
               aria-label="Open agent direct message"
               onclick="event.stopPropagation();"
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
               phx-click={@on_delete}
               phx-value-task_id={@task.uuid || to_string(@task.id)}
               aria-label="Delete task"
-              class="btn btn-ghost btn-xs btn-square text-base-content/40 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
+              class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error"
               onclick="event.stopPropagation();"
             >
               <.icon name="hero-trash-mini" class="size-3.5" />

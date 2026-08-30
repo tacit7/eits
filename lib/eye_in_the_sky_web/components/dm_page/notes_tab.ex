@@ -37,12 +37,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           </button>
 
           <div
-            class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
+            class="space-y-1 bg-base-200 rounded-box shadow-sm p-4"
             id="dm-note-list"
           >
             <%= for note <- @notes do %>
               <div
-                class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
                 id={"dm-note-#{note.id}"}
               >
                 <input type="checkbox" />
@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                     </button>
                     <%!-- Title + meta --%>
                     <div class="flex-1 min-w-0">
-                      <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                      <h3 class="text-message font-semibold text-base-content/85 truncate">
                         {note.title || extract_title(note.body)}
                       </h3>
                       <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
@@ -100,7 +100,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   <div class="pl-[30px]">
                     <div
                       id={"note-body-#{note.id}"}
-                      class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                      class="dm-markdown text-message text-base-content/70 leading-relaxed"
                       phx-hook="MarkdownMessage"
                       data-raw-body={note.body}
                     >

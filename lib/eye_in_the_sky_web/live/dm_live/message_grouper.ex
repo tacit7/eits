@@ -23,7 +23,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   @call_stream_types ~w(tool_use bash)
 
   # Tools whose input carries a file_path we want to surface in the summary.
-  @file_tools ~w(Write Edit Read)
+  @file_tools ~w(Write Edit MultiEdit Read File Change File Changes)
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -217,6 +217,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
     # rather than "0 calls" — the UI uses result_only: true to label it correctly.
     display_count = if result_only, do: length(events), else: call_count
     tool_groups = build_tool_groups(events)
+    files = cluster_file_paths(events)
 
     cluster =
       {:cluster, events,
@@ -224,6 +225,9 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
          count: display_count,
          result_only: result_only,
          tool_groups: tool_groups,
+         tool_labels: tool_groups |> Enum.map(& &1.name) |> Enum.take(4),
+         failed_count: count_failed_tools(events),
+         file_count: length(files),
          first_at: first.inserted_at,
          duration_ms: if(duration_ms && duration_ms > 1000, do: duration_ms)
        }}
@@ -312,19 +316,7 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
   end
 
   defp build_cluster_summary(first_id, events) do
-    files =
-      events
-      |> Enum.filter(fn msg ->
-        tool_name = get_in(msg.metadata || %{}, ["tool_name"])
-        tool_name in @file_tools
-      end)
-      |> Enum.flat_map(fn msg ->
-        case get_in(msg.metadata || %{}, ["input", "file_path"]) do
-          nil -> []
-          path -> [path]
-        end
-      end)
-      |> Enum.uniq()
+    files = cluster_file_paths(events)
 
     cost_usd =
       events
@@ -341,5 +333,99 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouper do
       end
 
     {:cluster_summary, first_id, %{files: files, cost_usd: cost_usd, first_id: first_id}}
+  end
+
+  defp cluster_file_paths(events) do
+    events
+    |> Enum.flat_map(fn msg ->
+      metadata = msg.metadata || %{}
+      tool_name = metadata["tool_name"]
+      input = message_input(msg)
+
+      if tool_name in @file_tools or input_has_file_path?(input) do
+        file_paths_from_input(input)
+      else
+        []
+      end
+    end)
+    |> Enum.uniq()
+  end
+
+  defp message_input(msg) do
+    metadata_input = get_in(msg.metadata || %{}, ["input"])
+
+    cond do
+      is_map(metadata_input) ->
+        metadata_input
+
+      body_input = input_from_body(msg.body) ->
+        body_input
+
+      true ->
+        %{}
+    end
+  end
+
+  defp input_from_body(body) when is_binary(body) do
+    case Regex.run(~r/^Tool: [^\n]+\n(.+)$/s, String.trim(body), capture: :all_but_first) do
+      [json] ->
+        case Jason.decode(json) do
+          {:ok, map} when is_map(map) -> map
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp input_from_body(_body), do: nil
+
+  defp input_has_file_path?(input) when is_map(input),
+    do: file_paths_from_input(input) != []
+
+  defp input_has_file_path?(_input), do: false
+
+  defp file_paths_from_input(input) when is_map(input) do
+    direct =
+      [
+        input["file_path"],
+        input["path"],
+        input["absolute_path"]
+      ]
+      |> Enum.filter(&is_binary/1)
+
+    nested_files =
+      input
+      |> Map.get("files", [])
+      |> List.wrap()
+      |> Enum.flat_map(fn
+        path when is_binary(path) -> [path]
+        %{"path" => path} when is_binary(path) -> [path]
+        %{"file_path" => path} when is_binary(path) -> [path]
+        _ -> []
+      end)
+
+    direct ++ nested_files
+  end
+
+  defp file_paths_from_input(_input), do: []
+
+  defp count_failed_tools(events) do
+    Enum.count(events, &failed_tool?/1)
+  end
+
+  defp failed_tool?(msg) do
+    metadata = msg.metadata || %{}
+    input = message_input(msg)
+    exit_code = metadata["exit_code"] || input["exit_code"]
+    status = metadata["status"] || input["status"]
+
+    cond do
+      is_integer(exit_code) -> exit_code != 0
+      is_binary(exit_code) -> exit_code not in ["", "0"]
+      is_binary(status) -> status in ["failed", "error", "errored"]
+      true -> false
+    end
   end
 end

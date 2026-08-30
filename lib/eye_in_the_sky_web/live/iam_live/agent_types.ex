@@ -138,11 +138,11 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
       <%= if @show_add_form do %>
         <section class="card bg-base-200">
           <div class="card-body p-4 space-y-4">
-            <h2 class="card-title text-base">Attach documents to agent type</h2>
+            <h2 class="card-title text-message">Attach documents to agent type</h2>
 
             <div class="space-y-3">
               <label class="form-control">
-                <span class="label-text text-xs">Agent type</span>
+                <span class="label-text text-mini">Agent type</span>
                 <input
                   type="text"
                   placeholder="e.g. code-reviewer"
@@ -154,15 +154,15 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
               </label>
 
               <div>
-                <span class="label-text text-xs">Documents</span>
-                <div class="mt-1 space-y-1 max-h-48 overflow-y-auto border border-base-content/10 rounded p-2">
+                <span class="label-text text-mini">Documents</span>
+                <div class="mt-1 space-y-1 max-h-48 overflow-y-auto border border-base-content/10 rounded-box p-2">
                   <%= if @available_documents == [] do %>
-                    <p class="text-xs text-base-content/50 py-2 text-center">
+                    <p class="text-mini text-base-content/50 py-2 text-center">
                       No documents available
                     </p>
                   <% end %>
                   <%= for doc <- @available_documents do %>
-                    <label class="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-base-content/5 rounded">
+                    <label class="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-base-content/5 rounded-box">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
@@ -170,9 +170,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                         phx-click="toggle_doc_selection"
                         phx-value-doc_id={doc.id}
                       />
-                      <span class="text-sm font-medium">{doc.name}</span>
+                      <span class="text-message font-medium">{doc.name}</span>
                       <%= if doc.description do %>
-                        <span class="text-xs text-base-content/50 truncate">{doc.description}</span>
+                        <span class="text-mini text-base-content/50 truncate">{doc.description}</span>
                       <% end %>
                     </label>
                   <% end %>
@@ -227,7 +227,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                         <% end %>
                       </div>
                     </td>
-                    <td class="font-mono text-sm">{length(docs)}</td>
+                    <td class="font-mono text-message">{length(docs)}</td>
                   </tr>
                 <% end %>
               </tbody>

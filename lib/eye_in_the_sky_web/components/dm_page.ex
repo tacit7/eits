@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :dm_settings_scope, :string, default: "session"
   attr :dm_settings_subtab, :string, default: "general"
   attr :dm_settings_effective, :map, default: %{}
-  # LiveView streams — passed through to MessagesTab so it can render the
+  # LiveView streams - passed through to MessagesTab so it can render the
   # phx-update="stream" container without holding @messages itself.
   attr :streams, :map, required: true
   # Grouped maps replacing 10 individual attrs
@@ -109,30 +109,30 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%= if @overlay_data.active_overlay == :create_note do %>
         <div class="modal modal-open modal-bottom sm:modal-middle" id="create-note-modal">
           <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
-            <h3 class="font-semibold text-base mb-3">Create Note</h3>
+            <h3 class="font-semibold text-message mb-3">Create Note</h3>
 
             <form id="create-note-form" phx-submit="create_note">
               <div class="mb-4">
-                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">
+                <label class="text-mini font-medium text-base-content/60 mb-1.5 block">
                   Title <span class="text-base-content/30">(optional)</span>
                 </label>
                 <input
                   type="text"
                   name="title"
-                  class="input input-bordered w-full text-base"
+                  class="input input-bordered w-full text-message"
                   placeholder="Note title..."
                   maxlength="255"
                 />
               </div>
 
               <div class="mb-4">
-                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">
+                <label class="text-mini font-medium text-base-content/60 mb-1.5 block">
                   Note
                 </label>
                 <textarea
                   name="body"
                   rows="6"
-                  class="textarea textarea-bordered w-full text-base resize-none"
+                  class="textarea textarea-bordered w-full text-message resize-none"
                   placeholder="Write your note..."
                   required
                 ></textarea>
@@ -166,15 +166,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         phx-hook="ReloadConfirmModal"
       >
         <div class="modal-box pb-[env(safe-area-inset-bottom)]">
-          <h3 class="font-semibold text-base">Reload from file?</h3>
-          <p class="py-3 text-sm text-base-content/70">
+          <h3 class="font-semibold text-message">Reload from file?</h3>
+          <p class="py-3 text-message text-base-content/70">
             This will <strong class="text-warning">delete all messages</strong>
             and re-import from the transcript file. Use "Sync messages" instead if you only want to recover missed messages.
           </p>
           <div class="form-control mb-4">
             <label class="label cursor-pointer gap-2 justify-start min-h-[44px] flex items-center">
               <input type="checkbox" data-reload-skip class="checkbox checkbox-sm" />
-              <span class="label-text text-sm">Don't show this message again</span>
+              <span class="label-text text-message">Don't show this message again</span>
             </label>
           </div>
           <div class="modal-action">
@@ -191,7 +191,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%= if @overlay_data.active_overlay == :schedule_timer do %>
         <div class="modal modal-open modal-bottom sm:modal-middle" id="schedule-timer-modal">
           <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
-            <h3 class="font-semibold text-base mb-3">
+            <h3 class="font-semibold text-message mb-3">
               {if @overlay_data.active_timer, do: "Edit Scheduled Message", else: "Schedule Message"}
             </h3>
 
@@ -200,17 +200,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <input type="hidden" name="preset" id="timer-preset-input" value="15m" />
 
               <div class="mb-4">
-                <label class="text-xs font-medium text-base-content/60 mb-1.5 block">Message</label>
+                <label class="text-mini font-medium text-base-content/60 mb-1.5 block">Message</label>
                 <textarea
                   name="message"
                   rows="3"
-                  class="textarea textarea-bordered w-full text-base resize-none"
+                  class="textarea textarea-bordered w-full text-message resize-none"
                   placeholder="Message to send when timer fires..."
                 ><%= if @overlay_data.active_timer, do: @overlay_data.active_timer.message, else: EyeInTheSky.OrchestratorTimers.default_message() %></textarea>
               </div>
 
               <div class="mb-3">
-                <p class="text-xs font-medium text-base-content/60 mb-2">Once</p>
+                <p class="text-mini font-medium text-base-content/60 mb-2">Once</p>
                 <div class="flex flex-wrap gap-1.5">
                   <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
                     <button
@@ -228,7 +228,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
 
               <div class="mb-4">
-                <p class="text-xs font-medium text-base-content/60 mb-2">Repeating</p>
+                <p class="text-mini font-medium text-base-content/60 mb-2">Repeating</p>
                 <div class="flex flex-wrap gap-1.5">
                   <%= for preset <- ["5m", "10m", "15m", "30m", "1h"] do %>
                     <button
@@ -263,23 +263,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <%!-- Reload loading overlay --%>
       <div
         :if={@overlay_data.reloading}
-        class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-xl"
+        class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box"
       >
         <div class="flex flex-col items-center gap-3">
           <span class="loading loading-spinner loading-lg text-primary"></span>
-          <p class="text-sm text-base-content/60">Reloading messages...</p>
+          <p class="text-message text-base-content/60">Reloading messages...</p>
         </div>
       </div>
 
       <%!-- Drag overlay --%>
       <div
         id="drag-overlay"
-        class="absolute inset-0 z-50 hidden pointer-events-none rounded-xl"
+        class="absolute inset-0 z-50 hidden pointer-events-none rounded-box"
       >
-        <div class="absolute inset-3 rounded-xl border-2 border-dashed border-primary/40 bg-primary/[0.04] flex items-center justify-center">
+        <div class="absolute inset-3 rounded-box border-2 border-dashed border-primary/40 bg-primary/[0.04] flex items-center justify-center">
           <div class="text-center">
             <.icon name="hero-arrow-up-tray" class="w-10 h-10 text-primary/50 mx-auto mb-2" />
-            <p class="text-sm font-medium text-primary/60">Drop files to attach</p>
+            <p class="text-message font-medium text-primary/60">Drop files to attach</p>
           </div>
         </div>
       </div>
@@ -310,10 +310,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               phx-blur="update_session_name"
               phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
               phx-key="Enter"
-              class="text-base font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
+              class="text-message font-semibold text-base-content/85 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded-box px-1 -mx-1 min-w-0 w-full text-center placeholder:text-base-content/20 transition-colors"
             />
             <%= if @agent_record && Ecto.assoc_loaded?(@agent_record.agent_definition) && @agent_record.agent_definition && @agent_record.agent_definition.display_name do %>
-              <span class="text-xs text-base-content/35 truncate">
+              <span class="text-mini text-base-content/35 truncate">
                 {@agent_record.agent_definition.display_name}
               </span>
             <% end %>
@@ -338,7 +338,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
 
       <%!-- Header card (desktop only) --%>
       <div
-        class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-2xl border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
+        class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-box border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
         id="dm-header-card"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
@@ -364,7 +364,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                     phx-blur="update_session_name"
                     phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
                     phx-key="Enter"
-                    class="text-base sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
+                    class="text-message sm:text-lg font-bold text-base-content bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded-box px-1 -mx-1 min-w-0 flex-1 placeholder:text-base-content/20 transition-colors"
                   />
                 </div>
                 <input
@@ -374,7 +374,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                   phx-blur="update_session_description"
                   phx-keydown="update_session_description"
                   phx-key="Enter"
-                  class="text-base text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
+                  class="text-message text-base-content/40 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded-box px-1 -mx-1 placeholder:text-base-content/20 transition-colors w-full"
                 />
               </div>
             </div>
@@ -384,7 +384,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <button
                   type="button"
                   phx-click="open_schedule_timer"
-                  class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-warning/10 text-warning text-xs font-medium hover:bg-warning/20 transition-colors"
+                  class="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-box bg-warning/10 text-warning text-mini font-medium hover:bg-warning/20 transition-colors"
                   title="Edit scheduled message"
                 >
                   <.icon name="hero-clock" class="size-3.5" />
@@ -421,16 +421,16 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <%= if is_struct(@task_data.current_task) do %>
           <div class="px-5 py-2 border-t border-base-content/5" id="dm-current-task">
             <div class="flex items-center gap-2">
-              <span class="text-xs font-semibold uppercase tracking-wider text-base-content/30 flex-shrink-0">
+              <span class="text-mini font-semibold uppercase tracking-normal text-base-content/30 flex-shrink-0">
                 Working on
               </span>
               <div class="flex items-center gap-1.5 min-w-0">
                 <div class="w-1.5 h-1.5 rounded-full bg-info animate-pulse flex-shrink-0" />
-                <span class="text-xs font-medium text-base-content/70 truncate">
+                <span class="text-mini font-medium text-base-content/70 truncate">
                   {@task_data.current_task.title}
                 </span>
               </div>
-              <span class="flex-shrink-0 text-xs text-base-content/25 font-mono">
+              <span class="flex-shrink-0 text-mini text-base-content/25 font-mono">
                 {String.slice(to_string(@task_data.current_task.id), 0..7)}
               </span>
             </div>
@@ -440,11 +440,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <%!-- Compacting indicator --%>
         <%= if @session_state.compacting do %>
           <div
-            class="px-5 py-2 border-t border-orange-500/20 bg-orange-500/5"
+            class="px-5 py-2 border-t border-warning/20 bg-warning/5"
             id="dm-compacting-strip"
           >
             <div class="flex items-center gap-2">
-              <div class="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse flex-shrink-0" />
+              <div class="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
               <span class="text-mini font-medium text-warning/80">Compacting context...</span>
             </div>
           </div>
@@ -452,7 +452,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       </div>
 
       <%= if @pty_pid do %>
-        <%!-- PTY terminal — always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
+        <%!-- PTY terminal - always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
         <div
           id={"pty-dm-#{@session_uuid}"}
           phx-hook="PtyHook"
@@ -463,7 +463,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         </div>
       <% end %>
       <%= if !@pty_pid || @active_tab not in ["messages", nil] do %>
-        <%!-- Tab content — shown when no PTY, or PTY active but on non-messages tab --%>
+        <%!-- Tab content - shown when no PTY, or PTY active but on non-messages tab --%>
         <div
           class="flex-1 min-h-0 max-w-6xl mx-auto w-full overflow-y-auto flex flex-col"
           id="dm-tab-content"
@@ -476,6 +476,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 stream={@stream}
                 agent={@agent}
                 codex_raw_lines={@codex_raw_lines}
+                session_state={@session_state}
                 syncing={@syncing}
               />
             <% "tasks" -> %>
@@ -513,6 +514,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 stream={@stream}
                 agent={@agent}
                 codex_raw_lines={@codex_raw_lines}
+                session_state={@session_state}
                 syncing={@syncing}
               />
           <% end %>
@@ -561,6 +563,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :stream, :map, required: true
   attr :agent, :map, required: true
   attr :codex_raw_lines, :list, required: true
+  attr :session_state, :map, default: %{}
   attr :syncing, :boolean, default: false
 
   defp messages_tab_content(assigns) do
@@ -574,6 +577,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       agent={@agent}
       message_search_query={@message_data.message_search_query}
       codex_raw_lines={@codex_raw_lines}
+      show_thinking_blocks={Map.get(@session_state, :show_thinking_blocks, false)}
       syncing={@syncing}
     />
     """

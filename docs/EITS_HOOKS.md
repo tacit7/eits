@@ -88,7 +88,7 @@ turn stop, compaction, session end, and error cases.
 | `working` | Codex `UserPromptSubmit` hook (`codex-prompt-working.sh`) | Each user prompt |
 | `working` | Claude `SessionStart` hook (`eits-session-startup.sh` / `eits-session-resume.sh`) | Session start/resume |
 | `idle` | AgentWorker backend (`on_sdk_completed`) | Turn completes, only if currently `working` |
-| `idle` | Codex `SessionStart` via dispatcher | Codex session is registered but no prompt is running yet |
+| `idle` | Codex `SessionStart` hook (`codex-session-startup.sh`) | Codex session is registered but no prompt is running yet |
 | `idle` | Codex `Stop` hook (`codex-session-stop.sh`) | Codex turn stops |
 | `waiting` | `SessionEnd` hook (`eits-session-end.sh`) for `sdk-cli` | Process exits |
 | `completed` | `SessionEnd` hook (`eits-session-end.sh`) for `cli` | Process exits |
@@ -121,8 +121,7 @@ echo "$CONTEXT"   # injected directly into conversation context
 `PreToolUse` hooks use `permissionDecision` to allow or deny tool calls instead of `additionalContext`.
 
 Codex does not use `CLAUDE_ENV_FILE`, but it still receives the SessionStart
-context block printed by `eits-session-startup.sh` through the Codex hook
-dispatcher.
+context block printed by `codex-session-startup.sh` through the Codex hook.
 
 ---
 
@@ -147,7 +146,7 @@ echo "EITS_PROJECT_ID=$PROJECT_ID"   >> "$CLAUDE_ENV_FILE"
 ## Codex Env Files
 
 Codex has no `CLAUDE_ENV_FILE` equivalent. During Codex `SessionStart`,
-`eits-codex-notify.sh` dispatches to `eits-session-startup.sh`, which writes a
+`codex-session-startup.sh` registers or resolves the EITS session, then writes a
 session-specific env file:
 
 ```bash
@@ -155,7 +154,9 @@ session-specific env file:
 ```
 
 The file is mode `0600`, lives under a mode `0700` directory, and stores
-non-secret session identity:
+non-secret session identity. Separately, `codex-session-startup.sh` persists the
+EITS session `entrypoint` as `EITS_ENTRYPOINT` when supplied, or `cli` for
+terminal-launched Codex sessions.
 
 | Variable | Purpose |
 |---|---|
@@ -165,6 +166,19 @@ non-secret session identity:
 | `EITS_AGENT_UUID` | Agent UUID, when resolved |
 | `EITS_AGENT_ID` | Integer agent ID, when resolved |
 | `EITS_PROJECT_ID` | Integer project ID, when resolved |
+| `ENTRYPOINT` | Codex runtime-origin marker for later hook/tool env loading. Preserves the hook `ENTRYPOINT` value when present; otherwise defaults to `cli`. App-spawned Codex processes also use `cli`. |
+
+Terminal-launched sessions are not app-managed. When the startup hook creates or
+patches a session with `entrypoint=cli`, the API records `managed_by_app=false`
+unless the caller explicitly sends `managed_by_app=true` or `process_owner=app`.
+The app may display and store DMs for those sessions, but must not start a Codex
+worker for them.
+
+Codex `Stop` may still mark the terminal session `idle` after a turn. That idle
+state means "the terminal turn stopped", not "Phoenix owns a dead worker that
+should be reclaimed". If a later prompt marks the same session `working`, any
+stale `archived_at` value should be cleared so the active terminal session does
+not remain hidden in archived views.
 
 The Rust `eits` CLI auto-loads this file when `EITS_CODEX_SESSION_ID`,
 `CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set. If a Codex session has no
@@ -186,18 +200,26 @@ Set `EITS_WORKFLOW=0` to disable all hook behavior for a session.
 
 ## Session Lifecycle Hooks
 
+### Codex Startup — `codex-session-startup.sh`
+
+Codex `SessionStart` runs `codex-session-startup.sh` directly. The script is
+Codex-specific: it loads any existing `~/.eits/codex/sessions/<session_id>.env`,
+requires a valid `.id` from `eits sessions get` before treating the session as
+registered, auto-registers missing sessions with `eits sessions create`, writes
+the Codex env file, and marks the session `idle` until `UserPromptSubmit`.
+
 ### Codex Dispatcher — `eits-codex-notify.sh`
 
-Codex runs one dispatcher hook for lifecycle, compaction, tool-use, and stop
+Codex uses the dispatcher for prompt, compaction, tool-use, session-end, and stop
 events. The dispatcher loads `~/.eits/codex/sessions/<session_id>.env` when it
 can infer a session id from `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or
 `CODEX_SESSION_ID`, then maps Codex payloads to the shared EITS hook scripts.
 
 | Codex event | Dispatcher behavior |
 |---|---|
-| `SessionStart` `startup` / `clear` | Runs `eits-session-startup.sh` with `EITS_SESSION_START_STATUS=idle` |
-| `SessionStart` `resume` | Runs `eits-session-resume.sh` with `EITS_SESSION_START_STATUS=idle` |
-| `SessionStart` `compact` | Runs `eits-session-compact.sh`, `eits-session-startup.sh`, and `eits-agent-working.sh` |
+| `SessionStart` `startup` / `clear` | Compatibility path: runs `codex-session-startup.sh` |
+| `SessionStart` `resume` | Compatibility path: runs `codex-session-startup.sh` |
+| `SessionStart` `compact` | Compatibility path: runs `eits-session-compact.sh`, `codex-session-startup.sh`, and `eits-agent-working.sh` |
 | `UserPromptSubmit` | Runs `codex-prompt-working.sh` |
 | `PreToolUse` `Edit` / `Write` / `apply_patch` | Runs `eits-pre-tool-use.sh` |
 | `PreToolUse` `Bash` | Runs `eits-rm-worktree-guard.sh` |
@@ -211,7 +233,7 @@ can infer a session id from `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or
 The dispatcher also sets `CLAUDE_CODE_ENTRYPOINT` from `EITS_ENTRYPOINT` for
 shared scripts that still branch on the Claude variable.
 
-### SessionStart (startup / clear) — `eits-session-startup.sh`
+### Claude SessionStart (startup / clear) — `eits-session-startup.sh`
 
 Fires when a new session starts or is cleared (`/clear`).
 
@@ -224,9 +246,9 @@ Fires when a new session starts or is cleared (`/clear`).
 6. Updates session status to `working` via `eits sessions update --status working`
 7. Echoes a `$CONTEXT` markdown block to stdout for injection
 
-For Codex, the dispatcher sets `EITS_SESSION_START_STATUS=idle` so a newly
-opened or resumed Codex session appears idle until `UserPromptSubmit` marks it
-working. The same startup script also writes the Codex env file described above.
+For Codex, `codex-session-startup.sh` handles equivalent registration and env
+file persistence without using `$CLAUDE_ENV_FILE`, and keeps the session idle
+until `UserPromptSubmit` marks it working.
 
 ---
 
@@ -482,7 +504,7 @@ Commands are intentionally repo-absolute in the generated JSON today.
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-session-startup.sh",
             "timeout": 15
           }
         ]

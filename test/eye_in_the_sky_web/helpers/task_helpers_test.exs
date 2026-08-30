@@ -334,28 +334,28 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpersTest do
     test "7 days old returns warning idle indicator" do
       seven_days = DateTime.add(DateTime.utc_now(), -7 * 86_400, :second)
       {border_class, label} = TaskHelpers.card_aging_indicator(seven_days)
-      assert border_class == "border-l-2 border-l-warning/60"
+      assert border_class == "border-l border-l-warning/60"
       assert String.ends_with?(label, "d idle")
     end
 
     test "10 days old returns warning idle indicator" do
       ten_days = DateTime.add(DateTime.utc_now(), -10 * 86_400, :second)
       {border_class, label} = TaskHelpers.card_aging_indicator(ten_days)
-      assert border_class == "border-l-2 border-l-warning/60"
+      assert border_class == "border-l border-l-warning/60"
       assert label == "10d idle"
     end
 
     test "14 days old returns error stale indicator" do
       fourteen_days = DateTime.add(DateTime.utc_now(), -14 * 86_400, :second)
       {border_class, label} = TaskHelpers.card_aging_indicator(fourteen_days)
-      assert border_class == "border-l-2 border-l-error/60"
+      assert border_class == "border-l border-l-error/60"
       assert label == "14d stale"
     end
 
     test "20 days old returns error stale indicator" do
       twenty_days = DateTime.add(DateTime.utc_now(), -20 * 86_400, :second)
       {border_class, label} = TaskHelpers.card_aging_indicator(twenty_days)
-      assert border_class == "border-l-2 border-l-error/60"
+      assert border_class == "border-l border-l-error/60"
       assert label == "20d stale"
     end
 

@@ -11,8 +11,8 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
   def kanban_bulk_bar(assigns) do
     ~H"""
     <%= if @bulk_mode do %>
-      <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
-        <span class="text-xs font-medium text-primary">
+      <div class="mb-2 flex flex-wrap items-center gap-1.5 sm:gap-2 px-2 py-1.5 rounded-box bg-primary/10 border border-primary/20">
+        <span class="text-mini font-medium text-primary">
           {MapSet.size(@selected_tasks)} selected
         </span>
         <%= if MapSet.size(@selected_tasks) > 0 do %>
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
             <button
               phx-click="bulk_move"
               phx-value-state_id={state.id}
-              class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[44px] sm:min-h-0"
+              class="focus-ring inline-flex min-h-[44px] items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80 sm:h-7 sm:min-h-0"
             >
               <span
                 class="w-1.5 h-1.5 rounded-full"
@@ -35,24 +35,27 @@ defmodule EyeInTheSkyWeb.Components.KanbanBulkBar do
           <span class="text-base-content/15 hidden sm:inline">|</span>
           <button
             phx-click="bulk_archive"
-            class="btn btn-sm sm:btn-xs btn-ghost text-warning gap-1 min-h-[44px] sm:min-h-0"
+            class="focus-ring inline-flex min-h-[44px] items-center gap-1 rounded-box px-2 text-mini font-medium text-warning transition-colors hover:bg-warning/10 sm:h-7 sm:min-h-0"
           >
-            <.icon name="hero-archive-box-mini" class="size-3" /> Archive
+            <.icon name="hero-archive-box-mini" class="size-3" />
+            <span>Archive</span>
           </button>
           <button
             phx-click="bulk_delete"
             phx-confirm={"Delete #{MapSet.size(@selected_tasks)} tasks?"}
-            class="btn btn-sm sm:btn-xs btn-ghost text-error gap-1 min-h-[44px] sm:min-h-0"
+            class="focus-ring inline-flex min-h-[44px] items-center gap-1 rounded-box px-2 text-mini font-medium text-error transition-colors hover:bg-error/10 sm:h-7 sm:min-h-0"
           >
-            <.icon name="hero-trash-mini" class="size-3" /> Delete
+            <.icon name="hero-trash-mini" class="size-3" />
+            <span>Delete</span>
           </button>
         <% end %>
         <div class="flex-1" />
         <button
           phx-click="toggle_bulk_mode"
-          class="btn btn-sm sm:btn-xs btn-ghost gap-1 min-h-[44px] sm:min-h-0 text-base-content/50"
+          class="focus-ring inline-flex min-h-[44px] items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/50 transition-colors hover:bg-base-content/5 hover:text-base-content/75 sm:h-7 sm:min-h-0"
         >
-          <.icon name="hero-x-mark-mini" class="size-3" /> Cancel
+          <.icon name="hero-x-mark-mini" class="size-3" />
+          <span>Cancel</span>
         </button>
       </div>
     <% end %>

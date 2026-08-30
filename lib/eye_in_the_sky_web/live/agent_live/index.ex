@@ -225,13 +225,13 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             <button
               :if={!@select_mode && @agents != []}
               phx-click="enter_select_mode"
-              class="btn btn-ghost btn-xs gap-1 min-h-[44px] sm:min-h-0 text-xs text-base-content/40 hover:text-base-content/70"
+              class="btn btn-ghost btn-xs gap-1 min-h-[44px] sm:min-h-0 text-mini text-base-content/40 hover:text-base-content/70"
             >
               <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
             </button>
             <button
               phx-click="toggle_new_session_drawer"
-              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-xs"
+              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 sm:h-7 text-mini"
             >
               <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
             </button>

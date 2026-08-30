@@ -173,8 +173,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   defp initial_workspace(nil), do: nil
   defp initial_workspace(workspace_id), do: Workspaces.get_workspace(workspace_id)
 
-  defp workspace_projects(nil), do: []
-  defp workspace_projects(workspace_id), do: Projects.list_projects_for_workspace(workspace_id)
+  defp workspace_projects(_workspace_id), do: Projects.list_projects_for_sidebar()
 
   defp maybe_reload_projects(socket, previous_workspace_id, workspace_id)
        when previous_workspace_id == workspace_id do
@@ -573,31 +572,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <%!-- Collapse chevron: pill attached to the rail's right edge, revealed on
-           rail hover or keyboard focus. Same toggle as the vsbar button and the
-           divider double-click (see #rail-divider + app.js). --%>
-      <button
-        id="rail-collapse-toggle"
-        phx-click="toggle_collapsed"
-        aria-expanded={to_string(@flyout_open)}
-        aria-label={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
-        title={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
-        class={[
-          "hidden md:grid place-items-center absolute -right-[13px] top-11 w-[26px] h-11 z-30",
-          "rounded-full border border-base-content/15 bg-base-200 shadow-sm",
-          "text-base-content/60 hover:text-base-content hover:border-primary/60",
-          "opacity-0 group-hover/rail:opacity-100 focus-visible:opacity-100",
-          "transition-opacity duration-150"
-        ]}
-      >
-        <.icon
-          name={if @flyout_open, do: "hero-chevron-left", else: "hero-chevron-right"}
-          class="size-3.5"
-        />
-      </button>
-
       <%!-- Divider strip: invisible 6px double-click target on the rail's right
-           edge (bonus gesture — the chevron is the discoverable affordance).
+           edge (bonus gesture - the chevron is the discoverable affordance).
            dblclick wiring in app.js clicks #rail-collapse-toggle. --%>
       <div
         id="rail-divider"
@@ -612,7 +588,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <button
           phx-click="toggle_proj_picker"
           class={[
-            "w-8 h-8 rounded-lg mb-2 flex items-center justify-center text-sm font-bold text-white transition-all",
+            "w-8 h-8 rounded-box mb-2 flex items-center justify-center text-message font-bold text-primary-content transition-all",
             "bg-primary hover:opacity-90",
             if(@proj_picker_open, do: "ring-2 ring-primary ring-offset-2 ring-offset-base-100")
           ]}
@@ -622,7 +598,51 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           {project_initial(@sidebar_project)}
         </button>
 
-        <div class="mb-3" />
+        <%!-- Flyout toggle lives in the rail so it stays aligned with the icon strip.
+             Desktop uses the persisted collapse event; mobile opens/closes the drawer. --%>
+        <button
+          id="rail-collapse-toggle"
+          phx-click="toggle_collapsed"
+          aria-expanded={to_string(@flyout_open)}
+          aria-label={if @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
+          title={if @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
+          class={[
+            "hidden md:flex w-8 h-8 items-center justify-center rounded-box",
+            "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/[0.06]",
+            "focus-ring transition-colors"
+          ]}
+        >
+          <.icon
+            name={if @flyout_open, do: "hero-chevron-double-left", else: "hero-chevron-double-right"}
+            class="size-4"
+          />
+        </button>
+
+        <button
+          id="rail-mobile-flyout-toggle"
+          phx-click={if @mobile_open && @flyout_open, do: "close_flyout", else: "open_mobile"}
+          aria-expanded={to_string(@mobile_open && @flyout_open)}
+          aria-label={
+            if @mobile_open && @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"
+          }
+          title={if @mobile_open && @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
+          class={[
+            "md:hidden flex w-8 h-8 items-center justify-center rounded-box",
+            "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/[0.06] active:bg-base-content/10",
+            "focus-ring transition-colors"
+          ]}
+        >
+          <.icon
+            name={
+              if @mobile_open && @flyout_open,
+                do: "hero-chevron-double-left",
+                else: "hero-chevron-double-right"
+            }
+            class="size-4"
+          />
+        </button>
+
+        <div class="mb-2" />
         <.rail_item
           section={:files}
           active_section={@active_section}
@@ -715,15 +735,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           <.link
             navigate="/notifications"
             class={[
-              "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+              "relative w-8 h-8 flex items-center justify-center rounded-box transition-colors",
+              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box"
             ]}
             aria-label="Notifications"
           >
             <.icon name="hero-bell-mini" class="size-4" />
             <span
               :if={@notification_count > 0}
-              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-error-content text-nano font-bold rounded-full flex items-center justify-center px-0.5"
             >
               {@notification_count}
             </span>
@@ -733,7 +753,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="tooltip tooltip-right" data-tip="IAM Policies">
           <.link
             navigate="/iam/policies"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="IAM Policies"
           >
             <.icon name="hero-shield-check-mini" class="size-4" />
@@ -743,7 +763,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="tooltip tooltip-right" data-tip="Claude Config">
           <.link
             navigate="/config"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Claude Config"
           >
             <.custom_icon name="lucide-file-cog" class="size-4" />
@@ -753,7 +773,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="tooltip tooltip-right" data-tip="Settings">
           <.link
             navigate="/settings"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Settings"
           >
             <.icon name="hero-cog-6-tooth-mini" class="size-4" />
@@ -764,7 +784,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           <.link
             href="/auth/logout"
             method="delete"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Sign out"
           >
             <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />

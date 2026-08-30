@@ -38,6 +38,7 @@ defmodule EyeInTheSky.Codex.SessionImporter do
   def import_messages(messages, session_id, opts \\ []) do
     BulkImporter.import_messages(messages, session_id,
       provider: "codex",
+      metadata_fn: fn msg -> Map.get(msg, :metadata) end,
       importing_from_file?: true,
       broadcast?: Keyword.get(opts, :broadcast?, true)
     )

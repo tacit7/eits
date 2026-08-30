@@ -16,15 +16,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
   def side_by_side(assigns) do
     ~H"""
     <%= if @diff.is_binary do %>
-      <div class="px-4 py-3 text-xs text-base-content/40 italic">Binary file</div>
+      <div class="px-4 py-3 text-mini text-base-content/40 italic">Binary file</div>
     <% else %>
-      <div class="overflow-x-auto font-mono text-[11px] leading-5">
+      <div class="overflow-x-auto font-mono text-mini leading-5">
         <%= if @diff.hunks == [] do %>
-          <div class="px-4 py-3 text-xs text-base-content/40 italic">No changes</div>
+          <div class="px-4 py-3 text-mini text-base-content/40 italic">No changes</div>
         <% else %>
           <%= for hunk <- @diff.hunks do %>
             <%!-- Hunk header --%>
-            <div class="px-3 py-0.5 bg-info/10 text-info/70 text-[10px] border-y border-info/10 select-none">
+            <div class="px-3 py-0.5 bg-info/10 text-info/70 text-micro border-y border-info/10 select-none">
               {hunk.header}
             </div>
             <%!-- Side-by-side rows --%>

@@ -4,10 +4,8 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Workspaces
 
-  # Projects must belong to the logged-in test user's workspace — otherwise
-  # Projects.create_project/1's "first workspace in the DB" test fallback can
-  # attach the project to an unrelated workspace, and the rail's now
-  # workspace-scoped project list (task 9085) silently excludes it.
+  # Most interaction tests use projects in the logged-in user's workspace so
+  # navigation and restored context are deterministic.
   defp build_project(user, name \\ nil) do
     name = name || "rail-test-#{System.unique_integer([:positive])}"
     workspace = Workspaces.default_workspace_for_user!(user)
@@ -29,7 +27,77 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   # parent's handle_event/3, which does not handle Rail-specific events.
   defp get_rail(view), do: find_live_child(view, "app-rail")
 
+  describe "flyout chevron toggle" do
+    test "renders a persistent desktop chevron for hiding or showing the flyout", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+
+      assert has_element?(
+               get_rail(view),
+               "#rail-icon-strip #rail-collapse-toggle[phx-click='toggle_collapsed'][aria-label='Hide flyout menu'] .hero-chevron-double-left"
+             )
+    end
+
+    test "mobile chevron opens and closes the flyout without relying on swipe", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+      rail = get_rail(view)
+
+      assert has_element?(
+               rail,
+               "#rail-icon-strip #rail-mobile-flyout-toggle[phx-click='open_mobile'][aria-label='Show flyout menu'] .hero-chevron-double-right"
+             )
+
+      rail
+      |> element("#rail-mobile-flyout-toggle")
+      |> render_click()
+
+      assert has_element?(
+               rail,
+               "#rail-icon-strip #rail-mobile-flyout-toggle[phx-click='close_flyout'][aria-label='Hide flyout menu'] .hero-chevron-double-left"
+             )
+
+      rail
+      |> element("#rail-mobile-flyout-toggle")
+      |> render_click()
+
+      assert has_element?(
+               rail,
+               "#rail-icon-strip #rail-mobile-flyout-toggle[phx-click='open_mobile'][aria-label='Show flyout menu'] .hero-chevron-double-right"
+             )
+    end
+  end
+
   describe "select_project — no-op reselect guard" do
+    test "command palette project submenu includes projects added after mount", %{
+      conn: conn,
+      user: user
+    } do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+
+      project = build_project(user, "late-palette-#{System.unique_integer([:positive])}")
+
+      render_hook(view, "palette:projects", %{})
+
+      assert_push_event(view, "palette:projects-result", %{projects: projects})
+      assert Enum.any?(projects, &(&1.id == project.id))
+    end
+
+    test "project switcher lists projects from other workspaces", %{conn: conn} do
+      other_user = EyeInTheSky.Factory.user_fixture()
+
+      foreign_project =
+        build_project(other_user, "foreign-rail-#{System.unique_integer([:positive])}")
+
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+      rail = get_rail(view)
+
+      rail |> element("[phx-click='toggle_proj_picker']") |> render_click()
+
+      assert has_element?(
+               view,
+               "[phx-click='select_project'][phx-value-project_id='#{foreign_project.id}']"
+             )
+    end
+
     test "closes proj_picker after selecting a project", %{conn: conn, user: user} do
       project = build_project(user)
       {:ok, view, _html} = live(conn, ~p"/sessions")

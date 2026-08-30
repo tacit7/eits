@@ -119,7 +119,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ToolsTab do
       <% else %>
         <div class="flex flex-col items-center justify-center py-16 text-center gap-3">
           <.icon name="hero-wrench-screwdriver" class="size-8 text-base-content/20" />
-          <p class="text-sm text-base-content/40">
+          <p class="text-message text-base-content/40">
             No init data yet. Start a session to see what tools are available.
           </p>
         </div>
@@ -141,11 +141,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ToolsTab do
     <div>
       <div class="flex items-center gap-1.5 mb-2">
         <.icon name={@icon} class="size-3.5 text-base-content/40" />
-        <h3 class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">
+        <h3 class="text-mini font-semibold text-base-content/50 uppercase tracking-normal">
           {@title}
         </h3>
       </div>
-      <div class="rounded-lg bg-base-content/[0.03] border border-base-content/[0.06] px-3 py-2.5">
+      <div class="rounded-box bg-base-content/[0.03] border border-base-content/[0.06] px-3 py-2.5">
         {render_slot(@inner_block)}
       </div>
     </div>

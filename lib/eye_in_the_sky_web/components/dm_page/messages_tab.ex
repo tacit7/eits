@@ -40,9 +40,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :agent, :any, default: nil
   attr :message_search_query, :string, default: ""
   attr :codex_raw_lines, :list, default: []
+  attr :show_thinking_blocks, :boolean, default: false
   attr :syncing, :boolean, default: false
 
   def messages_tab(assigns) do
+    assigns = assign(assigns, :codex_raw_rows, codex_raw_rows(assigns.codex_raw_lines))
+
     ~H"""
     <div
       class="flex flex-1 min-h-0 flex-col relative"
@@ -56,9 +59,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <div
         id="search-counter-overlay"
         class={[
-          "absolute top-2 right-3 z-20 flex items-center gap-1 rounded-md",
+          "absolute top-2 right-3 z-20 flex items-center gap-1 rounded-box",
           "bg-base-200/90 border border-base-content/10 shadow-sm px-1.5 py-0.5",
-          "text-[11px] text-base-content/60 select-none",
+          "text-mini text-base-content/60 select-none",
           @message_search_query == "" && "hidden"
         ]}
       >
@@ -117,8 +120,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               class="flex flex-col items-center justify-center h-full py-20 text-center select-none"
               icon="hero-chat-bubble-left-right"
               icon_class="size-16 text-base-content/10 mb-5"
-              title_class="text-base font-medium text-base-content/40"
-              subtitle_class="mt-1.5 text-xs text-base-content/25 max-w-xs"
+              title_class="text-message font-medium text-base-content/40"
+              subtitle_class="mt-1.5 text-mini text-base-content/25 max-w-xs"
             >
               <:subtitle_slot :if={not is_nil(@agent) && not is_nil(@agent.git_worktree_path)}>
                 <span class="font-mono">{Path.basename(@agent.git_worktree_path)}</span> &nbsp;&mdash;
@@ -132,7 +135,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                   <button
                     phx-click="load_more_messages"
                     phx-click-loading-class="opacity-50 pointer-events-none"
-                    class="text-xs text-base-content/35 hover:text-primary transition-colors"
+                    class="text-mini text-base-content/35 hover:text-primary transition-colors"
                     id="load-more-messages"
                     onclick="document.getElementById('messages-container').dispatchEvent(new CustomEvent('load-more-intent'))"
                   >
@@ -156,6 +159,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     agent={@agent}
                     session={@session}
                     search_query={@message_search_query}
+                    show_thinking_blocks={@show_thinking_blocks}
                   />
                 </div>
               </div>
@@ -174,18 +178,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             aria-live="polite"
             aria-busy="true"
           >
-            <div class="rounded-md bg-[var(--agent-bg)] px-3 py-2.5">
+            <div class="rounded-box bg-[var(--agent-bg)] px-3 py-2.5">
               <div class="flex items-center gap-2 mb-2">
                 <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
                   <.provider_avatar session={@session} class="size-3 animate-pulse" />
                 </div>
-                <span class="text-[11px] font-semibold text-primary/80 animate-pulse">
+                <span class="text-mini font-semibold text-primary/80 animate-pulse">
                   {stream_provider_label(@session)}
                 </span>
               </div>
-              <div class="border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5">
-                <%= if @stream.thinking && @stream.content in [nil, ""] do %>
-                  <div class="text-xs text-base-content/40 italic font-mono animate-pulse flex items-center gap-1.5">
+              <div class="border-l border-[var(--guide-line)] pl-3.5 ml-1.5">
+                <%= if @stream.thinking && @show_thinking_blocks && @stream.content in [nil, ""] do %>
+                  <div class="text-mini text-base-content/40 italic font-mono animate-pulse flex items-center gap-1.5">
                     <span>Thinking</span>
                     <span class="flex items-center gap-0.5 text-base-content/50">
                       <span class="stream-dot"></span>
@@ -194,18 +198,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                     </span>
                   </div>
                 <% end %>
-                <%= if @stream.thinking && @stream.content not in [nil, ""] do %>
-                  <div class="text-xs text-base-content/30 italic font-mono line-clamp-3">
+                <%= if @stream.thinking && @show_thinking_blocks && @stream.content not in [nil, ""] do %>
+                  <div class="text-mini text-base-content/30 italic font-mono line-clamp-3">
                     {String.slice(@stream.thinking, -200, 200)}
                   </div>
                 <% end %>
                 <%= if @stream.tool do %>
-                  <div class="text-xs text-base-content/40 font-mono">
+                  <div class="text-mini text-base-content/40 font-mono">
                     Using {@stream.tool}...
                   </div>
                 <% end %>
                 <%= if @stream.content not in [nil, ""] do %>
-                  <div class="text-[13px] leading-[1.7] text-base-content/60 stream-content-appear stream-cursor">
+                  <div class="text-message leading-[1.7] text-base-content/60 stream-content-appear stream-cursor">
                     <span class="whitespace-pre-wrap">{String.trim_leading(@stream.content)}</span>
                   </div>
                 <% end %>
@@ -227,13 +231,27 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
             raw stream ({length(@codex_raw_lines)} lines)
           </summary>
           <div
-            class="h-40 overflow-y-auto bg-[var(--surface-code)] px-3 py-2"
+            class="h-44 overflow-y-auto bg-[var(--surface-code)] px-3 py-2 space-y-1"
             id="codex-raw-lines"
             phx-hook="AutoScroll"
           >
-            <%= for line <- Enum.reverse(@codex_raw_lines) do %>
-              <div class="font-mono text-micro text-base-content/40 leading-relaxed truncate">
-                {line}
+            <%= for row <- @codex_raw_rows do %>
+              <div class="grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-2 rounded px-1 py-0.5 hover:bg-base-content/[0.04]">
+                <span class={[
+                  "mt-0.5 rounded px-1 py-px text-micro font-mono font-semibold uppercase",
+                  raw_row_badge_class(row.severity)
+                ]}>
+                  {row.type}
+                </span>
+                <span :if={row.status} class="mt-0.5 text-micro font-mono text-base-content/30">
+                  {row.status}
+                </span>
+                <details class="min-w-0 group/raw">
+                  <summary class="cursor-pointer list-none truncate font-mono text-micro text-base-content/45 group-open/raw:whitespace-normal group-open/raw:break-words">
+                    {row.detail}
+                  </summary>
+                  <pre class="mt-1 max-h-28 overflow-y-auto whitespace-pre-wrap break-words font-mono text-micro text-base-content/30">{row.raw}</pre>
+                </details>
               </div>
             <% end %>
           </div>
@@ -252,6 +270,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   attr :agent, :map, default: nil
   attr :session, :map, default: nil
   attr :search_query, :string, default: ""
+  attr :show_thinking_blocks, :boolean, default: false
 
   defp message_item(assigns) do
     role =
@@ -268,12 +287,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       role not in [:user, :system] and segments != [] and
         Enum.all?(segments, &match?({:tool_call, _, _}, &1))
 
-    is_tool_event = stream_type in ["tool_result", "tool_use"] or body_is_tool_calls
+    is_tool_event =
+      stream_type in ["tool_result", "tool_use", "output", "bash", "thinking"] or
+        body_is_tool_calls
+
     is_same_sender = assigns.prev_role != nil && assigns.prev_role == assigns.message.sender_role
     is_new_turn = assigns.prev_role != nil && assigns.prev_role != assigns.message.sender_role
 
     is_empty_tool_result =
       stream_type == "tool_result" and String.trim(assigns.message.body || "") == ""
+
+    is_hidden_thinking = stream_type == "thinking" and not assigns.show_thinking_blocks
 
     tier =
       if role == :agent,
@@ -289,11 +313,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       |> assign(:is_same_sender, is_same_sender)
       |> assign(:is_new_turn, is_new_turn)
       |> assign(:is_empty_tool_result, is_empty_tool_result)
+      |> assign(:is_hidden_thinking, is_hidden_thinking)
       |> assign(:show_header, show_header)
       |> assign(:tier, tier)
 
     ~H"""
-    <%= if !@is_empty_tool_result do %>
+    <%= if !@is_empty_tool_result && !@is_hidden_thinking do %>
       <%!-- Inter-turn divider: user → agent turn boundary --%>
       <div
         :if={@is_new_turn && @role == :agent && !@is_tool_event}
@@ -320,7 +345,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <%!-- System message: centered annotation with dividers --%>
           <div class="flex items-center gap-3 my-1">
             <div class="flex-1 h-px bg-[var(--border-subtle)]/[0.4]"></div>
-            <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+            <span class="text-micro text-base-content/25 select-none whitespace-nowrap">
               {String.slice(@message.body || "system message", 0, 50)}
             </span>
             <div class="flex-1 h-px bg-[var(--border-subtle)]/[0.4]"></div>
@@ -329,7 +354,12 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
           <%= if @is_tool_event do %>
             <%!-- Tool events: subordinate rendering — compact + muted --%>
             <div class="pl-[33px]">
-              <.message_body message={@message} compact={true} search_query={@search_query} />
+              <.message_body
+                message={@message}
+                compact={true}
+                search_query={@search_query}
+                show_thinking_blocks={@show_thinking_blocks}
+              />
             </div>
           <% else %>
             <%= if @role == :user do %>
@@ -337,23 +367,28 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div class="group">
                 <%!-- Header row --%>
                 <div :if={@show_header} class="flex items-center gap-2 mb-1.5">
-                  <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-[9px] font-bold text-base-content/40 flex-shrink-0 select-none">
+                  <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-nano font-bold text-base-content/40 flex-shrink-0 select-none">
                     U
                   </div>
-                  <span class="text-[11px] font-semibold text-base-content/40">you</span>
+                  <span class="text-mini font-semibold text-base-content/40">you</span>
                   <time
                     id={"msg-time-#{@message.id}"}
-                    class="text-[10px] text-base-content/25"
+                    class="text-micro text-base-content/25"
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
                 </div>
                 <%!-- Body --%>
                 <div class={[
-                  "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-md text-[12.5px] leading-[1.5] break-words text-base-content/60",
+                  "px-3 py-2 bg-[var(--prompt-bg)] border border-[var(--border-subtle)] rounded-box text-prompt leading-[1.5] break-words text-base-content/60",
                   @show_header && "ml-7"
                 ]}>
-                  <.message_body message={@message} compact={false} search_query={@search_query} />
+                  <.message_body
+                    message={@message}
+                    compact={false}
+                    search_query={@search_query}
+                    show_thinking_blocks={@show_thinking_blocks}
+                  />
                 </div>
                 <.message_attachments attachments={@message.attachments || []} />
                 <%!-- Copy button - bottom, always present, hover-revealed --%>
@@ -364,22 +399,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div class={[
                 "group",
                 @tier == :primary &&
-                  "rounded-lg border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
+                  "rounded-box border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
                 @tier == :secondary && "pl-[33px] py-1",
                 @tier not in [:primary, :secondary] &&
-                  "rounded-lg bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"
+                  "rounded-box bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"
               ]}>
                 <%!-- Header row --%>
                 <div :if={@show_header && @tier == :primary} class="flex items-center gap-2 mb-3">
                   <div class="size-5 rounded-full bg-[var(--accent-soft)] border border-[var(--border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden">
                     <.provider_avatar session={@session} />
                   </div>
-                  <span class="text-[11px] font-semibold text-base-content/80">
+                  <span class="text-mini font-semibold text-base-content/80">
                     {if @agent, do: @agent.name, else: "agent"}
                   </span>
                   <time
                     id={"msg-time-#{@message.id}"}
-                    class="text-[10px] text-base-content/25"
+                    class="text-micro text-base-content/25"
                     data-utc={to_utc_string(@message.inserted_at)}
                     phx-hook="LocalTime"
                   />
@@ -388,10 +423,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <div class={[
                   "break-words",
                   @tier != :secondary &&
-                    "border-l-2 border-[var(--guide-line)] pl-3.5 ml-1.5 text-[13px] leading-[1.7] text-base-content",
-                  @tier == :secondary && "text-[var(--text-secondary)] text-sm"
+                    "border-l border-[var(--guide-line)] pl-3.5 ml-1.5 text-message leading-[1.7] text-base-content",
+                  @tier == :secondary && "text-[var(--text-secondary)] text-message"
                 ]}>
-                  <.message_body message={@message} compact={false} search_query={@search_query} />
+                  <.message_body
+                    message={@message}
+                    compact={false}
+                    search_query={@search_query}
+                    show_thinking_blocks={@show_thinking_blocks}
+                  />
                 </div>
                 <.message_attachments attachments={@message.attachments || []} />
                 <%!-- Metadata footer — only on primary tier --%>
@@ -439,6 +479,83 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
   end
 
   defdelegate stream_provider_label(session), to: DmHelpers
+
+  defp tool_cluster_count_label(%{count: 1, result_only: true}), do: "result"
+  defp tool_cluster_count_label(%{result_only: true}), do: "results"
+  defp tool_cluster_count_label(%{count: 1}), do: "call"
+  defp tool_cluster_count_label(_meta), do: "calls"
+
+  defp codex_raw_rows(lines) do
+    lines
+    |> Enum.reverse()
+    |> Enum.map(&codex_raw_row/1)
+  end
+
+  defp codex_raw_row(line) do
+    case Jason.decode(line) do
+      {:ok, decoded} when is_map(decoded) ->
+        raw_type = raw_event_type(decoded)
+        status = decoded["status"] || get_in(decoded, ["error", "status"])
+
+        %{
+          type: raw_type,
+          status: status,
+          severity: raw_event_severity(decoded),
+          detail: raw_event_detail(decoded),
+          raw: line
+        }
+
+      _ ->
+        %{
+          type: "raw",
+          status: nil,
+          severity: :neutral,
+          detail: String.slice(line, 0, 240),
+          raw: line
+        }
+    end
+  end
+
+  defp raw_event_type(%{"payload" => %{"type" => type}}) when is_binary(type), do: type
+  defp raw_event_type(%{"type" => type}) when is_binary(type), do: type
+  defp raw_event_type(_decoded), do: "event"
+
+  defp raw_event_severity(%{"type" => "error"}), do: :error
+  defp raw_event_severity(%{"error" => _}), do: :error
+  defp raw_event_severity(%{"type" => "turn.failed"}), do: :error
+  defp raw_event_severity(%{"payload" => %{"type" => "turn.failed"}}), do: :error
+
+  defp raw_event_severity(%{"payload" => %{"type" => type}}) when type in ["token_count"],
+    do: :muted
+
+  defp raw_event_severity(_decoded), do: :neutral
+
+  defp raw_event_detail(decoded) do
+    cond do
+      message = get_in(decoded, ["error", "message"]) ->
+        message
+
+      message = decoded["message"] ->
+        to_string(message)
+
+      id = get_in(decoded, ["payload", "id"]) ->
+        id
+
+      item_type = get_in(decoded, ["payload", "type"]) ->
+        item_type
+
+      type = decoded["type"] ->
+        type
+
+      true ->
+        inspect(decoded)
+    end
+    |> String.slice(0, 240)
+  end
+
+  defp raw_row_badge_class(:error), do: "bg-error/15 text-error/80"
+  defp raw_row_badge_class(:muted), do: "bg-base-content/[0.05] text-base-content/30"
+  defp raw_row_badge_class(_severity), do: "bg-primary/10 text-primary/65"
 
   # ---------------------------------------------------------------------------
   # Loading skeleton — shown while mount sync Task is running
@@ -493,18 +610,37 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
     <details
       id={"cluster-#{List.first(@events).id}"}
       phx-hook="PreserveDetails"
-      class="group my-1.5 w-full rounded-lg border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
+      class="group my-1.5 w-full rounded-box border border-base-content/[0.08] bg-base-content/[0.02] overflow-hidden"
     >
       <summary class="flex items-center gap-1.5 px-3 py-1.5 cursor-pointer list-none select-none hover:bg-base-content/[0.03] transition-colors">
-        <span class="text-[var(--text-disabled)] group-open:rotate-90 transition-transform duration-100 text-[10px] shrink-0">
-          &#9658;
-        </span>
+        <.icon
+          name="hero-chevron-right-mini"
+          class="size-3 shrink-0 text-[var(--text-disabled)] transition-transform duration-100 group-open:rotate-90"
+        />
         <span class="text-nano font-mono text-[var(--text-disabled)]">
-          {@meta.count} tool {if @meta.count == 1, do: "call", else: "calls"}
+          {@meta.count} tool {tool_cluster_count_label(@meta)}
+        </span>
+        <span
+          :for={label <- Map.get(@meta, :tool_labels, [])}
+          class="rounded bg-base-content/[0.05] px-1 py-px text-nano font-mono text-base-content/35"
+        >
+          {label}
+        </span>
+        <span
+          :if={Map.get(@meta, :failed_count, 0) > 0}
+          class="rounded bg-error/10 px-1 py-px text-nano font-mono font-semibold text-error/80"
+        >
+          {Map.get(@meta, :failed_count)} failed
+        </span>
+        <span
+          :if={Map.get(@meta, :file_count, 0) > 0}
+          class="rounded bg-primary/10 px-1 py-px text-nano font-mono text-primary/65"
+        >
+          {Map.get(@meta, :file_count)} files
         </span>
         <%= if @meta.duration_ms && @meta.duration_ms >= 1000 do %>
           <span class="text-nano font-mono text-[var(--text-disabled)]">
-            &middot; ~{div(@meta.duration_ms, 1000)}s
+            | ~{div(@meta.duration_ms, 1000)}s
           </span>
         <% end %>
         <span class="ml-auto text-nano text-[var(--text-disabled)]">
@@ -563,7 +699,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
       <span class="text-nano font-mono text-[var(--text-disabled)]">
         <%= if @data.files != [] do %>
           <span>
-            {length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} &middot;
+            {length(@data.files)} {if length(@data.files) == 1, do: "file", else: "files"} |
           </span>
           <span>{@data.files |> Enum.map(&Path.basename/1) |> Enum.join(", ")}</span>
         <% end %>

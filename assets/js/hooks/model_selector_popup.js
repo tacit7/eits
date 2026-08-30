@@ -163,11 +163,11 @@ export const ModelSelectorPopup = {
       const visible = expanded ? models : primary
       const hiddenCount = expanded ? 0 : legacy.length
 
-      html += `<div class="menu-title text-xs px-3 pt-2 pb-0.5 text-base-content/40">${this._esc(group)}</div>`
+      html += `<div class="menu-title text-mini px-3 pt-2 pb-0.5 text-base-content/40">${this._esc(group)}</div>`
       html += visible.map((m) => this._rowHtml(m, q)).join("")
 
       if (hiddenCount > 0) {
-        html += `<div data-disclosure-toggle="${this._esc(group)}" class="px-3 py-1.5 text-xs text-base-content/40 cursor-pointer hover:text-base-content/60">More (${hiddenCount})</div>`
+        html += `<div data-disclosure-toggle="${this._esc(group)}" class="px-3 py-1.5 text-mini text-base-content/40 cursor-pointer hover:text-base-content/60">More (${hiddenCount})</div>`
       } else if (group.startsWith("Ollama") || (models[0] && models[0].provider === "pi")) {
         // Pi sub-provider buckets: cap primary display separately from the
         // Claude/Codex legacy split above.
@@ -177,7 +177,7 @@ export const ModelSelectorPopup = {
           html = html.replace(
             visible.map((m) => this._rowHtml(m, q)).join(""),
             shown.map((m) => this._rowHtml(m, q)).join("") +
-              `<div data-disclosure-toggle="${this._esc(group)}" class="px-3 py-1.5 text-xs text-base-content/40 cursor-pointer hover:text-base-content/60">Show all ${models.length}</div>`
+              `<div data-disclosure-toggle="${this._esc(group)}" class="px-3 py-1.5 text-mini text-base-content/40 cursor-pointer hover:text-base-content/60">Show all ${models.length}</div>`
           )
         }
       }
@@ -195,13 +195,13 @@ export const ModelSelectorPopup = {
       data-provider="${this._esc(m.provider)}"
       role="option"
       aria-selected="${active}"
-      class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-base-content/[0.04] aria-selected:bg-base-content/[0.06]"
+      class="flex items-center gap-2 rounded-box px-3 py-2 text-message cursor-pointer hover:bg-base-content/[0.04] aria-selected:bg-base-content/[0.06]"
     >
       <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
       <span class="flex-1 truncate">${this._highlight(m.label, q)}</span>
-      ${m.default ? '<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success">Recommended</span>' : ""}
+      ${m.default ? '<span class="text-nano px-1.5 py-0.5 rounded-full bg-success/10 text-success">Recommended</span>' : ""}
       ${active ? '<svg class="size-3.5 text-primary flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/></svg>' : ""}
-      ${!active && m.premium ? '<span class="text-xs text-base-content/40 flex-shrink-0">$</span>' : ""}
+      ${!active && m.premium ? '<span class="text-mini text-base-content/40 flex-shrink-0">$</span>' : ""}
     </li>`
   },
 

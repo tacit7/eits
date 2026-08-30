@@ -300,11 +300,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
       get_in(socket.assigns, [:sidebar_project, Access.key(:workspace_id)])
   end
 
-  defp workspace_projects(socket) do
-    case current_workspace_id(socket) do
-      nil -> []
-      workspace_id -> Projects.list_projects_for_workspace(workspace_id)
-    end
+  defp workspace_projects(_socket) do
+    Projects.list_projects_for_sidebar()
   end
 
   defp select_project(socket, project) do
@@ -314,7 +311,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     |> assign(:sidebar_project, project)
     |> assign(:workspace, workspace)
     |> assign(:workspace_id, workspace && workspace.id)
-    |> assign(:projects, Projects.list_projects_for_workspace(project.workspace_id))
+    |> assign(:projects, Projects.list_projects_for_sidebar())
   end
 
   defp basename_from_path(path) do

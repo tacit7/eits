@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
               <label class="label"><span class="label-text font-medium">Description</span></label>
               <textarea
                 name="description"
-                class="textarea textarea-bordered w-full text-base"
+                class="textarea textarea-bordered w-full text-message"
                 rows="3"
                 placeholder="What kind of job do you want to create?"
               ></textarea>

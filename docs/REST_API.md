@@ -44,6 +44,9 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
 | `model` | string | no | Model identifier, e.g. `claude-sonnet-4-5-20250929` |
 | `provider` | string | no | AI provider. Defaults to `"claude"` |
 | `worktree_path` | string | no | Git worktree path |
+| `entrypoint` | string | no | Runtime entrypoint marker. `cli` marks the session terminal-owned unless `managed_by_app=true` or `process_owner=app` is also sent |
+| `managed_by_app` | boolean | no | Whether Phoenix may start/resume an app worker for this session. Defaults to `false` for `entrypoint=cli`, otherwise `true` |
+| `process_owner` | string | no | Optional alias for ownership: `"terminal"` sets `managed_by_app=false`, `"app"` sets `managed_by_app=true` |
 
 **Response:** `201 Created`
 
@@ -88,6 +91,9 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 |-------|------|----------|-------------|
 | `status` | string | no | One of: `working`, `idle`, `waiting`, `completed`, `failed` |
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
+| `entrypoint` | string | no | Runtime entrypoint marker. `cli` marks the session terminal-owned unless ownership is explicitly overridden |
+| `managed_by_app` | boolean | no | Whether Phoenix may start/resume an app worker for this session |
+| `process_owner` | string | no | Optional alias for ownership: `"terminal"` or `"app"` |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 | `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
 | `worktree_path` | string | no | Absolute path to the git worktree for this session. Stored as `git_worktree_path` in DB. Set by agents after `git worktree add` |
@@ -295,6 +301,7 @@ Fetch session detail with related resources (tasks, notes, commits).
   "name": "fix auth bug",
   "description": "fixing the oauth flow",
   "is_spawned": true,
+  "managed_by_app": true,
   "initialized": true,
   "worktree_path": "/path/to/project/.claude/worktrees/fix-auth-bug",
   "branch_name": "worktree-fix-auth-bug",
@@ -348,7 +355,7 @@ curl localhost:5001/api/v1/sessions/42 \
 
 ### GET /api/v1/sessions/:id/worker
 
-Check AgentWorker liveness for a session. Returns the alive status, last activity timestamp, and whether the worker is hung (stale).
+Check AgentWorker liveness for a session. Returns the worker state, handler/CLI port health, last activity timestamp, and whether the worker is hung (stale).
 
 **URL params:**
 
@@ -361,6 +368,17 @@ Check AgentWorker liveness for a session. Returns the alive status, last activit
 ```json
 {
   "alive": true,
+  "provider": "claude",
+  "status": "running",
+  "processing": true,
+  "handler_alive": true,
+  "sdk_active": true,
+  "port_alive": true,
+  "port_type": "port",
+  "os_pid": 12345,
+  "current_job_active": true,
+  "current_job_id": 987654321,
+  "queue_depth": 0,
   "last_activity_at": "2026-05-06T19:30:45Z",
   "hung": false
 }
@@ -368,6 +386,17 @@ Check AgentWorker liveness for a session. Returns the alive status, last activit
 
 **Fields:**
 - `alive` — Boolean indicating whether the AgentWorker process is registered and running
+- `provider` — Provider for the worker (`claude`, `codex`, or `pi`); `null` when no worker is registered
+- `status` — AgentWorker internal status (`idle`, `running`, `retry_wait`, or `failed`); `null` when no worker is registered
+- `processing` — Boolean indicating whether the AgentWorker currently believes an SDK run is active
+- `handler_alive` — Boolean indicating whether the SDK output handler process is alive
+- `sdk_active` — Boolean indicating whether the AgentWorker has an active SDK reference
+- `port_alive` — Boolean indicating whether the active SDK Port, or test PID, is still alive
+- `port_type` — `"port"` for real CLI subprocess ports, `"pid"` for test doubles, or `null`
+- `os_pid` — Operating-system process ID for the CLI Port when available; `null` when absent or when the backing object is not a Port
+- `current_job_active` — Boolean indicating whether the worker has an in-flight job
+- `current_job_id` — Current in-flight AgentWorker job ID when assigned; may be `null` for immediate jobs, idle workers, or missing workers
+- `queue_depth` — Count of queued prompts waiting behind the current job
 - `last_activity_at` — ISO 8601 timestamp of the last recorded session activity; `null` if no activity recorded
 - `hung` — Boolean indicating whether the worker is stale (alive but with no activity in the last 10 minutes)
 
@@ -1804,6 +1833,7 @@ List sessions with optional filtering. Supports full-text search, name filters, 
       "description": "fixing the oauth flow",
       "status": "working",
       "status_reason": null,
+      "managed_by_app": true,
       "tasks": [
         {
           "id": 1,

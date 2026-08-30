@@ -78,7 +78,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
           <h2 class="font-semibold flex items-center gap-2">
             <.icon name="hero-funnel" class="size-5" /> Scope
           </h2>
-          <span class="text-xs text-base-content/60">
+          <span class="text-mini text-base-content/60">
             Controls which hook contexts this policy matches.
           </span>
         </div>
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               disabled={@scope_disabled}
             />
             <span class="label-text">
-              Global <span class="text-xs opacity-60">— every project</span>
+              Global <span class="text-mini opacity-60">| every project</span>
             </span>
           </label>
           <label class="label cursor-pointer gap-2">
@@ -106,7 +106,9 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               class="radio radio-sm"
               disabled={@scope_disabled}
             />
-            <span class="label-text">Project <span class="text-xs opacity-60">— pick one</span></span>
+            <span class="label-text">
+              Project <span class="text-mini opacity-60">| pick one</span>
+            </span>
           </label>
           <label class="label cursor-pointer gap-2">
             <input
@@ -118,7 +120,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               disabled={@scope_disabled}
             />
             <span class="label-text">
-              Path glob <span class="text-xs opacity-60">— match by filesystem path</span>
+              Path glob <span class="text-mini opacity-60">| match by filesystem path</span>
             </span>
           </label>
         </div>
@@ -141,7 +143,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
               disabled={@project_path_disabled}
             />
           <% true -> %>
-            <p class="text-xs text-base-content/60">
+            <p class="text-mini text-base-content/60">
               This policy will apply to every project.
             </p>
         <% end %>
@@ -154,7 +156,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
           <h2 class="font-semibold flex items-center gap-2">
             <.icon name="hero-code-bracket" class="size-5" /> Condition (JSON)
           </h2>
-          <span class="text-xs text-base-content/60">
+          <span class="text-mini text-base-content/60">
             Predicates: time_between, env_equals, session_state_equals
           </span>
         </div>
@@ -162,12 +164,12 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
         <textarea
           name="condition_text"
           rows="6"
-          class="textarea textarea-bordered textarea-sm font-mono text-xs w-full"
+          class="textarea textarea-bordered textarea-sm font-mono text-mini w-full"
           disabled={@condition_disabled}
         ><%= @condition_text %></textarea>
 
         <%= if cond_error = @form[:condition].errors |> List.first() do %>
-          <p class="text-error text-xs">{elem(cond_error, 0)}</p>
+          <p class="text-error text-mini">{elem(cond_error, 0)}</p>
         <% end %>
       </div>
     </section>

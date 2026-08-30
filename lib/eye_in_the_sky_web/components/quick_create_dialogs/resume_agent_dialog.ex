@@ -13,14 +13,14 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
     >
       <div class="modal-box max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
-          <h2 class="text-sm font-semibold text-base-content">Resume Agent</h2>
+          <h2 class="text-message font-semibold text-base-content">Resume Agent</h2>
           <button
             data-qra-cancel
             type="button"
-            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
+            class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
             aria-label="Close"
           >
-            <span class="hero-x-mark size-4"></span>
+            <.icon name="hero-x-mark-mini" class="size-4" />
           </button>
         </div>
         <form data-qra-form class="p-4 flex flex-col gap-3">
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
               data-qra-agent-uuid
               required
               placeholder="Enter agent UUID to resume"
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message min-h-[44px]"
             />
           </div>
           <div>
@@ -41,18 +41,27 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
               data-qra-instructions
               placeholder="New instructions (optional - uses original if blank)"
               rows="4"
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base resize-none"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message resize-none"
             ></textarea>
           </div>
-          <div class="alert alert-info text-sm">
+          <div class="alert alert-info text-message">
             <.icon name="hero-information-circle" class="shrink-0 size-5" />
             <span>This will spawn a new Claude session for the existing agent.</span>
           </div>
           <div class="flex justify-end gap-2 pt-1">
-            <button data-qra-cancel type="button" class="btn btn-ghost btn-sm min-h-[44px]">
+            <button
+              data-qra-cancel
+              type="button"
+              class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+            >
               Cancel
             </button>
-            <button type="submit" class="btn btn-primary btn-sm min-h-[44px]">Resume Agent</button>
+            <button
+              type="submit"
+              class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+            >
+              Resume Agent
+            </button>
           </div>
         </form>
       </div>

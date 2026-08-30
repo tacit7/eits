@@ -188,7 +188,10 @@ const liveSocket = new LiveSocket("/live", Socket, {
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+topbar.config({
+  barColors: {0: "var(--color-primary)"},
+  shadowColor: "color-mix(in oklch, var(--color-base-content) 30%, transparent)",
+})
 // Track navigation kind so we can reset main scroll on full navigations only.
 // phx:page-loading-stop doesn't carry detail; capture kind from start and apply on stop.
 let _pendingNavKind = null

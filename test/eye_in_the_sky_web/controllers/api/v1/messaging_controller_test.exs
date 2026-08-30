@@ -227,6 +227,50 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       assert String.contains?(dm.body, "Status update?")
     end
 
+    test "stores a DM for a terminal-owned target session without starting an app worker", %{
+      conn: conn
+    } do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockFailingAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+
+      target_session =
+        create_session(target_agent, %{
+          provider: "codex",
+          entrypoint: "cli",
+          managed_by_app: false
+        })
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Terminal should poll this"
+        })
+
+      resp = json_response(conn, 201)
+
+      assert resp["success"] == true
+
+      [dm] = Messages.list_inbound_dms(target_session.id)
+
+      assert dm.from_session_id == sender_session.id
+      assert dm.to_session_id == target_session.id
+      assert String.contains?(dm.body, "Terminal should poll this")
+    end
+
     test "returns 503 with delivery_failed when agent manager returns unknown error", %{
       conn: conn
     } do

@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
       <%!-- Desktop modal --%>
       <div class="hidden sm:flex fixed inset-0 z-50 items-center justify-center">
-        <div class="bg-base-100 rounded-xl shadow-2xl w-full max-w-lg p-6 border border-base-300 max-h-[90vh] overflow-y-auto">
+        <div class="bg-base-100 rounded-box shadow-2xl w-full max-w-lg p-6 border border-base-300 max-h-[90vh] overflow-y-auto">
           <.form_body
             prompt={@prompt}
             job={@job}
@@ -72,15 +72,19 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h2 class="text-base font-semibold">
+        <h2 class="text-message font-semibold">
           {if @editing, do: "Edit Schedule", else: "Schedule Agent"}
         </h2>
-        <p class="text-xs text-base-content/50 mt-0.5">{@prompt.name}</p>
-        <p class="text-xs text-base-content/40 mt-1 italic">
+        <p class="text-mini text-base-content/50 mt-0.5">{@prompt.name}</p>
+        <p class="text-mini text-base-content/40 mt-1 italic">
           Instructions captured at time of scheduling
         </p>
       </div>
-      <button class="btn btn-ghost btn-sm btn-square" phx-click="cancel_schedule">
+      <button
+        class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
+        phx-click="cancel_schedule"
+        aria-label="Close schedule form"
+      >
         <.icon name="hero-x-mark" class="size-4" />
       </button>
     </div>
@@ -127,7 +131,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   defp schedule_type_fields(assigns) do
     ~H"""
     <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Schedule Type</span></label>
+      <label class="label"><span class="label-text text-mini">Schedule Type</span></label>
       <select name="schedule[schedule_type]" class="select select-bordered select-sm w-full">
         <option value="cron" selected={@schedule_type == "cron"}>Cron</option>
         <option value="interval" selected={@schedule_type == "interval"}>Interval</option>
@@ -141,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
   defp model_selector(assigns) do
     ~H"""
     <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Model</span></label>
+      <label class="label"><span class="label-text text-mini">Model</span></label>
       <select name="schedule[model]" class="select select-bordered select-sm w-full">
         <%= for {value, label} <- claude_models() do %>
           <option value={value} selected={@model == value}>{label}</option>
@@ -157,14 +161,14 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Cron Expression</span>
+        <span class="label-text text-mini">Cron Expression</span>
       </label>
       <input
         type="text"
         name="schedule[schedule_value]"
         value={@schedule_value}
         placeholder="0 9 * * *"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        class="input input-bordered input-sm w-full font-mono text-message min-h-[44px]"
         required
       />
     </div>
@@ -178,14 +182,14 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Interval (seconds)</span>
+        <span class="label-text text-mini">Interval (seconds)</span>
       </label>
       <input
         type="text"
         name="schedule[schedule_value]"
         value={@schedule_value}
         placeholder="3600"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        class="input input-bordered input-sm w-full font-mono text-message min-h-[44px]"
         required
       />
     </div>
@@ -222,7 +226,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
     ~H"""
     <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Timezone</span></label>
+      <label class="label"><span class="label-text text-mini">Timezone</span></label>
       <select name="schedule[timezone]" class="select select-bordered select-sm w-full">
         <%= for tz <- @timezones do %>
           <option value={tz} selected={tz == @timezone}>{tz}</option>
@@ -240,10 +244,10 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Project (optional override)</span>
+        <span class="label-text text-mini">Project (optional override)</span>
       </label>
       <select name="schedule[project_override_id]" class="select select-bordered select-sm w-full">
-        <option value="">— use prompt default —</option>
+        <option value="">- use prompt default -</option>
         <%= for p <- @projects do %>
           <option
             value={p.id}
@@ -263,9 +267,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   defp cron_reference(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+    <div class="collapse collapse-arrow bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2 px-3 flex items-center gap-1.5 text-xs text-base-content/60">
+      <div class="collapse-title min-h-0 py-2 px-3 flex items-center gap-1.5 text-mini text-base-content/60">
         <.icon name="hero-question-mark-circle" class="size-3.5" /> Cron syntax reference
       </div>
       <div class="collapse-content px-3 pb-3">
@@ -278,7 +282,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
                 <th class="pr-0">Specials</th>
               </tr>
             </thead>
-            <tbody class="text-xs">
+            <tbody class="text-mini">
               <tr>
                 <td class="pl-0 font-medium">Minute</td>
                 <td>0 - 59</td>
@@ -308,8 +312,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
           </table>
         </div>
         <div class="divider my-1"></div>
-        <p class="text-xs font-medium text-base-content/50 mb-1">Examples</p>
-        <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+        <p class="text-mini font-medium text-base-content/50 mb-1">Examples</p>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-mini">
           <code class="font-mono text-primary">0 9 * * *</code><span class="text-base-content/50">Daily at 9:00 AM</span>
           <code class="font-mono text-primary">*/15 * * * *</code><span class="text-base-content/50">Every 15 minutes</span>
           <code class="font-mono text-primary">0 9 * * 1-5</code><span class="text-base-content/50">Weekdays at 9 AM</span>
@@ -348,9 +352,9 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     assigns = assign(assigns, :config, config)
 
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+    <div class="collapse collapse-arrow bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced CLI Flags
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
@@ -390,7 +394,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="grid grid-cols-2 gap-3">
       <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Max Budget (USD)</span></label>
+        <label class="label"><span class="label-text text-mini">Max Budget (USD)</span></label>
         <input
           type="number"
           name="schedule[max_budget_usd]"
@@ -403,8 +407,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
       </div>
       <div class="form-control">
         <label class="label">
-          <span class="label-text text-xs">Max Turns</span>
-          <span class="label-text-alt text-base-content/40 font-mono text-xs">--max-turns</span>
+          <span class="label-text text-mini">Max Turns</span>
+          <span class="label-text-alt text-base-content/40 font-mono text-mini">--max-turns</span>
         </label>
         <input
           type="number"
@@ -428,7 +432,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     ~H"""
     <div class="grid grid-cols-2 gap-3">
       <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Fallback Model</span></label>
+        <label class="label"><span class="label-text text-mini">Fallback Model</span></label>
         <select name="schedule[fallback_model]" class="select select-bordered select-sm w-full">
           <option value="" selected={@fallback_model == ""}>None</option>
           <%= for {value, label} <- claude_models() do %>
@@ -437,7 +441,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
         </select>
       </div>
       <div class="form-control">
-        <label class="label"><span class="label-text text-xs">Output Format</span></label>
+        <label class="label"><span class="label-text text-mini">Output Format</span></label>
         <select name="schedule[output_format]" class="select select-bordered select-sm w-full">
           <option value="" selected={@output_format == ""}>Default</option>
           <option value="text" selected={@output_format == "text"}>Text</option>
@@ -449,30 +453,30 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Permission Mode</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--permission-mode</span>
+        <span class="label-text text-mini">Permission Mode</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-mini">--permission-mode</span>
       </label>
       <select name="schedule[permission_mode]" class="select select-bordered select-sm w-full">
         <option value="" selected={@permission_mode == ""}>Default</option>
         <option value="acceptEdits" selected={@permission_mode == "acceptEdits"}>
-          acceptEdits — auto-accept file edits
+          acceptEdits - auto-accept file edits
         </option>
         <option value="bypassPermissions" selected={@permission_mode == "bypassPermissions"}>
-          bypassPermissions — skip all prompts
+          bypassPermissions - skip all prompts
         </option>
-        <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk — never ask</option>
-        <option value="plan" selected={@permission_mode == "plan"}>plan — read-only</option>
+        <option value="dontAsk" selected={@permission_mode == "dontAsk"}>dontAsk - never ask</option>
+        <option value="plan" selected={@permission_mode == "plan"}>plan - read-only</option>
       </select>
     </div>
 
     <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Allowed Tools</span></label>
+      <label class="label"><span class="label-text text-mini">Allowed Tools</span></label>
       <input
         type="text"
         name="schedule[allowed_tools]"
         value={@allowed_tools}
         placeholder="e.g. Bash,Read,Edit,Write,Grep,Glob"
-        class="input input-bordered input-sm w-full font-mono text-base min-h-[44px]"
+        class="input input-bordered input-sm w-full font-mono text-message min-h-[44px]"
       />
       <label class="label">
         <span class="label-text-alt text-base-content/40">

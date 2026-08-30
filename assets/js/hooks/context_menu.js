@@ -230,7 +230,7 @@ export const CtxMenu = {
         : item.icon && item.icon.startsWith('hero-')
           ? `<span class="ctx-menu-ic ${item.icon}"></span>`
           : `<span class="ctx-menu-ic">${item.icon || ''}</span>`
-      el.innerHTML = `${iconHtml}<span class="ctx-menu-label"></span>${item.children ? '<span class="ctx-menu-sub-arrow">▸</span>' : ''}`
+      el.innerHTML = `${iconHtml}<span class="ctx-menu-label"></span>${item.children ? '<span class="ctx-menu-sub-arrow" aria-hidden="true"></span>' : ''}`
       el.querySelector('.ctx-menu-label').textContent = item.label
       if (item.children) {
         el.addEventListener('mouseenter', () => this._openSub(el, item))
@@ -264,11 +264,11 @@ export const CtxMenu = {
 
   _activate(item, el) {
     if (item.danger && !el.dataset.confirming) {
-      // inline confirm: the row becomes "Really? ✓ / ✕"
+      // Inline confirmation keeps destructive actions inside the same menu row.
       el.dataset.confirming = '1'
       el.innerHTML =
-        '<span class="ctx-menu-ic">⚠</span><span class="ctx-menu-label">Really?</span>' +
-        '<span class="ctx-menu-confirm"><span data-yes>✓</span><span data-no>✕</span></span>'
+        '<span class="ctx-menu-ic hero-exclamation-triangle"></span><span class="ctx-menu-label">Really?</span>' +
+        '<span class="ctx-menu-confirm"><span data-yes>Confirm</span><span data-no>Cancel</span></span>'
       el.querySelector('[data-yes]').addEventListener('click', (e) => {
         e.stopPropagation()
         item.run(this._ctx())

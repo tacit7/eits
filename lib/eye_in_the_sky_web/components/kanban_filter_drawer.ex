@@ -35,10 +35,10 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
     >
       <%!-- Header --%>
       <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
-        <h2 class="text-sm font-semibold text-base-content/80">Filter</h2>
+        <h2 class="text-message font-semibold text-base-content/80">Filter</h2>
         <button
           phx-click="toggle_filter_drawer"
-          class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
+          class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
           aria-label="Close"
         >
           <.icon name="hero-x-mark-mini" class="size-4" />
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
       <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         <%!-- Keyword --%>
         <div>
-          <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+          <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
             Keyword
           </h3>
           <form phx-change="search">
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                 placeholder="Enter a keyword..."
                 phx-debounce="300"
                 data-vim-search
-                class="input input-sm w-full pl-8 bg-base-100 border-base-content/10 placeholder:text-base-content/25 text-base min-h-[44px]"
+                class="input input-sm focus-ring min-h-[44px] w-full border-base-content/10 bg-base-100 pl-8 text-message placeholder:text-base-content/25"
                 autocomplete="off"
               />
             </div>
@@ -74,34 +74,34 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
         <%!-- Card Status --%>
         <div>
-          <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+          <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
             Card status
           </h3>
           <div class="space-y-0.5">
-            <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
+            <label class="flex cursor-pointer items-center gap-3 py-1.5 transition-colors hover:text-base-content">
               <input
                 type="checkbox"
-                class="checkbox checkbox-sm checkbox-primary"
+                class="checkbox checkbox-primary checkbox-sm focus-ring"
                 checked={@show_completed}
                 phx-click="toggle_show_completed"
               />
-              <span class="text-sm text-base-content/70">Marked as complete</span>
+              <span class="text-message text-base-content/70">Marked as complete</span>
             </label>
-            <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
+            <label class="flex cursor-pointer items-center gap-3 py-1.5 transition-colors hover:text-base-content">
               <input
                 type="checkbox"
-                class="checkbox checkbox-sm checkbox-primary"
+                class="checkbox checkbox-primary checkbox-sm focus-ring"
                 checked={@show_archived}
                 phx-click="toggle_show_archived"
               />
-              <span class="text-sm text-base-content/70">Archived</span>
+              <span class="text-message text-base-content/70">Archived</span>
             </label>
           </div>
         </div>
 
         <%!-- Due Date --%>
         <div>
-          <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+          <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
             Due date
           </h3>
           <div class="space-y-0.5">
@@ -112,17 +112,17 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                   {"Due in the next week", "next_week", :next_week, "hero-clock", "text-base-content/45"},
                   {"Due in the next month", "next_month", :next_month, "hero-clock", "text-base-content/30"}
                 ] do %>
-              <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
+              <label class="flex cursor-pointer items-center gap-3 py-1.5 transition-colors hover:text-base-content">
                 <input
                   type="checkbox"
-                  class="checkbox checkbox-sm checkbox-primary"
+                  class="checkbox checkbox-primary checkbox-sm focus-ring"
                   checked={@filter_due_date == atom}
                   phx-click="update_filter"
                   phx-value-field="due_date"
                   phx-value-value={value}
                 />
                 <.icon name={icon} class={"size-3.5 flex-shrink-0 #{icon_class}"} />
-                <span class="text-sm text-base-content/70">{label}</span>
+                <span class="text-message text-base-content/70">{label}</span>
               </label>
             <% end %>
           </div>
@@ -130,21 +130,24 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
         <%!-- Priority --%>
         <div>
-          <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+          <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
             Priority
           </h3>
           <div class="space-y-1.5">
             <%= for {label, value, color} <- [{"High", 3, "hsl(var(--er))"}, {"Med", 2, "hsl(var(--wa))"}, {"Low", 1, "hsl(var(--in))"}] do %>
-              <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
+              <label class="group flex cursor-pointer items-center gap-3 py-0.5">
                 <input
                   type="checkbox"
-                  class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                  class="checkbox checkbox-primary checkbox-sm focus-ring flex-shrink-0"
                   checked={@filter_priority == value}
                   phx-click="update_filter"
                   phx-value-field="priority"
                   phx-value-value={value}
                 />
-                <div class="flex-1 h-5 rounded" style={"background-color: #{color}"} />
+                <div
+                  class="h-5 flex-1 rounded-box border border-base-content/8"
+                  style={"background-color: #{color}"}
+                />
                 <span class="text-mini text-base-content/45 w-7 text-right shrink-0">
                   {label}
                 </span>
@@ -156,35 +159,37 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
         <%!-- Labels / Tags --%>
         <%= if @available_tags != [] do %>
           <div>
-            <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+            <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
               Labels
             </h3>
             <div class="space-y-1.5">
               <%= for tag <- @available_tags do %>
-                <label class="flex items-center gap-3 cursor-pointer py-0.5 group">
+                <label class="group flex cursor-pointer items-center gap-3 py-0.5">
                   <input
                     type="checkbox"
-                    class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                    class="checkbox checkbox-primary checkbox-sm focus-ring flex-shrink-0"
                     checked={MapSet.member?(@filter_tags, tag.name)}
                     phx-click="update_filter"
                     phx-value-field="tag"
                     phx-value-value={tag.name}
                   />
                   <div
-                    class="flex-1 h-5 rounded flex items-center px-2"
+                    class="h-5 w-8 flex-shrink-0 rounded-box border border-base-content/8"
                     style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
-                  >
-                    <span class="text-mini font-medium text-white/90 truncate">{tag.name}</span>
-                  </div>
+                  />
+                  <span class="min-w-0 flex-1 truncate text-message font-medium text-base-content/70">
+                    {tag.name}
+                  </span>
                   <button
                     type="button"
                     phx-click="cycle_tag_color"
                     phx-value-tag-id={tag.id}
-                    class="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity flex-shrink-0"
+                    class="focus-ring flex size-7 flex-shrink-0 items-center justify-center rounded-box text-base-content/45 opacity-0 transition-[background-color,color,opacity] hover:!opacity-100 hover:bg-base-content/6 hover:text-base-content/70 group-hover:opacity-60"
                     onclick="event.stopPropagation();"
                     title="Change color"
+                    aria-label={"Change color for #{tag.name}"}
                   >
-                    <.icon name="hero-swatch-mini" class="size-3.5 text-base-content/50" />
+                    <.icon name="hero-swatch-mini" class="size-3.5" />
                   </button>
                 </label>
               <% end %>
@@ -194,7 +199,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
 
         <%!-- Activity --%>
         <div>
-          <h3 class="text-mini font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+          <h3 class="mb-2 text-mini font-semibold uppercase tracking-normal text-base-content/40">
             Activity
           </h3>
           <div class="space-y-0.5">
@@ -204,16 +209,16 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                   {"Active in the last four weeks", "four_weeks", :four_weeks},
                   {"Without activity in the last four weeks", "inactive", :inactive}
                 ] do %>
-              <label class="flex items-center gap-3 cursor-pointer py-1.5 hover:text-base-content transition-colors">
+              <label class="flex cursor-pointer items-center gap-3 py-1.5 transition-colors hover:text-base-content">
                 <input
                   type="checkbox"
-                  class="checkbox checkbox-sm checkbox-primary flex-shrink-0"
+                  class="checkbox checkbox-primary checkbox-sm focus-ring flex-shrink-0"
                   checked={@filter_activity == atom}
                   phx-click="update_filter"
                   phx-value-field="activity"
                   phx-value-value={value}
                 />
-                <span class="text-sm text-base-content/70">{label}</span>
+                <span class="text-message text-base-content/70">{label}</span>
               </label>
             <% end %>
           </div>
@@ -225,10 +230,10 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
         <%= if MapSet.size(@filter_tags) >= 2 do %>
           <form phx-change="update_filter" class="flex items-center gap-2">
             <input type="hidden" name="field" value="tag_mode" />
-            <label class="text-xs text-base-content/40 flex-shrink-0">Tag match</label>
+            <label class="flex-shrink-0 text-mini text-base-content/40">Tag match</label>
             <select
               name="value"
-              class="select select-xs flex-1 bg-base-100 border-base-content/10 text-sm"
+              class="select select-xs focus-ring flex-1 border-base-content/10 bg-base-100 text-message"
             >
               <option value="or" selected={@filter_tag_mode == :or}>Any match</option>
               <option value="and" selected={@filter_tag_mode == :and}>All match</option>
@@ -238,7 +243,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
         <%= if @active_filter_count > 0 do %>
           <button
             phx-click="clear_filters"
-            class="btn btn-ghost btn-sm w-full text-base-content/40 hover:text-base-content/80"
+            class="focus-ring inline-flex min-h-[44px] w-full items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
           >
             Clear all filters
           </button>

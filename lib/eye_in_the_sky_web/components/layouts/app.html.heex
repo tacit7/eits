@@ -22,12 +22,12 @@
   </div>
   <a
     href="#main-content"
-    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-md bg-base-100 px-3 py-2 text-xs font-medium shadow"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-box bg-base-100 px-3 py-2 text-mini font-medium shadow"
   >
     Skip to main content
   </a>
 
-  <%!-- VS Code-style title bar — full-width, above rail + topbar. Desktop only.
+  <%!-- VS Code-style title bar - full-width, above rail + topbar. Desktop only.
        Drag region for the Tauri window (handler in app.js excludes interactive
        children). Traffic-light clearance via CSS gated on data-env="tauri". --%>
   <div
@@ -37,7 +37,7 @@
   >
     <%!-- Center group: history arrows + command center, absolute-centered so
          left/right content never shifts it (VS Code layout). Arrows drive
-         browser history — LiveView live navs pushState, so back/forward work
+         browser history - LiveView live navs pushState, so back/forward work
          across them; no-ops harmlessly at history ends. --%>
     <span class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
       <button
@@ -59,7 +59,7 @@
       <button
         id="vsbar-cmdcenter"
         phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-        class="flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-md border border-base-content/10 bg-base-100 text-xs text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
+        class="flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-box border border-base-content/10 bg-base-100 text-mini text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
         title="Open command palette"
         aria-label="Open command palette"
       >
@@ -73,7 +73,7 @@
     <span class="ml-auto flex items-center gap-1">
       <span
         id="vsbar-status"
-        class="hidden lg:flex items-center gap-1.5 px-2 text-[11px] text-base-content/50 select-none"
+        class="hidden lg:flex items-center gap-1.5 px-2 text-mini text-base-content/50 select-none"
         title="Server connection"
       >
         <span id="vsbar-status-dot" class="size-[7px] rounded-full bg-success"></span>
@@ -135,7 +135,7 @@
     />
 
     <div id="main-content-wrapper" class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
+      <%!-- Mobile top bar - hidden on md+ since sidebar is always visible --%>
       <header class={[
         "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100",
         assigns[:hide_mobile_header] && "hidden"
@@ -148,7 +148,7 @@
         >
           <.icon name="hero-bars-3" class="size-5" />
         </button>
-        <span class="flex-1 text-sm font-semibold text-base-content/80">Eye in the Sky</span>
+        <span class="flex-1 text-message font-semibold text-base-content/80">Eye in the Sky</span>
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
           class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
@@ -170,7 +170,7 @@
         </button>
       </header>
 
-      <%!-- Desktop top bar — hidden on mobile. Window drag + traffic-light
+      <%!-- Desktop top bar - hidden on mobile. Window drag + traffic-light
          clearance moved up to #app-vsbar. --%>
       <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
       <div
@@ -301,7 +301,7 @@
             aria-label="Sessions"
             aria-current={if mobile_nav_tab == :sessions, do: "page"}
             class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
+              "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
               if(mobile_nav_tab == :sessions,
                 do: "text-primary bg-primary/10",
                 else: "text-base-content/60"
@@ -316,7 +316,7 @@
               aria-label="Tasks"
               aria-current={if mobile_nav_tab == :tasks, do: "page"}
               class={[
-                "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
                 if(mobile_nav_tab == :tasks,
                   do: "text-primary bg-primary/10",
                   else: "text-base-content/60"
@@ -330,7 +330,7 @@
               aria-label="Notes"
               aria-current={if mobile_nav_tab == :notes, do: "page"}
               class={[
-                "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
                 if(mobile_nav_tab == :notes,
                   do: "text-primary bg-primary/10",
                   else: "text-base-content/60"
@@ -344,7 +344,7 @@
               aria-label="Project"
               aria-current={if mobile_nav_tab == :project, do: "page"}
               class={[
-                "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
                 if(mobile_nav_tab == :project,
                   do: "text-primary bg-primary/10",
                   else: "text-base-content/60"
@@ -359,7 +359,7 @@
               aria-label="Notifications"
               aria-current={if mobile_nav_tab == :notifications, do: "page"}
               class={[
-                "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
                 if(mobile_nav_tab == :notifications,
                   do: "text-primary bg-primary/10",
                   else: "text-base-content/60"
@@ -409,7 +409,7 @@
               type="text"
               data-palette-input
               placeholder="Search pages, projects, and commands..."
-              class="w-full h-10 rounded-lg border border-base-content/10 bg-base-100 px-3 text-base focus:outline-none focus:border-primary/40"
+              class="w-full h-10 rounded-box border border-base-content/10 bg-base-100 px-3 text-message focus:outline-none focus:border-primary/40"
             />
           </div>
           <div
@@ -450,7 +450,7 @@
        for free; the hook fills title/value and resolves on the `close` event. --%>
   <dialog id="ctx-rename-dialog" phx-update="ignore" class="modal modal-bottom sm:modal-middle">
     <div class="modal-box max-w-sm">
-      <h3 class="text-base font-semibold mb-3" data-rename-title>Rename</h3>
+      <h3 class="text-message font-semibold mb-3" data-rename-title>Rename</h3>
       <form method="dialog" data-rename-form>
         <label for="ctx-rename-input" class="sr-only">New name</label>
         <input

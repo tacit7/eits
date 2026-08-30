@@ -88,7 +88,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   the native `.indeterminate` DOM property in sync with `data-indeterminate`.
   When `id` is nil, renders a plain checkbox without a hook.
 
-  The `checkbox_area` attr adds `data-checkbox-area="true"` to the outer label —
+  The `checkbox_area` attr adds `data-checkbox-area="true"` to the outer label -
   used by the `ShiftSelect` hook to detect checkbox clicks for range selection.
   """
   attr :id, :string, default: nil
@@ -199,8 +199,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :subtitle, :string, default: nil
   attr :class, :string, default: "py-12 text-center"
   attr :icon_class, :string, default: "mx-auto h-12 w-12 text-base-content/40"
-  attr :title_class, :string, default: "mt-2 text-sm font-medium text-base-content"
-  attr :subtitle_class, :string, default: "mt-1 text-sm text-base-content/60"
+  attr :title_class, :string, default: "mt-2 text-message font-medium text-base-content"
+  attr :subtitle_class, :string, default: "mt-1 text-message text-base-content/60"
 
   slot :icon_slot
   slot :subtitle_slot
@@ -346,7 +346,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           id={@id}
           name={@name}
           class={[
-            @class || "w-full textarea text-base",
+            @class || "w-full textarea text-message",
             @errors != [] && (@error_class || "textarea-error")
           ]}
           {@rest}
@@ -369,7 +369,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            @class || "w-full input text-base",
+            @class || "w-full input text-message",
             @errors != [] && (@error_class || "input-error")
           ]}
           {@rest}
@@ -383,7 +383,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
+    <p class="mt-1.5 flex gap-2 items-center text-message text-error">
       <.icon name="hero-exclamation-circle" class="size-5" />
       {render_slot(@inner_block)}
     </p>
@@ -404,7 +404,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         <h1 class="text-lg font-semibold leading-8">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="text-sm text-base-content/70">
+        <p :if={@subtitle != []} class="text-message text-base-content/70">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -531,7 +531,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   # Lucide icons, rendered as inline SVG. Use these only where Heroicons has no
-  # icon matching the concept — otherwise prefer `<.icon name="hero-..." />`.
+  # icon matching the concept; otherwise prefer `<.icon name="hero-..." />`.
   attr :name, :string, required: true
   attr :class, :string, default: "size-4"
 
@@ -716,7 +716,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         phx-click={@on_click}
         aria-label={@aria_label}
         class={[
-          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box transition-all focus-visible:outline-none focus-visible:ring-2",
           @show_on_hover && hover_reveal_class(@hover_group),
           color_classes(@color),
           @class
@@ -732,7 +732,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       phx-click={@on_click}
       aria-label={@aria_label}
       class={[
-        "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+        "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box transition-all focus-visible:outline-none focus-visible:ring-2",
         @show_on_hover && hover_reveal_class(@hover_group),
         color_classes(@color),
         @class
@@ -775,7 +775,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   ## Examples
 
       <.form_field label="Title">
-        <input type="text" name="title" class="input input-bordered text-base" />
+        <input type="text" name="title" class="input input-bordered text-message" />
       </.form_field>
 
       <.form_field label="Budget" hint="Optional">
@@ -811,7 +811,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def detail_label(assigns) do
     ~H"""
-    <label class="text-mini font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+    <label class="text-mini font-medium text-base-content/40 uppercase tracking-normal mb-1.5 block">
       {@text}
     </label>
     """
@@ -927,18 +927,18 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   Renders a search form with a magnifying glass icon on the left.
 
   Supports two sizes:
-  - `"sm"` (default) — page-level search bars (`input-sm min-h-[44px]`)
-  - `"xs"` — compact top-bar search bars (`input-xs h-7 text-xs`)
+  - `"sm"` (default) - page-level search bars (`input-sm min-h-[44px]`)
+  - `"xs"` - compact top-bar search bars (`input-xs h-7 text-mini`)
 
   ## Examples
 
-      <.search_bar id="agent-search" placeholder="Search agents…" value={@query} />
-      <.search_bar id="top-bar-search" size="xs" label="Search sessions" placeholder="Search…" value={@search_query || ""} class="flex-1 max-w-xs" />
+      <.search_bar id="agent-search" placeholder="Search agents..." value={@query} />
+      <.search_bar id="top-bar-search" size="xs" label="Search sessions" placeholder="Search..." value={@search_query || ""} class="flex-1 max-w-xs" />
   """
   attr :id, :string, required: true
   attr :size, :string, default: "sm"
   attr :label, :string, default: nil
-  attr :placeholder, :string, default: "Search…"
+  attr :placeholder, :string, default: "Search..."
   attr :value, :string, default: ""
   attr :on_change, :string, default: "search"
   attr :on_submit, :string, default: nil
@@ -976,8 +976,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
           "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
           if(@size == "xs",
-            do: "input-xs pl-8 h-7 text-xs",
-            else: "input-sm pl-9 min-h-[44px] text-base"
+            do: "input-xs pl-8 h-7 text-mini",
+            else: "input-sm pl-9 min-h-[44px] text-message"
           )}
       />
     </form>
@@ -1103,7 +1103,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   @doc """
   Renders a pill tab container. Each tab is declared with the `:item` slot.
 
-  `value_key` controls which `phx-value-*` attribute is emitted — default is `"tab"`.
+  `value_key` controls which `phx-value-*` attribute is emitted; default is `"tab"`.
   Supported values: `"tab"`, `"filter"`, `"type"`, `"by"`.
 
   Per-item `active_class` overrides the default active styling (useful for coloured status tabs).
@@ -1136,7 +1136,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def tab_pills(assigns) do
     ~H"""
-    <div class={["flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5 shrink-0", @class]}>
+    <div class={["flex items-center gap-0.5 bg-base-200/40 rounded-box p-0.5 shrink-0", @class]}>
       <%= for item <- @item do %>
         <button
           type="button"
@@ -1146,7 +1146,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           phx-value-type={if @value_key == "type", do: item[:value]}
           phx-value-by={if @value_key == "by", do: item[:value]}
           class={[
-            "px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
+            "px-2.5 py-1 rounded-box text-mini font-medium transition-all duration-150",
             if(item[:active],
               do: item[:active_class] || "bg-base-100 text-base-content/90 shadow-sm",
               else: "text-base-content/45 hover:text-base-content/65"
@@ -1244,9 +1244,15 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_color(:waiting), do: "bg-warning"
   defp status_dot_color(:pending), do: "bg-warning"
   defp status_dot_color(:completed), do: "bg-base-content/15"
-  defp status_dot_color(:failed), do: "bg-base-content/15"
+  defp status_dot_color(:failed), do: "bg-error"
+  defp status_dot_color(:failed_billing), do: "bg-error"
+  defp status_dot_color(:failed_auth), do: "bg-error"
+  defp status_dot_color(:failed_rate_limit), do: "bg-error"
+  defp status_dot_color(:failed_timeout), do: "bg-error"
+  defp status_dot_color(:failed_retry_exhausted), do: "bg-error"
+  defp status_dot_color(:failed_model), do: "bg-error"
   defp status_dot_color(:stopped), do: "bg-base-content/15"
-  defp status_dot_color(:compacting), do: "bg-orange-500"
+  defp status_dot_color(:compacting), do: "bg-warning"
 
   defp status_dot_color(s) when is_binary(s) do
     case s do
@@ -1256,9 +1262,15 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       "waiting" -> "bg-warning"
       "pending" -> "bg-warning"
       "completed" -> "bg-base-content/15"
-      "failed" -> "bg-base-content/15"
+      "failed" -> "bg-error"
+      "failed_billing" -> "bg-error"
+      "failed_auth" -> "bg-error"
+      "failed_rate_limit" -> "bg-error"
+      "failed_timeout" -> "bg-error"
+      "failed_retry_exhausted" -> "bg-error"
+      "failed_model" -> "bg-error"
       "stopped" -> "bg-base-content/15"
-      "compacting" -> "bg-orange-500"
+      "compacting" -> "bg-warning"
       _ -> "bg-base-content/25"
     end
   end

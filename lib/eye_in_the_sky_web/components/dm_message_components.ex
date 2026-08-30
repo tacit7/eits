@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
   def message_tier(message) do
     stream_type = get_in(message.metadata || %{}, ["stream_type"])
-    is_tool_event = stream_type in ["tool_result", "tool_use", "output", "bash"]
+    is_tool_event = stream_type in ["tool_result", "tool_use", "output", "bash", "thinking"]
 
     body = message.body || ""
     segments = parse_body_segments(body)
@@ -82,12 +82,12 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <%= if @metrics_text != "" or @cache_pct do %>
       <div class="mt-1 px-1 flex items-center gap-0">
         <%= if @metrics_text != "" do %>
-          <span class="text-[11px] font-mono tabular-nums text-base-content/40">
+          <span class="text-mini font-mono tabular-nums text-base-content/40">
             {@metrics_text}
           </span>
         <% end %>
         <%= if @cache_pct do %>
-          <span class="inline-flex items-center gap-0.5 text-[11px] font-mono tabular-nums text-base-content/40">
+          <span class="inline-flex items-center gap-0.5 text-mini font-mono tabular-nums text-base-content/40">
             <%= if @metrics_text != "" do %>
               ·
             <% end %>
@@ -164,7 +164,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     <%= if @attachments != [] do %>
       <div class="mt-2 space-y-1">
         <%= for attachment <- @attachments do %>
-          <div class="flex items-center gap-2 rounded-md bg-base-content/[0.04] px-2.5 py-1.5 text-mini hover:bg-base-content/[0.08] transition-colors group">
+          <div class="flex items-center gap-2 rounded-box bg-base-content/[0.04] px-2.5 py-1.5 text-mini hover:bg-base-content/[0.08] transition-colors group">
             <.icon name="hero-paper-clip" class="size-3 text-base-content/30" />
             <span class="text-base-content/60 truncate">{attachment.original_filename}</span>
             <%= if attachment.size_bytes do %>
@@ -197,6 +197,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   attr :flat, :boolean, default: false
   attr :extra_id, :any, default: nil
   attr :search_query, :string, default: ""
+  attr :show_thinking_blocks, :boolean, default: false
 
   def message_body(assigns) do
     raw_body = assigns.message.body || ""
@@ -236,6 +237,13 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     hook_name = get_in(assigns.message.metadata || %{}, ["hook_name"])
     exit_code = get_in(assigns.message.metadata || %{}, ["exit_code"])
 
+    failure_title =
+      get_in(assigns.message.metadata || %{}, ["error_title"]) || codex_failure_title(stream_type)
+
+    failure_badges =
+      assigns.message.metadata
+      |> codex_failure_badges()
+
     assigns =
       assigns
       |> assign(:segments, segments)
@@ -247,6 +255,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       |> assign(:bash_body, body)
       |> assign(:hook_name, hook_name)
       |> assign(:exit_code, exit_code)
+      |> assign(:failure_title, failure_title)
+      |> assign(:failure_badges, failure_badges)
 
     ~H"""
     <div class={[
@@ -255,7 +265,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
       @compact && @stream_type != "tool_result" && "mt-0.5"
     ]}>
       <%= if @stream_type == "hook_failure" do %>
-        <div class="flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-2.5 py-2">
+        <div class="flex items-start gap-2 rounded-box bg-warning/10 border border-warning/20 px-2.5 py-2">
           <.icon
             name="hero-exclamation-triangle"
             class="size-3.5 text-warning/80 mt-0.5 flex-shrink-0"
@@ -314,9 +324,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
         </div>
       <% end %>
       <details
-        :if={@thinking && @thinking != ""}
+        :if={@show_thinking_blocks && @thinking && @thinking != ""}
         id={"#{@id_prefix}thinking-#{@message.id}"}
-        class="group rounded border-l-2 border-primary/50 bg-[var(--surface-code)] overflow-hidden"
+        class="group overflow-hidden rounded-box border border-primary/15 bg-[var(--surface-code)]"
         phx-hook="ExpandOnSearch"
         data-thinking={@thinking}
         data-query={@search_query}
@@ -334,7 +344,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
             }
           />
           <span class={
-            "font-mono font-semibold text-primary/60 uppercase tracking-wide " <>
+            "font-mono font-semibold text-primary/60 uppercase tracking-normal " <>
               if(@compact, do: "text-micro", else: "text-mini")
           }>
             Thinking
@@ -360,11 +370,47 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
               do:
                 "font-mono text-micro text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed",
               else:
-                "font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed"
+                "font-mono text-mini text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed"
           }>{@thinking}</pre>
         </div>
       </details>
       <%= cond do %>
+        <% @stream_type in ["codex_turn_failed", "codex_error"] -> %>
+          <div class={[
+            "flex items-start gap-2 rounded-box border px-2.5 py-2",
+            @stream_type == "codex_turn_failed" && "bg-error/10 border-error/20",
+            @stream_type == "codex_error" && "bg-warning/10 border-warning/20"
+          ]}>
+            <.icon
+              name="hero-exclamation-triangle"
+              class={
+                "size-4 mt-0.5 flex-shrink-0 " <>
+                  if(@stream_type == "codex_turn_failed",
+                    do: "text-error/80",
+                    else: "text-warning/80"
+                  )
+              }
+            />
+            <div class="min-w-0 space-y-1">
+              <p class={[
+                "text-mini font-mono font-semibold uppercase tracking-normal",
+                @stream_type == "codex_turn_failed" && "text-error/80",
+                @stream_type == "codex_error" && "text-warning/80"
+              ]}>
+                {@failure_title}
+              </p>
+              <div :if={@failure_badges != []} class="flex flex-wrap gap-1">
+                <span
+                  :for={badge <- @failure_badges}
+                  class="rounded bg-base-content/[0.06] px-1.5 py-0.5 text-micro font-mono text-base-content/45"
+                >
+                  {badge}
+                </span>
+              </div>
+              <pre class="text-mini text-base-content/65 font-mono whitespace-pre-wrap break-words overflow-x-auto">{@bash_body}</pre>
+            </div>
+          </div>
+        <% @stream_type == "thinking" -> %>
         <% @stream_type in ["tool_result", "output"] -> %>
           <%!-- "output" is a legacy alias for tool_result — both route to the output widget. --%>
           <.tool_result_body body={@message.body} compact={@compact} flat={@flat} />
@@ -381,7 +427,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
                   id={"msg-body-#{@id_prefix}#{@message.id}-#{idx}"}
                   class={[
                     "dm-markdown leading-relaxed text-base-content/85",
-                    if(@compact, do: "text-xs", else: "text-sm")
+                    if(@compact, do: "text-mini", else: "text-message")
                   ]}
                   phx-hook="MarkdownMessage"
                   data-raw-body={text}
@@ -395,4 +441,19 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     </div>
     """
   end
+
+  defp codex_failure_title("codex_turn_failed"), do: "Codex turn failed"
+  defp codex_failure_title("codex_error"), do: "Codex error"
+  defp codex_failure_title(_stream_type), do: nil
+
+  defp codex_failure_badges(metadata) when is_map(metadata) do
+    [
+      metadata["status"] && "HTTP #{metadata["status"]}",
+      metadata["error_type"],
+      metadata["model"] && "model #{metadata["model"]}"
+    ]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp codex_failure_badges(_metadata), do: []
 end

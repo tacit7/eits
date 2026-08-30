@@ -26,17 +26,17 @@ export function createHintOverlay(items: HTMLElement[], labels: string[]): HTMLE
       "position:fixed",
       `top:${rect.top + 4}px`,
       `left:${rect.left + 4}px`,
-      "background:var(--color-warning,#f59e0b)",
-      "color:var(--color-warning-content,#000)",
-      "font-family:monospace",
-      "font-size:11px",
+      "background:var(--color-warning)",
+      "color:var(--color-warning-content)",
+      "font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+      "font-size:var(--text-mini)",
       "font-weight:700",
       "line-height:1",
       "padding:1px 4px",
-      "border-radius:3px",
+      "border-radius:var(--radius-selector)",
       "pointer-events:none",
       "z-index:9999",
-      "letter-spacing:0.05em",
+      "letter-spacing:0",
     ].join(";")
     overlay.appendChild(badge)
   })

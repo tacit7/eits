@@ -189,23 +189,6 @@
     flex-shrink: 0;
   }
 
-  /* active-dot and error-dot wired when LiveView passes agent_statuses and channel_errors props */
-  .active-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #22c55e;
-    flex-shrink: 0;
-  }
-
-  .error-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #ef4444;
-    flex-shrink: 0;
-  }
-
   .sidebar-footer {
     padding: 0.75rem;
   }

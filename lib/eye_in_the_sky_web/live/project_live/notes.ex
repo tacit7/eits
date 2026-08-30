@@ -246,7 +246,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   end
 
   def handle_info({:editor_sync_failed, :note, _id, _reason}, socket) do
-    {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+    {:noreply, put_flash(socket, :error, "Editor sync failed | check your editor")}
   end
 
   defp load_notes(socket) do
@@ -323,13 +323,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       <button
         type="button"
         phx-click="open_quick_note_modal"
-        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
+        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-box text-mini font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
       >
         <.icon name="hero-bolt" class="size-3.5" /> Quick Note
       </button>
       <.link
         navigate={@new_href || "/notes/new"}
-        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
+        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-box text-mini font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
       >
         <.icon name="hero-plus" class="size-3.5" /> New Note
       </.link>
@@ -337,7 +337,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         type="button"
         phx-click="toggle_starred_filter"
         aria-label={if @starred_filter, do: "Remove starred filter", else: "Filter by starred"}
-        class={"flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-lg text-xs font-medium transition-colors " <>
+        class={"flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-box text-mini font-medium transition-colors " <>
           if(@starred_filter,
             do: "bg-warning/10 text-warning",
             else: "text-base-content/35 hover:text-base-content/50 hover:bg-base-200/40"
@@ -353,7 +353,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         <select
           id="notes-type-filter-mobile"
           name="value"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="all" selected={@type_filter == "all"}>All Types</option>
           <option value="session" selected={@type_filter == "session"}>Session</option>
@@ -368,7 +368,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
         <select
           id="notes-sort-mobile"
           name="value"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="newest" selected={@sort_by == "newest"}>Newest</option>
           <option value="oldest" selected={@sort_by == "oldest"}>Oldest</option>
@@ -408,7 +408,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
     >
       <div class="modal-box max-w-md p-0 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
-          <h2 class="text-sm font-semibold text-base-content">Quick Note</h2>
+          <h2 class="text-message font-semibold text-base-content">Quick Note</h2>
           <button
             type="button"
             phx-click="close_quick_note_modal"
@@ -427,7 +427,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-title-proj"
               required
               placeholder="Title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-base min-h-[44px]"
+              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message min-h-[44px]"
               autocomplete="off"
               autofocus
             />
@@ -439,13 +439,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
               id="qn-body-proj"
               rows="4"
               placeholder="Note content..."
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none text-base"
+              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 resize-none text-message"
             ></textarea>
           </div>
           <label class="flex items-center gap-2 cursor-pointer select-none">
             <input type="checkbox" name="starred" value="1" class="checkbox checkbox-sm" />
             <.icon name="hero-star" class="size-3.5 text-warning/70" />
-            <span class="text-sm text-base-content/70">Star this note</span>
+            <span class="text-message text-base-content/70">Star this note</span>
           </label>
           <div class="flex justify-end gap-2 pt-1">
             <.form_actions

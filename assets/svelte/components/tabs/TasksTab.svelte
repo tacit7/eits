@@ -8,6 +8,7 @@
   import PencilSvg from 'heroicons/24/outline/pencil-square.svg'
   import TrashSvg from 'heroicons/24/outline/trash.svg'
   import ClipboardSvg from 'heroicons/24/outline/clipboard-document.svg'
+  import FlagSvg from 'heroicons/24/outline/flag.svg'
 
   export let tasks = []
   export const live = undefined
@@ -16,10 +17,10 @@
   let hoveredTask = null
 
   function getPriorityFlag(priority) {
-    if (priority >= 70) return { color: '#d1453b', icon: '🚩', label: 'P1' }
-    if (priority >= 40) return { color: '#eb8909', icon: '🔶', label: 'P2' }
-    if (priority >= 20) return { color: '#246fe0', icon: '🔵', label: 'P3' }
-    return { color: '#808080', icon: '⚪', label: 'P4' }
+    if (priority >= 70) return { tone: 'text-error', label: 'P1' }
+    if (priority >= 40) return { tone: 'text-warning', label: 'P2' }
+    if (priority >= 20) return { tone: 'text-info', label: 'P3' }
+    return { tone: 'text-base-content/40', label: 'P4' }
   }
 
   function isOverdue(dateStr) {
@@ -77,28 +78,27 @@
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-normal text-base-content group-hover:text-base-content/90 {task.completed_at ? 'line-through opacity-60' : ''}">
+                  <h3 class="text-message font-normal text-base-content group-hover:text-base-content/90 {task.completed_at ? 'line-through opacity-60' : ''}">
                     {task.title}
                   </h3>
                   {#if task.priority >= 20}
                     <span
-                      class="flex-shrink-0 text-xs"
-                      style="color: {priority.color}"
+                      class="flex-shrink-0 text-nano {priority.tone}"
                       title="{priority.label} priority"
                     >
-                      🚩
+                      <span class="w-3.5 h-3.5 block">{@html FlagSvg}</span>
                     </span>
                   {/if}
                 </div>
 
                 {#if task.description && selectedTask?.id === task.id}
-                  <p class="text-xs text-base-content/60 mt-1 whitespace-pre-wrap">
+                  <p class="text-message text-base-content/60 mt-1 whitespace-pre-wrap">
                     {task.description}
                   </p>
                 {/if}
 
                 <!-- Task Meta -->
-                <div class="flex items-center gap-3 mt-2 text-xs text-base-content/50">
+                <div class="flex items-center gap-3 mt-2 text-mini text-base-content/50">
                   <!-- Task ID Badge -->
                   <button
                     class="badge badge-ghost badge-xs hover:badge-primary cursor-pointer font-mono transition-colors"
@@ -163,8 +163,8 @@
         <div class="text-base-content/40 mb-2">
           <span class="w-12 h-12 mx-auto block">{@html ClipboardSvg}</span>
         </div>
-        <h3 class="text-sm font-medium text-base-content/60 mb-1">No tasks yet</h3>
-        <p class="text-xs text-base-content/40">Click "New Task" to get started</p>
+        <h3 class="text-message font-medium text-base-content/60 mb-1">No tasks yet</h3>
+        <p class="text-mini text-base-content/40">Click "New Task" to get started</p>
       </div>
     {/if}
   </div>

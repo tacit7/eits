@@ -18,13 +18,13 @@ defmodule EyeInTheSkyWeb.IAMLive.IAMComponents do
   def iam_offline_banner(assigns) do
     ~H"""
     <%= if @hooks_status == :not_installed do %>
-      <div class="flex items-center gap-3 rounded-lg border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
+      <div class="flex items-center gap-3 rounded-box border border-error/40 bg-error/10 px-4 py-3 text-message text-error">
         <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
         <div class="flex-1">
           <span class="font-semibold">IAM OFFLINE</span>
           <span class="ml-2 text-error/80">
-            No policy enforcement active — all tool calls allowed. Install the IAM hook in
-            <code class="font-mono text-xs">~/.claude/settings.json</code>
+            No policy enforcement active | all tool calls allowed. Install the IAM hook in
+            <code class="font-mono text-mini">~/.claude/settings.json</code>
             to enable enforcement.
           </span>
         </div>

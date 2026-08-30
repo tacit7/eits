@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
           <button
             :if={@copy_text}
             type="button"
-            class="tool-copy-btn ml-auto shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 p-0.5 rounded text-base-content/25 hover:text-base-content/55"
+            class="tool-copy-btn ml-auto shrink-0 rounded-box p-0.5 text-base-content/25 opacity-0 transition-opacity duration-150 hover:text-base-content/55 focus-ring group-hover:opacity-100 [@media(hover:none)]:opacity-100"
             data-copy-btn
             data-copy-text={@copy_text}
             aria-label={@copy_title}
@@ -50,20 +50,20 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         if @compact,
           do: "group my-px",
           else:
-            "group rounded-md border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
+            "group rounded-box border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
       }>
         <summary class={
           if @compact,
             do:
-              "flex items-center gap-1.5 py-0.5 px-1 rounded cursor-pointer select-none list-none hover:bg-base-content/[0.04] transition-colors",
+              "flex cursor-pointer list-none items-center gap-1.5 rounded-box px-1 py-0.5 transition-colors hover:bg-base-content/[0.04] focus-ring",
             else:
-              "flex items-center gap-2 px-2.5 py-1.5 cursor-pointer select-none list-none hover:bg-[var(--border-subtle)] transition-colors"
+              "flex cursor-pointer list-none items-center gap-2 px-2.5 py-1.5 transition-colors hover:bg-[var(--border-subtle)] focus-ring"
         }>
           {render_slot(@summary)}
           <button
             :if={@compact && @copy_text}
             type="button"
-            class="tool-copy-btn shrink-0 opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-150 p-0.5 rounded text-base-content/25 hover:text-base-content/55"
+            class="tool-copy-btn shrink-0 rounded-box p-0.5 text-base-content/25 opacity-0 transition-opacity duration-150 hover:text-base-content/55 focus-ring group-hover:opacity-100 [@media(hover:none)]:opacity-100"
             data-copy-btn
             data-copy-text={@copy_text}
             aria-label={@copy_title}
@@ -141,9 +141,9 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         <span class={
           if @compact,
             do:
-              "text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-wide",
+              "text-micro font-mono font-semibold text-base-content/30 flex-shrink-0 uppercase tracking-normal",
             else:
-              "text-mini font-mono font-semibold text-base-content/40 uppercase tracking-wide flex-shrink-0"
+              "text-mini font-mono font-semibold text-base-content/40 uppercase tracking-normal flex-shrink-0"
         }>
           Output
         </span>
@@ -155,10 +155,10 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         </span>
       </:summary>
       <%= if @compact do %>
-        <pre class="font-mono text-micro text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
+        <pre class="font-mono text-micro text-[var(--code-text)] whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto">{@body}</pre>
       <% else %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
+          <pre class="font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto">{@body}</pre>
         </div>
       <% end %>
     </.tool_card_shell>
@@ -199,21 +199,21 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         <%= if @compact do %>
           <%!-- Claudette-style compact: colored text badge + inline detail --%>
           <span class={[
-            "text-[11px] font-mono font-semibold px-1.5 py-px rounded shrink-0 leading-none",
+            "shrink-0 rounded-box px-1.5 py-px font-mono text-mini font-semibold leading-none",
             tool_badge_class(@name)
           ]}>
             {@label}
           </span>
           <span
             :if={@detail != "" && !@wrap_detail}
-            class="text-[11px] font-mono text-base-content/30 truncate flex-1 min-w-0"
+            class="min-w-0 flex-1 truncate font-mono text-mini text-base-content/30"
           >
             {@detail}
           </span>
         <% else %>
           <%!-- Expanded card: keep icon + uppercase label --%>
           <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
-          <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-wide flex-shrink-0">
+          <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-normal flex-shrink-0">
             {@label}
           </span>
           <span
@@ -239,56 +239,82 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   attr :input, :any, default: nil
 
   def tool_widget_body(assigns) do
-    assigns = assign(assigns, :body_type, classify_body_type(assigns))
+    assigns =
+      assigns
+      |> assign(:body_type, classify_body_type(assigns))
+      |> assign(:command_output, command_output(assigns.input))
+      |> assign(:exit_code, command_exit_code(assigns.input))
 
     ~H"""
     <%= case @body_type do %>
       <% :bash -> %>
-        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-64 overflow-y-auto">{(@input && @input["command"]) || @detail}</pre>
+        <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1.5">
+          <div :if={@exit_code != nil} class="flex items-center gap-1.5">
+            <span class={[
+              "rounded px-1.5 py-0.5 text-micro font-mono font-semibold",
+              @exit_code == 0 && "bg-success/10 text-success/80",
+              @exit_code != 0 && "bg-error/10 text-error/80"
+            ]}>
+              exit {@exit_code}
+            </span>
+          </div>
+          <pre class="bg-[var(--surface-code)] rounded-box px-2 py-1.5 font-mono text-mini text-[var(--code-text)] whitespace-pre-wrap break-words leading-relaxed max-h-64 overflow-y-auto">{(@input && @input["command"]) || @detail}</pre>
+          <div
+            :if={@command_output not in [nil, ""]}
+            class={[
+              "rounded-box border px-2 py-1.5",
+              @exit_code not in [nil, 0] && "border-error/15 bg-error/[0.04]",
+              @exit_code in [nil, 0] && "border-base-content/[0.06] bg-base-content/[0.025]"
+            ]}
+          >
+            <div class="mb-1 text-micro font-mono font-semibold uppercase tracking-normal text-base-content/35">
+              Output
+            </div>
+            <pre class="max-h-56 overflow-y-auto whitespace-pre-wrap break-words font-mono text-micro leading-relaxed text-[var(--code-text)]">{@command_output}</pre>
+          </div>
         </div>
       <% :edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1.5">
-          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-error/10 text-error/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["old_string"] || "", 0..800), "─")}</pre>
-          <pre class="bg-success/10 text-success/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["new_string"] || "", 0..800), "+")}</pre>
+          <div class="font-mono text-mini text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-error/10 text-error/80 rounded-box px-2 py-1 font-mono text-mini whitespace-pre-wrap break-words leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["old_string"] || "", 0..800), "─")}</pre>
+          <pre class="bg-success/10 text-success/80 rounded-box px-2 py-1 font-mono text-mini whitespace-pre-wrap break-words leading-relaxed max-h-32 overflow-y-auto">{prefix_lines(String.slice(@input["new_string"] || "", 0..800), "+")}</pre>
         </div>
       <% :multi_edit -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-2">
-          <div class="font-mono text-xs text-base-content/40 pb-0.5">{@input["file_path"]}</div>
+          <div class="font-mono text-mini text-base-content/40 pb-0.5">{@input["file_path"]}</div>
           <%= for {edit, idx} <- Enum.with_index(@input["edits"] || []) do %>
             <div class="space-y-1">
               <div
                 :if={length(@input["edits"] || []) > 1}
-                class="text-micro font-mono text-base-content/25 uppercase tracking-wide"
+                class="text-micro font-mono text-base-content/25 uppercase tracking-normal"
               >
                 edit {idx + 1}
               </div>
-              <pre class="bg-error/10 text-error/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["old_string"] || "", 0..400), "─")}</pre>
-              <pre class="bg-success/10 text-success/80 rounded px-2 py-1 font-mono text-xs whitespace-pre-wrap break-all leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["new_string"] || "", 0..400), "+")}</pre>
+              <pre class="bg-error/10 text-error/80 rounded-box px-2 py-1 font-mono text-mini whitespace-pre-wrap break-words leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["old_string"] || "", 0..400), "─")}</pre>
+              <pre class="bg-success/10 text-success/80 rounded-box px-2 py-1 font-mono text-mini whitespace-pre-wrap break-words leading-relaxed max-h-24 overflow-y-auto">{prefix_lines(String.slice(edit["new_string"] || "", 0..400), "+")}</pre>
             </div>
           <% end %>
         </div>
       <% :write -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)] space-y-1">
-          <div class="font-mono text-xs text-[var(--text-ghost)] pb-0.5">{@input["file_path"]}</div>
-          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 font-mono text-xs text-[var(--code-text)] whitespace-pre-wrap break-all leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..800)}{if String.length(@input["content"] || "") > 800, do: "\n…", else: ""}</pre>
+          <div class="font-mono text-mini text-[var(--text-ghost)] pb-0.5">{@input["file_path"]}</div>
+          <pre class="bg-[var(--surface-code)] rounded-box px-2 py-1.5 font-mono text-mini text-[var(--code-text)] whitespace-pre-wrap break-words leading-relaxed max-h-48 overflow-y-auto">{String.slice(@input["content"] || "", 0..800)}{if String.length(@input["content"] || "") > 800, do: "\n...", else: ""}</pre>
         </div>
       <% :read_glob -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="font-mono text-xs text-[var(--code-text)] bg-[var(--surface-code)] rounded px-2 py-1.5 whitespace-pre-wrap break-all">{@input["file_path"] || @input["pattern"] || @detail}</pre>
+          <pre class="font-mono text-mini text-[var(--code-text)] bg-[var(--surface-code)] rounded-box px-2 py-1.5 whitespace-pre-wrap break-words">{@input["file_path"] || @input["pattern"] || @detail}</pre>
         </div>
       <% :speak -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="bg-[var(--surface-code)] rounded px-2 py-1.5 text-mini text-[var(--text-secondary)] whitespace-pre-wrap break-all leading-relaxed">{@detail}</pre>
+          <pre class="bg-[var(--surface-code)] rounded-box px-2 py-1.5 text-mini text-[var(--text-secondary)] whitespace-pre-wrap break-words leading-relaxed">{@detail}</pre>
         </div>
       <% :json -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
+          <pre class="font-mono text-mini text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed max-h-40 overflow-y-auto">{Jason.encode!(@input, pretty: true)}</pre>
         </div>
       <% :text -> %>
         <div class="px-2.5 pb-2 pt-1 border-t border-[var(--border-subtle)]">
-          <pre class="font-mono text-xs text-[var(--text-muted)] whitespace-pre-wrap break-all leading-relaxed">{@rest}</pre>
+          <pre class="font-mono text-mini text-[var(--text-muted)] whitespace-pre-wrap break-words leading-relaxed">{@rest}</pre>
         </div>
       <% :none -> %>
     <% end %>
@@ -344,6 +370,15 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   end
 
   defp text_body?(assigns), do: assigns.rest != "" and assigns.rest != assigns.detail
+
+  defp command_output(input) when is_map(input) do
+    input["output"] || input["aggregated_output"]
+  end
+
+  defp command_output(_input), do: nil
+
+  defp command_exit_code(input) when is_map(input), do: input["exit_code"]
+  defp command_exit_code(_input), do: nil
 
   # Prefix every line in text with the given marker and a space.
   defp prefix_lines("", _prefix), do: ""

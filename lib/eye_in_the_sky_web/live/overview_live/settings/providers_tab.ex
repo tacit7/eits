@@ -9,26 +9,26 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
     <div class="space-y-4">
       <section>
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider">
+          <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal">
             Providers
           </h2>
           <button
             type="button"
             phx-click="pi_refresh_models"
-            class="btn btn-sm btn-outline"
+            class="eits-action eits-action--secondary"
           >
             Refresh models
           </button>
         </div>
 
-        <div class="alert alert-info alert-soft mb-4 text-xs">
+        <div class="alert alert-info alert-soft mb-4 text-mini">
           <p>
             EITS Pi uses ~/.pi/agent/auth.json only. Environment credentials
             (including ANTHROPIC_API_KEY) are intentionally not passed into the harness.
           </p>
         </div>
 
-        <div class="text-xs text-base-content/60 mb-3">
+        <div class="text-mini text-base-content/60 mb-3">
           {model_status_line(@pi_model_status)}
         </div>
 
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
 
   defp render_providers(%{pi_providers: :loading} = assigns) do
     ~H"""
-    <div class="px-5 py-4 text-sm text-base-content/50">Loading providers…</div>
+    <div class="px-5 py-4 text-message text-base-content/50">Loading providers...</div>
     """
   end
 
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
     assigns = assign(assigns, :reason, format_reason(reason))
 
     ~H"""
-    <div class="px-5 py-4 text-sm text-error">
+    <div class="px-5 py-4 text-message text-error">
       Could not load providers: {@reason}
     </div>
     """
@@ -65,8 +65,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
     <div :for={p <- @providers} class="px-5 py-4">
       <div class="flex items-center justify-between mb-2">
         <div>
-          <p class="text-sm font-medium text-base-content">{p["label"] || p["id"]}</p>
-          <p class="text-xs text-base-content/50 mt-0.5 font-mono">{p["id"]}</p>
+          <p class="text-message font-medium text-base-content">{p["label"] || p["id"]}</p>
+          <p class="text-mini text-base-content/50 mt-0.5 font-mono">{p["id"]}</p>
         </div>
         {configured_badge(configured?(p))}
       </div>
@@ -78,7 +78,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
   defp render_provider_actions(%{p: %{"kind" => "oauth"} = _p} = assigns) do
     ~H"""
     <div class="mt-2">
-      <button type="button" class="btn btn-sm btn-outline" disabled>Sign in (Phase 3)</button>
+      <button type="button" class="eits-action eits-action--secondary" disabled>
+        Sign in (Phase 3)
+      </button>
     </div>
     """
   end
@@ -105,13 +107,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
         class="input input-bordered input-sm flex-1 font-mono min-w-[12rem]"
         disabled={@in_flight?}
       />
-      <button type="submit" class="btn btn-sm btn-primary" disabled={@in_flight?}>
-        {if @in_flight?, do: "Saving…", else: "Save"}
+      <button type="submit" class="eits-action eits-action--primary" disabled={@in_flight?}>
+        {if @in_flight?, do: "Saving...", else: "Save"}
       </button>
       <button
         :if={@configured?}
         type="button"
-        class="btn btn-sm btn-outline"
+        class="eits-action eits-action--secondary"
         phx-click="pi_clear_key"
         phx-value-provider_id={@provider_id}
         disabled={@in_flight?}
@@ -132,21 +134,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
 
   defp configured_badge(true) do
     assigns = %{}
-    ~H|<span class="badge badge-success badge-sm">configured</span>|
+    ~H|<span class="eits-chip eits-chip--success">configured</span>|
   end
 
   defp configured_badge(false) do
     assigns = %{}
-    ~H|<span class="badge badge-ghost badge-sm">not set</span>|
+
+    ~H|<span class="eits-chip eits-chip--neutral">not set</span>|
   end
 
-  defp model_status_line(:loading), do: "Model discovery: loading…"
+  defp model_status_line(:loading), do: "Model discovery: loading..."
 
   defp model_status_line({count, :fresh}) when is_integer(count),
     do: "Model discovery: #{count} model(s) cached (fresh)"
 
   defp model_status_line({count, :stale}) when is_integer(count),
-    do: "Model discovery: #{count} model(s) cached (stale — refresh)"
+    do: "Model discovery: #{count} model(s) cached (stale - refresh)"
 
   defp model_status_line(:empty), do: "Model discovery: no cached models yet"
 

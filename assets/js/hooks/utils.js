@@ -5,7 +5,7 @@ export function showToast(message, type = "info") {
   wrapper.style.transition = "opacity 0.2s"
 
   const alertEl = document.createElement("div")
-  alertEl.className = `alert alert-${type} text-sm`
+  alertEl.className = `alert alert-${type} text-message`
   alertEl.innerHTML = `<span>${message}</span>`
 
   wrapper.appendChild(alertEl)
@@ -48,7 +48,7 @@ export function showSessionFailureToast({ title, reason } = {}) {
   }
 
   const alertEl = document.createElement("div")
-  alertEl.className = "alert alert-error text-sm shadow-lg"
+  alertEl.className = "alert alert-error text-message shadow-lg"
   alertEl.setAttribute("role", "alert")
 
   const body = document.createElement("div")

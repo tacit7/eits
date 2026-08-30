@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     <%!-- Notes: quick note + starred + type + sort + search --%>
     <button
       phx-click="open_quick_note_modal"
-      class="flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"
+      class="focus-ring flex items-center gap-1 h-7 px-2.5 rounded-box text-mini font-medium text-base-content/60 hover:text-base-content hover:bg-base-content/8 transition-colors"
     >
       <.icon name="hero-bolt" class="size-3" /> Quick Note
     </button>
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
     <button
       phx-click="toggle_starred_filter"
       aria-label={if @starred_filter, do: "Remove starred filter", else: "Filter by starred"}
-      class={"flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium transition-colors " <>
+      class={"focus-ring flex items-center gap-1 h-7 px-2 rounded-box text-mini font-medium transition-colors " <>
         if(@starred_filter,
           do: "bg-warning/10 text-warning",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
@@ -56,19 +56,19 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
       data-label={Helpers.sort_label(@sort_by, sort_options(), "Newest")}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="focus-ring flex items-center gap-1 h-7 px-2 rounded-box text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort:
         <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options(), "Newest")}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-1 min-w-[120px]">
         <%= for {value, label} <- sort_options() do %>
           <li>
             <button
               phx-click="sort_notes"
               phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
+              class={"focus-ring block w-full px-3 py-1.5 text-left text-mini rounded-box hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}
@@ -93,13 +93,13 @@ defmodule EyeInTheSkyWeb.TopBar.Notes do
         placeholder="Search notes..."
         phx-debounce="300"
         autocomplete="off"
-        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-xs"
+        class="input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors input-xs pl-8 h-7 text-mini"
       />
     </form>
     <%= if @new_href do %>
       <.link
         navigate={@new_href}
-        class="flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+        class="focus-ring flex items-center gap-1 h-7 px-2.5 rounded-box text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
       >
         <.icon name="hero-plus" class="size-3" /> New Note
       </.link>

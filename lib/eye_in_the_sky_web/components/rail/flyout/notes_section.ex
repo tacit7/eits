@@ -16,10 +16,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
         <input
           type="text"
           value={@note_search}
-          placeholder="Search notes…"
+          placeholder="Search notes..."
           phx-keyup="update_note_search"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="focus-ring w-full pl-6 pr-2 py-1 text-mini bg-base-content/5 border border-base-content/10 rounded placeholder:text-base-content/30"
         />
       </div>
 
@@ -42,7 +42,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
     <.note_row :for={note <- @notes} note={note} />
     <%= if @notes == [] do %>
       <% filtering = @note_search != "" or not is_nil(@note_parent_type) %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">
         {if filtering, do: "No matching notes", else: "No notes"}
       </div>
     <% end %>
@@ -80,7 +80,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
       phx-click="open_note_detail"
       phx-value-note_id={@note.id}
       data-vim-flyout-item
-      class="w-full flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="w-full flex flex-col gap-0.5 px-3 py-2 text-mini text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box"
     >
       <span class={[
         "truncate",
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.NotesSection do
       >
         {String.slice(@note.body, 0, 60)}
       </span>
-      <span class="text-micro text-base-content/30 uppercase tracking-wide">
+      <span class="text-micro text-base-content/30 uppercase tracking-normal">
         {@note.parent_type}
       </span>
     </button>

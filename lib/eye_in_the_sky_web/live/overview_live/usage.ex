@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
             </div>
           <% @totals.failed != nil -> %>
             <div class="flex items-center justify-center py-16">
-              <p class="text-sm text-error/70">Failed to load usage data. Try refreshing.</p>
+              <p class="text-message text-error/70">Failed to load usage data. Try refreshing.</p>
             </div>
           <% true -> %>
             <.usage_totals totals={@totals.result} recalculating={@recalculating} />

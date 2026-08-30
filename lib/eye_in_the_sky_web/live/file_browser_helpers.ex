@@ -41,7 +41,7 @@ defmodule EyeInTheSkyWeb.Live.FileBrowserHelpers do
       <%= for file <- @files do %>
         <.link
           patch={@patch_fn.(file.path)}
-          class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-3 min-h-[44px]"
+          class="flex items-center gap-3 rounded-box border border-base-content/10 bg-base-100 px-3 py-3 min-h-[44px]"
         >
           <%= if file.is_dir do %>
             <.icon name="hero-folder-solid" class="size-4 text-primary shrink-0" />
@@ -49,8 +49,8 @@ defmodule EyeInTheSkyWeb.Live.FileBrowserHelpers do
             <.icon name="hero-document" class="size-4 shrink-0" />
           <% end %>
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm">{file.name}</p>
-            <p class="text-xs text-base-content/55">
+            <p class="truncate text-message">{file.name}</p>
+            <p class="text-mini text-base-content/55">
               {if file.is_dir, do: "Directory", else: format_size(file.size)}
             </p>
           </div>

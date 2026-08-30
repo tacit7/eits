@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
             class="grid grid-cols-1 md:grid-cols-5 gap-3 items-end"
           >
             <label class="form-control">
-              <span class="label-text text-xs">Agent type</span>
+              <span class="label-text text-mini">Agent type</span>
               <input
                 type="text"
                 name="filters[agent_type]"
@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
               />
             </label>
             <label class="form-control">
-              <span class="label-text text-xs">Action</span>
+              <span class="label-text text-mini">Action</span>
               <input
                 type="text"
                 name="filters[action]"
@@ -187,7 +187,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
               />
             </label>
             <label class="form-control">
-              <span class="label-text text-xs">Effect</span>
+              <span class="label-text text-mini">Effect</span>
               <select name="filters[effect]" class="select select-bordered select-sm">
                 <option value="" selected={@filters["effect"] == ""}>any</option>
                 <option value="allow" selected={@filters["effect"] == "allow"}>allow</option>
@@ -196,7 +196,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
               </select>
             </label>
             <label class="form-control">
-              <span class="label-text text-xs">Enabled</span>
+              <span class="label-text text-mini">Enabled</span>
               <select name="filters[enabled]" class="select select-bordered select-sm">
                 <option value="" selected={@filters["enabled"] == ""}>any</option>
                 <option value="true" selected={@filters["enabled"] == "true"}>enabled</option>
@@ -237,19 +237,19 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                 <% end %>
                 <%= for p <- @policies do %>
                   <tr id={"policy-#{p.id}"}>
-                    <td class="font-mono text-xs">{p.priority}</td>
+                    <td class="font-mono text-mini">{p.priority}</td>
                     <td>
                       <div class="font-medium">{p.name}</div>
                       <%= if p.system_key do %>
-                        <div class="text-xs text-base-content/60 font-mono">{p.system_key}</div>
+                        <div class="text-mini text-base-content/60 font-mono">{p.system_key}</div>
                       <% end %>
                     </td>
                     <td>
                       <span class={"badge badge-sm " <> effect_badge(p.effect)}>{p.effect}</span>
                     </td>
-                    <td class="font-mono text-xs">{p.agent_type}</td>
-                    <td class="font-mono text-xs">{p.action}</td>
-                    <td class="font-mono text-xs">{p.resource_glob || "—"}</td>
+                    <td class="font-mono text-mini">{p.agent_type}</td>
+                    <td class="font-mono text-mini">{p.action}</td>
+                    <td class="font-mono text-mini">{p.resource_glob || "-"}</td>
                     <td>
                       <button
                         type="button"

@@ -56,20 +56,20 @@ case "$hook_event_name" in
   SessionStart)
     case "$hook_source" in
       startup|clear)
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
       resume)
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-resume.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
       compact)
         run_hook "$SCRIPT_DIR/eits-session-compact.sh"
-        run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         run_hook "$SCRIPT_DIR/eits-agent-working.sh"
         ;;
       *)
         # Default to startup semantics when source is omitted/unknown, but do
         # not mark Codex busy until UserPromptSubmit arrives.
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
     esac
     ;;

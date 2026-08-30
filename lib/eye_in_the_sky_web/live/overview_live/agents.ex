@@ -111,7 +111,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
         <select
           id="agents-sort-mobile"
           name="by"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="name_asc" selected={@sort_by == "name_asc"}>Name A–Z</option>
           <option value="name_desc" selected={@sort_by == "name_desc"}>Name Z–A</option>
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
         <select
           id="agents-scope-mobile"
           name="scope"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="all" selected={@scope_filter == "all"}>All Sources</option>
           <option value="global" selected={@scope_filter == "global"}>Global</option>
@@ -153,9 +153,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
               <div class="py-0.5">
                 <div
                   class={[
-                    "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-lg transition-colors",
+                    "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-box transition-colors",
                     if(selected?,
-                      do: "bg-primary/5 border-l-2 border-primary",
+                      do: "bg-primary/5",
                       else: "hover:bg-base-200/40"
                     )
                   ]}
@@ -174,33 +174,33 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                       class={"size-3.5 flex-shrink-0 " <>
                         if(selected?, do: "text-primary", else: "text-base-content/35")}
                     />
-                    <code class={"text-sm font-semibold " <>
+                    <code class={"text-message font-semibold " <>
                       if(selected?, do: "text-primary", else: "text-base-content/85")}>
                       {agent.name}
                     </code>
                   </div>
                   <%!-- Description --%>
-                  <p class="text-xs text-base-content/55 leading-snug pl-5 line-clamp-2">
+                  <p class="text-mini text-base-content/55 leading-snug pl-5 line-clamp-2">
                     {agent.description}
                   </p>
                   <%!-- Metadata row --%>
                   <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                    <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <>
                       source_badge_class(agent.source)}>
                       {source_label(agent.source)}
                     </span>
-                    <span class="text-base-content/20 text-xs">&middot;</span>
-                    <span class="text-[10px] text-base-content/40 tabular-nums">
+                    <span class="text-base-content/20 text-mini">|</span>
+                    <span class="text-micro text-base-content/40 tabular-nums">
                       {FileHelpers.format_size(agent.size)}
                     </span>
                     <%= if agent.model do %>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 font-mono truncate">
+                      <span class="text-base-content/20 text-mini">|</span>
+                      <span class="truncate font-mono text-micro text-base-content/35">
                         {agent.model}
                       </span>
                     <% end %>
-                    <span class="text-base-content/20 text-xs">&middot;</span>
-                    <span class="text-[10px] text-base-content/35 font-mono truncate">
+                    <span class="text-base-content/20 text-mini">|</span>
+                    <span class="truncate font-mono text-micro text-base-content/35">
                       {agent.path}
                     </span>
                   </div>
@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   <div class="md:hidden px-3 pb-3">
                     <div
                       id={"agent-mobile-#{agent.id}"}
-                      class="dm-markdown text-sm text-base-content leading-relaxed mt-2"
+                      class="dm-markdown text-message text-base-content leading-relaxed mt-2"
                       phx-hook="MarkdownMessage"
                       data-raw-body={agent.content}
                     >
@@ -245,27 +245,29 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">
+                  <code class="text-message font-semibold text-base-content">
                     {@selected_agent.name}
                   </code>
-                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                  <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <>
                     source_badge_class(@selected_agent.source)}>
                     {source_label(@selected_agent.source)}
                   </span>
                   <%= if @selected_agent.model do %>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
+                    <span class="inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium bg-base-content/5 text-base-content/50">
                       {@selected_agent.model}
                     </span>
                   <% end %>
                 </div>
-                <p class="text-xs text-base-content/45 font-mono truncate">{@selected_agent.path}</p>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                <p class="text-mini text-base-content/45 font-mono truncate">
+                  {@selected_agent.path}
+                </p>
+                <p class="text-message text-base-content/60 mt-1.5 leading-snug">
                   {@selected_agent.description}
                 </p>
                 <%= if @selected_agent.tools != [] do %>
                   <div class="flex flex-wrap gap-1 mt-2">
                     <%= for tool <- @selected_agent.tools do %>
-                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-base-content/5 text-base-content/50">
+                      <span class="inline-flex items-center rounded-box px-1.5 py-0.5 font-mono text-micro bg-base-content/5 text-base-content/50">
                         {tool}
                       </span>
                     <% end %>
@@ -280,7 +282,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                 />
                 <button
                   phx-click="close_viewer"
-                  class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                  class="eits-action eits-action--ghost eits-action--icon !min-h-9 !min-w-9"
+                  aria-label="Close agent details"
                 >
                   <.icon name="hero-x-mark" class="size-4" />
                 </button>
@@ -290,7 +293,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
               <button
                 phx-click="set_detail_tab"
                 phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
+                class={"px-3 py-1 rounded-box text-mini font-medium " <>
                   if(@detail_tab == :preview,
                     do: "bg-base-content/8 text-base-content",
                     else: "text-base-content/50 hover:text-base-content")}
@@ -300,14 +303,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
               <button
                 phx-click="set_detail_tab"
                 phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
+                class={"px-3 py-1 rounded-box text-mini font-medium " <>
                   if(@detail_tab == :raw,
                     do: "bg-base-content/8 text-base-content",
                     else: "text-base-content/50 hover:text-base-content")}
               >
                 Raw
               </button>
-              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+              <span class="ml-auto text-micro text-base-content/35 tabular-nums">
                 {FileHelpers.format_size(@selected_agent.size)}
               </span>
             </div>
@@ -316,13 +319,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
             <%= if @detail_tab == :preview do %>
               <div
                 id={"agent-viewer-#{@selected_agent.id}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                class="dm-markdown px-6 py-4 text-message text-base-content leading-relaxed"
                 phx-hook="MarkdownMessage"
                 data-raw-body={@selected_agent.content}
               >
               </div>
             <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
+              <pre class="px-6 py-4 text-mini font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_agent.content}</pre>
             <% end %>
           </div>
         </div>

@@ -19,6 +19,8 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # Unknown errors and result errors carry free-form strings that still need
   # substring matching, but only within the message field — not on inspect output.
 
+  alias EyeInTheSky.Codex.Error, as: CodexError
+
   @type category ::
           :billing_error
           | :authentication_error
@@ -77,6 +79,18 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
 
   def classify({:pi_turn_error, _}), do: :transient
 
+  def classify({:codex_error, payload}) do
+    payload
+    |> CodexError.normalize("Codex error")
+    |> classify_codex_error()
+  end
+
+  def classify({:turn_failed, payload}) do
+    payload
+    |> CodexError.normalize("Codex turn failed")
+    |> classify_codex_error()
+  end
+
   # errors is a list of strings — scan each entry
   def classify({:claude_result_error, %{errors: errors}}) when is_list(errors) do
     cond do
@@ -121,6 +135,29 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   end
 
   def classify(_), do: :transient
+
+  defp classify_codex_error(normalized) do
+    message = normalized.message || ""
+
+    cond do
+      normalized.status == 429 or message =~ ~r/rate.?limit|overloaded|too many requests/iu ->
+        :rate_limit_error
+
+      CodexError.unsupported_model?(normalized) or normalized.status == 404 or
+          message =~ ~r/not_found_error|unknown model/iu ->
+        :model_not_found
+
+      normalized.status in [401, 403] or
+          message =~ ~r/authentication|unauthorized|forbidden|invalid[ _-]?(api[ _-]?key|token)/iu ->
+        :authentication_error
+
+      message =~ ~r/out of .*usage|quota|credit|billing/iu ->
+        :billing_error
+
+      true ->
+        :transient
+    end
+  end
 
   @doc """
   Category string persisted to `sessions.status_reason`. Returns `nil` for

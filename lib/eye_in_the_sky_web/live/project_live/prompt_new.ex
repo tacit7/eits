@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
           <h1 class="text-2xl font-semibold leading-6 text-base-content">
             New Prompt
           </h1>
-          <p class="mt-2 text-sm text-base-content/70">
+          <p class="mt-2 text-message text-base-content/70">
             Create a reusable prompt template for subagents
             <%= if @project do %>
               in <span class="font-medium">{@project.name}</span>
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
               field={@form[:prompt_text]}
               type="textarea"
               rows="20"
-              class="font-mono text-sm"
+              class="font-mono text-message"
               placeholder="Write the prompt instructions here..."
               phx-debounce="blur"
             />

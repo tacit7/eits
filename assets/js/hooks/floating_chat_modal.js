@@ -1,17 +1,17 @@
 /**
- * ChatModal — shared factory class for in-page chat modals.
+ * ChatModal - shared factory class for in-page chat modals.
  *
  * Config:
- *   id              {string}   — DOM id for the modal root (required)
- *   title           {string}   — header title text
- *   initials        {string}   — avatar letters (1–2 chars)
- *   subtitle        {string=}  — status label shown next to title
- *   subtitleClass   {string=}  — extra CSS classes for the subtitle span
- *   placeholder     {string=}  — input placeholder text
- *   dmHref          {string=}  — URL for the "open full DM" link button
- *   errorCloseButton {boolean=} — show a Close button inside error bubbles
- *   onSend          {fn(body)} — called with trimmed body when user sends
- *   onClose         {fn()}     — called when the close button is clicked
+ *   id              {string}   - DOM id for the modal root (required)
+ *   title           {string}   - header title text
+ *   initials        {string}   - avatar letters (1-2 chars)
+ *   subtitle        {string=}  - status label shown next to title
+ *   subtitleClass   {string=}  - extra CSS classes for the subtitle span
+ *   placeholder     {string=}  - input placeholder text
+ *   dmHref          {string=}  - URL for the "open full DM" link button
+ *   errorCloseButton {boolean=} - show a Close button inside error bubbles
+ *   onSend          {fn(body)} - called with trimmed body when user sends
+ *   onClose         {fn()}     - called when the close button is clicked
  */
 export class FloatingChatModal {
   constructor(config) {
@@ -48,7 +48,7 @@ export class FloatingChatModal {
   setMessages(messages, emptyText = 'No messages yet') {
     if (!this._messagesEl) return
     if (messages.length === 0) {
-      this._messagesEl.innerHTML = `<div id="${this._id}-empty" class="text-center text-base-content/25 text-xs py-10">${emptyText}</div>`
+      this._messagesEl.innerHTML = `<div id="${this._id}-empty" class="text-center text-base-content/25 text-mini py-10">${emptyText}</div>`
     } else {
       this._messagesEl.innerHTML = messages.map(m => this._messageHtml(m)).join('')
     }
@@ -79,13 +79,13 @@ export class FloatingChatModal {
     return div.innerHTML
   }
 
-  // ── private ────────────────────────────────────────────────────────────────
+  // Private helpers.
 
   _buildHtml() {
     const { title, initials, subtitle, subtitleClass, placeholder, dmHref } = this._cfg
 
     const subtitleHtml = subtitle != null
-      ? `<span id="${this._id}-subtitle" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${subtitleClass || ''}">${FloatingChatModal.escape(subtitle)}</span>`
+      ? `<span id="${this._id}-subtitle" class="text-mini font-medium uppercase tracking-normal ml-1.5 ${subtitleClass || ''}">${FloatingChatModal.escape(subtitle)}</span>`
       : ''
 
     const dmLinkHtml = dmHref
@@ -98,12 +98,12 @@ export class FloatingChatModal {
       : ''
 
     return `
-      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
+      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-box shadow-2xl max-h-[850px] overflow-hidden">
         <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
+            <span class="font-bold text-nano bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
             <div>
-              <span class="text-xs font-semibold text-base-content/70">${FloatingChatModal.escape(title)}</span>
+              <span class="text-mini font-semibold text-base-content/70">${FloatingChatModal.escape(title)}</span>
               ${subtitleHtml}
             </div>
           </div>
@@ -118,7 +118,7 @@ export class FloatingChatModal {
         </div>
 
         <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
-          <div id="${this._id}-loading" class="text-center text-base-content/25 text-xs py-10">
+          <div id="${this._id}-loading" class="text-center text-base-content/25 text-mini py-10">
             Loading messages...
           </div>
         </div>
@@ -129,7 +129,7 @@ export class FloatingChatModal {
               type="text"
               id="${this._id}-input"
               placeholder="${FloatingChatModal.escape(placeholder || '')}"
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
+              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-message placeholder:text-base-content/25"
               autocomplete="off"
             />
             <button id="${this._id}-send" class="btn btn-primary btn-sm btn-square">
@@ -145,13 +145,13 @@ export class FloatingChatModal {
   _messageHtml(m) {
     if (m.sender_role === 'error') {
       const closeBtn = this._cfg.errorCloseButton
-        ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-xs underline mt-1 opacity-70">Close</button>`
+        ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-mini underline mt-1 opacity-70">Close</button>`
         : ''
       return `<div class="flex items-start gap-2 px-1 py-1.5">
         <div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-error/20 flex items-center justify-center">
           <div class="w-1 h-1 rounded-full bg-error"></div>
         </div>
-        <div class="min-w-0 flex-1 text-sm text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
+        <div class="min-w-0 flex-1 text-message text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
       </div>`
     }
     const isUser = m.sender_role === 'user'
@@ -160,11 +160,11 @@ export class FloatingChatModal {
       : `<div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-primary/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-primary/60"></div></div>`
     const nameColor = isUser ? 'text-base-content/60' : 'text-primary/70'
     const label = isUser ? 'You' : 'Agent'
-    return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+    return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-box hover:bg-base-content/[0.02] transition-colors">
       ${dotInner}
       <div class="min-w-0 flex-1">
         <span class="text-mini font-semibold ${nameColor} mr-1">${label}</span>
-        <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
+        <p class="text-message leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
       </div>
     </div>`
   }

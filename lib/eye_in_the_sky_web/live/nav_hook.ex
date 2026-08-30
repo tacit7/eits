@@ -16,7 +16,6 @@ defmodule EyeInTheSkyWeb.NavHook do
 
   alias EyeInTheSky.Events
   alias EyeInTheSky.Projects
-  alias EyeInTheSky.Workspaces
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
@@ -28,14 +27,8 @@ defmodule EyeInTheSkyWeb.NavHook do
     workspace = Events.workspace_for_assigns(socket.assigns)
 
     projects =
-      case workspace do
-        %Workspaces.Workspace{id: workspace_id} ->
-          Projects.list_projects_for_workspace(workspace_id)
-          |> Enum.map(&%{id: &1.id, name: &1.name})
-
-        _ ->
-          []
-      end
+      Projects.list_projects_for_sidebar()
+      |> Enum.map(&%{id: &1.id, name: &1.name})
 
     # live_render-embedded views (e.g. Rail) don't support :handle_params hooks
     # because they're not mounted via live/3 in the router. Guard by the :router

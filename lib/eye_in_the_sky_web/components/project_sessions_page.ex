@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           <button
             :if={!@select_mode && @agents != []}
             phx-click="enter_select_mode"
-            class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/75"
           >
             <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
           </button>
@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
+            class="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-box text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
           >
             <.icon name="hero-funnel-mini" class="size-4" />
             <%= if @session_filter != "all" || @sort_by != "last_message" do %>
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           </button>
           <button
             phx-click="toggle_new_session_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1.5 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
           >
             <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
           </button>

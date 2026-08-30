@@ -38,23 +38,23 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
       />
       <%!-- Modal panel --%>
       <div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div class="pointer-events-auto w-72 rounded-2xl bg-base-200 shadow-2xl flex flex-col overflow-hidden">
+        <div class="pointer-events-auto w-72 rounded-box bg-base-200 shadow-2xl flex flex-col overflow-hidden">
           <%!-- Month navigation --%>
           <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
             <button
               type="button"
               phx-click="date_picker_prev_month"
-              class="w-7 h-7 flex items-center justify-center rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
+              class="w-7 h-7 flex items-center justify-center rounded-box text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
             >
               <.icon name="hero-chevron-left-mini" class="size-4" />
             </button>
-            <span class="text-sm font-semibold text-base-content">
+            <span class="text-message font-semibold text-base-content">
               {@month_name} {@year}
             </span>
             <button
               type="button"
               phx-click="date_picker_next_month"
-              class="w-7 h-7 flex items-center justify-center rounded-lg text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
+              class="w-7 h-7 flex items-center justify-center rounded-box text-base-content/50 hover:text-base-content hover:bg-base-content/8 transition-colors"
             >
               <.icon name="hero-chevron-right-mini" class="size-4" />
             </button>
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
             <%!-- Day headers --%>
             <div class="grid grid-cols-7 mb-1">
               <%= for day <- @day_names do %>
-                <div class="text-center text-xs font-medium text-base-content/40 py-1">
+                <div class="text-center text-mini font-medium text-base-content/40 py-1">
                   {day}
                 </div>
               <% end %>
@@ -83,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
                       phx-click="select_due_date"
                       phx-value-date={date_str}
                       class={[
-                        "w-full aspect-square rounded-lg text-xs flex items-center justify-center transition-colors",
+                        "w-full aspect-square rounded-box text-mini flex items-center justify-center transition-colors",
                         is_selected && "bg-base-content text-base-100 font-semibold",
                         is_today && !is_selected && "bg-primary text-primary-content font-semibold",
                         !is_today && !is_selected && "text-base-content hover:bg-base-content/10"
@@ -103,20 +103,20 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
           <form phx-submit="save_due_date" class="px-4 pb-4 pt-3 border-t border-base-content/10 mt-2">
             <input type="hidden" name="task_id" value={@task.uuid || to_string(@task.id)} />
             <div class="mb-3">
-              <label class="text-mini font-medium text-base-content/50 uppercase tracking-wider mb-1.5 block">
+              <label class="text-mini font-medium text-base-content/50 uppercase tracking-normal mb-1.5 block">
                 Due date
               </label>
               <input
                 type="date"
                 name="due_at"
                 value={@selected_date || ""}
-                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-base focus:border-primary/50 min-h-[44px]"
+                class="input input-sm w-full bg-base-300 dark:bg-base-100/10 border-base-content/15 text-message focus:border-primary/50 min-h-[44px]"
               />
             </div>
             <div class="flex gap-2">
               <button
                 type="submit"
-                class="flex-1 btn btn-sm btn-primary"
+                class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
               >
                 Save
               </button>
@@ -124,7 +124,7 @@ defmodule EyeInTheSkyWeb.Components.DatePickerModal do
                 type="button"
                 phx-click="remove_due_date"
                 phx-value-task_id={@task.uuid || to_string(@task.id)}
-                class="flex-1 btn btn-sm btn-ghost text-base-content/60"
+                class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
               >
                 Remove
               </button>

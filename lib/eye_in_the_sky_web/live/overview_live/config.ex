@@ -235,9 +235,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
           <button
             id="config-guide-chat-btn"
             phx-hook="ConfigChatGuide"
-            class="btn btn-sm btn-ghost ml-auto"
+            class="focus-ring ml-auto inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
           >
-            <.icon name="hero-chat-bubble-left-ellipsis" class="size-4" /> Config Guide
+            <.icon name="hero-chat-bubble-left-ellipsis" class="size-4" />
+            <span>Config Guide</span>
           </button>
         </div>
       </div>
@@ -262,35 +263,37 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                       do: ~p"/config?path=#{Path.dirname(@current_path)}",
                       else: ~p"/config"
                   }
-                  class="btn btn-sm btn-ghost"
+                  class="focus-ring inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" />
+                  <span>Back</span>
                 </.link>
                 <div>
                   <h2 class="text-lg font-semibold text-base-content">
                     {Path.basename(@current_path)}
                   </h2>
-                  <p class="text-sm text-base-content/60">~/.claude/{@current_path}</p>
+                  <p class="text-message text-base-content/60">~/.claude/{@current_path}</p>
                 </div>
                 <button
                   phx-click="open_file"
-                  class="btn btn-sm btn-ghost ml-auto"
+                  class="focus-ring ml-auto inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                   title="Open in editor"
                 >
-                  <.icon name="hero-pencil-square" class="size-4" /> Edit
+                  <.icon name="hero-pencil-square" class="size-4" />
+                  <span>Edit</span>
                 </button>
               </div>
-              <div class="bg-base-200 rounded-lg overflow-x-auto">
+              <div class="bg-base-200 rounded-box overflow-x-auto">
                 <%= if @file_type == :markdown do %>
                   <div
                     id="config-viewer-list"
-                    class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
+                    class="dm-markdown p-4 text-message text-base-content leading-relaxed"
                     phx-hook="MarkdownMessage"
                     data-raw-body={@file_content}
                   >
                   </div>
                 <% else %>
-                  <pre class="text-sm p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
+                  <pre class="text-message p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
                 <% end %>
               </div>
             </div>
@@ -305,9 +308,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                       do: ~p"/config?path=#{Path.dirname(@current_path)}",
                       else: ~p"/config"
                   }
-                  class="btn btn-sm btn-ghost"
+                  class="focus-ring inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 >
-                  <.icon name="hero-arrow-left" class="size-4" /> Back
+                  <.icon name="hero-arrow-left" class="size-4" />
+                  <span>Back</span>
                 </.link>
               <% end %>
               <h2 class="text-lg font-semibold text-base-content flex-1">
@@ -316,18 +320,20 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
               <button
                 phx-click="start_create"
                 phx-value-type="file"
-                class="btn btn-sm btn-ghost"
+                class="focus-ring inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 title="New file"
               >
-                <.icon name="hero-plus" class="size-4" /> File
+                <.icon name="hero-plus" class="size-4" />
+                <span>File</span>
               </button>
               <button
                 phx-click="start_create"
                 phx-value-type="dir"
-                class="btn btn-sm btn-ghost"
+                class="focus-ring inline-flex h-7 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 title="New folder"
               >
-                <.icon name="hero-plus" class="size-4" /> Folder
+                <.icon name="hero-plus" class="size-4" />
+                <span>Folder</span>
               </button>
             </div>
             
@@ -342,7 +348,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                   type="text"
                   name="name"
                   placeholder={if @creating == :dir, do: "Folder name", else: "File name"}
-                  class="input input-sm input-bordered flex-1 text-base min-h-[44px]"
+                  class="input input-sm input-bordered flex-1 text-message min-h-[44px]"
                   autofocus
                 />
                 <.form_actions submit_text="Create" cancel_event="cancel_create" size="sm" />
@@ -362,7 +368,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
                     class="w-16 h-16 mx-auto text-base-content/20 mb-4"
                   />
                   <h3 class="text-lg font-semibold text-base-content/60 mb-2">Empty directory</h3>
-                  <p class="text-sm text-base-content/40">No files in this directory</p>
+                  <p class="text-message text-base-content/40">No files in this directory</p>
                 </div>
               </div>
             <% end %>

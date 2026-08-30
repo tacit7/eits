@@ -65,7 +65,7 @@ hooks = true
 ```
 
 When enabled, these run automatically:
-- `SessionStart` → `eits-codex-notify.sh` routes startup/resume bookkeeping without marking busy
+- `SessionStart` → `codex-session-startup.sh` registers/resolves the session without marking busy
 - `UserPromptSubmit` → `eits-codex-notify.sh` sets status=working
 - `PostToolUse/Bash` → `eits-codex-notify.sh` records tool activity and logs git commits
 - `PreCompact` → `eits-codex-notify.sh` sets status=compacting

@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="title"
-                  class="input input-bordered text-base"
+                  class="input input-bordered text-message"
                   placeholder="Task title"
                   required
                   autofocus={@show}
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
               <.form_field label="Description">
                 <textarea
                   name="description"
-                  class="textarea textarea-bordered h-24 text-base"
+                  class="textarea textarea-bordered h-24 text-message"
                   placeholder="Task description (optional)"
                 ></textarea>
               </.form_field>
@@ -75,7 +75,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="tags"
-                  class="input input-bordered text-base"
+                  class="input input-bordered text-message"
                   placeholder="tag1, tag2, tag3"
                 />
                 <label class="label">

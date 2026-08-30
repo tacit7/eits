@@ -70,7 +70,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActionsTest do
 
     assert result.assigns.sidebar_project.id == current_project.id
     assert result.assigns.workspace_id == workspace.id
-    assert Enum.all?(result.assigns.projects, &(&1.workspace_id == workspace.id))
+    assert Enum.any?(result.assigns.projects, &(&1.id == current_project.id))
+    assert Enum.any?(result.assigns.projects, &(&1.id == foreign_project.id))
   end
 
   test "handle_restore_project/2 falls back to a valid workspace project when no project is selected" do
@@ -95,6 +96,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActionsTest do
     assert result.assigns.sidebar_project.id == fallback_project.id
     assert result.assigns.workspace_id == workspace.id
     assert Enum.any?(result.assigns.projects, &(&1.id == fallback_project.id))
-    refute Enum.any?(result.assigns.projects, &(&1.id == foreign_project.id))
+    assert Enum.any?(result.assigns.projects, &(&1.id == foreign_project.id))
   end
 end

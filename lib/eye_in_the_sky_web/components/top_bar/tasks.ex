@@ -20,12 +20,12 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
     ~H"""
     <%!-- Tasks: state filter pills + view toggle + sort + search --%>
     <%!-- Status filter pills --%>
-    <div class="flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5">
+    <div class="flex items-center gap-0.5 rounded-box bg-base-200/40 p-0.5">
       <button
         phx-click="filter_status"
         phx-value-state_id=""
         class={[
-          "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
+          "focus-ring flex items-center gap-1.5 rounded-box px-2.5 py-1 text-mini font-medium transition-all duration-150",
           if(is_nil(@filter_state_id),
             do: "bg-base-100 text-base-content shadow-sm",
             else: "text-base-content/45 hover:text-base-content/70"
@@ -52,7 +52,7 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
           phx-click="filter_status"
           phx-value-state_id={state.id}
           class={[
-            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
+            "focus-ring flex items-center gap-1.5 rounded-box px-2.5 py-1 text-mini font-medium transition-all duration-150",
             if(active,
               do: "bg-base-100 text-base-content shadow-sm",
               else: "text-base-content/45 hover:text-base-content/70"
@@ -83,16 +83,16 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
     </div>
     <%!-- View toggle --%>
     <%= if @sidebar_project do %>
-      <div class="flex items-center bg-base-200/40 rounded-lg p-0.5">
+      <div class="flex items-center rounded-box bg-base-200/40 p-0.5">
         <span
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-mini font-medium bg-base-100 shadow-sm text-base-content cursor-default"
+          class="flex items-center gap-1 h-6 px-2 rounded-box text-mini font-medium bg-base-100 shadow-sm text-base-content cursor-default"
           title="List view"
         >
           <.icon name="hero-list-bullet-mini" class="size-3.5" /> List
         </span>
         <.link
           navigate={~p"/projects/#{@sidebar_project.id}/kanban"}
-          class="flex items-center gap-1 h-6 px-2 rounded-md text-mini font-medium text-base-content/45 hover:text-base-content/70 transition-colors"
+          class="focus-ring flex h-6 items-center gap-1 rounded-box px-2 text-mini font-medium text-base-content/45 transition-colors hover:text-base-content/70"
           title="Board view"
         >
           <.icon name="hero-view-columns-mini" class="size-3.5" /> Board
@@ -108,18 +108,18 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       data-label={Helpers.sort_label(@sort_by, sort_options(), "Newest")}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options(), "Newest")}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[120px]">
+      <ul class="dropdown-content z-50 mt-1 min-w-[120px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- sort_options() do %>
           <li>
             <button
               phx-click="sort_by"
               phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
+              class={"focus-ring block w-full rounded-box px-3 py-1.5 text-left text-mini hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}

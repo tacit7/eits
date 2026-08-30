@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         phx-value-task_id={@task_id}
         aria-label={if @task.completed_at, do: "Mark task incomplete", else: "Mark task complete"}
         aria-pressed={to_string(not is_nil(@task.completed_at))}
-        class="flex-shrink-0 mt-0.5 flex items-center justify-center min-w-[44px] min-h-[44px] rounded text-base-content/30 hover:text-success transition-colors"
+        class="flex-shrink-0 mt-0.5 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-box text-base-content/30 hover:text-success transition-colors"
       >
         <.icon
           name={if @task.completed_at, do: "hero-check-circle-mini", else: "hero-circle-mini"}
@@ -91,7 +91,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       </button>
       <h4
         class={[
-          "text-xs font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
+          "text-mini font-medium flex-1 leading-snug cursor-pointer hover:text-primary transition-colors",
           @task.completed_at && "text-base-content/40 line-through",
           !@task.completed_at && "text-base-content"
         ]}
@@ -114,7 +114,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
       <div class="flex flex-wrap gap-1 mt-2">
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span
-            class="text-xs px-1.5 py-0.5 rounded font-medium leading-none"
+            class="text-mini px-1.5 py-0.5 rounded-box font-medium leading-none"
             style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}26; color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
           >
             {tag.name}
@@ -137,16 +137,16 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
     ~H"""
     <div class="flex-shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity">
       <details id={"kanban-menu-#{@task_id}"} phx-update="ignore" class="dropdown dropdown-end">
-        <summary class="flex items-center justify-center min-w-[44px] min-h-[44px] -mx-2.5 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
+        <summary class="flex items-center justify-center min-w-[44px] min-h-[44px] -mx-2.5 rounded-box text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
           <.icon name="hero-ellipsis-horizontal-mini" class="size-3.5" />
         </summary>
-        <div class="dropdown-content z-50 mt-1 w-48 rounded-xl bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
+        <div class="dropdown-content z-50 mt-1 w-48 rounded-box bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
           <%!-- Open card --%>
           <button
             type="button"
             phx-click={@on_click}
             phx-value-task_id={@task_id}
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon
               name="hero-rectangle-stack-mini"
@@ -159,7 +159,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             phx-click="open_task_detail"
             phx-value-task_id={@task_id}
             phx-value-focus="tags"
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-tag-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Edit labels
@@ -169,7 +169,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             type="button"
             phx-click="open_date_picker"
             phx-value-task_id={@task_id}
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-clock-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Edit dates
@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             id={"copy-task-kanban-#{@task.id}"}
             data-copy={@task_id}
             onclick="event.preventDefault();"
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+            class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors text-left"
           >
             <.icon name="hero-link-mini" class="size-4 text-base-content/60 flex-shrink-0" />
             Copy link
@@ -190,7 +190,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           <%= if @workflow_states != [] do %>
             <div class="border-t border-base-content/10 my-0.5" />
             <details class="group/move">
-              <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
+              <summary class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors cursor-pointer list-none">
                 <.icon
                   name="hero-arrow-right-mini"
                   class="size-4 text-base-content/60 flex-shrink-0"
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
                     phx-click="move_task"
                     phx-value-task_id={@task_id}
                     phx-value-state_id={state.id}
-                    class="w-full flex items-center gap-2 px-3 py-3 rounded-lg text-sm text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
+                    class="w-full flex items-center gap-2 px-3 py-3 rounded-box text-message text-base-content/80 hover:bg-base-content/10 transition-colors text-left"
                   >
                     <span
                       class="w-2 h-2 rounded-full flex-shrink-0"
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-click="archive_task"
               phx-value-task_id={@task_id}
               phx-confirm="Archive this task?"
-              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-base-content hover:bg-base-content/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-base-content hover:bg-base-content/10 transition-colors text-left"
             >
               <.icon name="hero-archive-box-mini" class="size-4 text-base-content/60 flex-shrink-0" />
               Archive
@@ -235,7 +235,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
               phx-click={@on_delete}
               phx-value-task_id={@task_id}
               phx-confirm="Delete this task?"
-              class="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-sm text-error hover:bg-error/10 transition-colors text-left"
+              class="w-full flex items-center gap-3 px-3 py-3 rounded-box text-message text-error hover:bg-error/10 transition-colors text-left"
             >
               <.icon name="hero-trash-mini" class="size-4 flex-shrink-0" /> Delete
             </button>

@@ -189,6 +189,61 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert assistant_msg.uuid != user_msg.uuid
     end
 
+    test "preserves Codex reasoning, tool calls, and failures from response items", %{
+      session_file: session_file,
+      thread_id: thread_id
+    } do
+      write_jsonl(session_file, [
+        %{
+          "type" => "response_item",
+          "timestamp" => "2026-08-14T19:36:40.000Z",
+          "payload" => %{
+            "type" => "reasoning",
+            "id" => "rs_123",
+            "content" => [%{"type" => "text", "text" => "checking the repo"}]
+          }
+        },
+        %{
+          "type" => "response_item",
+          "timestamp" => "2026-08-14T19:36:41.000Z",
+          "payload" => %{
+            "type" => "command_execution",
+            "id" => "cmd_123",
+            "command" => "mix test",
+            "exit_code" => 2,
+            "aggregated_output" => "failed\n"
+          }
+        },
+        %{
+          "type" => "turn.failed",
+          "timestamp" => "2026-08-14T19:36:42.000Z",
+          "message" => "Rate limited"
+        }
+      ])
+
+      assert {:ok, [thinking, tool, failure]} = SessionReader.read_messages(thread_id)
+
+      assert thinking.role == "assistant"
+      assert thinking.content == "checking the repo"
+      assert thinking.stream_type == "thinking"
+      assert thinking.metadata["thinking"] == "checking the repo"
+
+      assert tool.role == "assistant"
+      assert tool.stream_type == "tool_use"
+      assert tool.metadata["tool_name"] == "Bash"
+      assert tool.metadata["input"]["command"] == "mix test"
+      assert tool.metadata["input"]["exit_code"] == 2
+      assert tool.metadata["exit_code"] == 2
+      assert tool.content =~ "Tool: Bash"
+      assert tool.content =~ "mix test"
+
+      assert failure.role == "assistant"
+      assert failure.content == "Rate limited"
+      assert failure.stream_type == "codex_turn_failed"
+      assert failure.metadata["error_title"] == "Codex turn failed"
+      assert failure.metadata["error_message"] == "Rate limited"
+    end
+
     test "skips token_count and session_meta events", %{
       session_file: session_file,
       thread_id: thread_id

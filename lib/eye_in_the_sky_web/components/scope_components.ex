@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def scope_subtitle(%{scope: %Scope{type: :project}} = assigns) do
     ~H"""
-    <span class="text-xs text-base-content/50 font-normal">
+    <span class="text-mini text-base-content/50 font-normal">
       {@scope.project.name} only
     </span>
     """
@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def scope_subtitle(%{scope: %Scope{type: :workspace}} = assigns) do
     ~H"""
-    <span class="text-xs text-base-content/50 font-normal">
+    <span class="text-mini text-base-content/50 font-normal">
       Across all projects
     </span>
     """
@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def project_label(assigns) do
     ~H"""
-    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-base-200 text-base-content/60">
+    <span class="inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-base-200 text-base-content/60">
       {@project.name}
     </span>
     """
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
   # ---------------------------------------------------------------------------
 
   @doc """
-  DaisyUI details/summary dropdown for switching between workspace and project scope.
+  Details/summary dropdown for switching between workspace and project scope.
 
   Shows current context in the trigger. Workspace at top, then project list.
   Uses phx-update="ignore" with a stable id to preserve open state across LiveView patches.
@@ -78,35 +78,35 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
   def context_switcher(assigns) do
     ~H"""
     <details id="context-switcher" phx-update="ignore" class="dropdown">
-      <summary class="btn btn-ghost btn-sm gap-1.5 font-medium normal-case">
-        <span class="text-sm leading-tight">
+      <summary class="focus-ring inline-flex min-h-[44px] cursor-pointer list-none items-center justify-center gap-1.5 rounded-box px-3 text-message font-medium text-base-content/80 transition-colors hover:bg-base-content/5 hover:text-base-content">
+        <span class="text-message leading-tight">
           <%= if Scope.project?(@scope) do %>
             {@scope.project.name}
-            <span class="text-xs text-base-content/50 ml-1">Project</span>
+            <span class="text-mini text-base-content/50 ml-1">Project</span>
           <% else %>
             {@scope.workspace.name}
-            <span class="text-xs text-base-content/50 ml-1">All projects</span>
+            <span class="text-mini text-base-content/50 ml-1">All projects</span>
           <% end %>
         </span>
         <.icon name="hero-chevron-down" class="size-3 text-base-content/50" />
       </summary>
       <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-48 z-50 p-1">
-        <li class="menu-title text-xs text-base-content/40 px-2 pt-1">WORKSPACE</li>
+        <li class="menu-title text-mini text-base-content/40 px-2 pt-1">WORKSPACE</li>
         <li>
-          <.link navigate={~p"/workspace/sessions"} class="gap-2 text-sm">
+          <.link navigate={~p"/workspace/sessions"} class="gap-2 text-message">
             <.icon name="hero-squares-2x2" class="size-4" />
             <span>
               {@scope.workspace.name}
-              <span class="text-xs text-base-content/50">All projects</span>
+              <span class="text-mini text-base-content/50">All projects</span>
             </span>
           </.link>
         </li>
-        <li class="menu-title text-xs text-base-content/40 px-2 pt-2">PROJECTS</li>
+        <li class="menu-title text-mini text-base-content/40 px-2 pt-2">PROJECTS</li>
         <li :for={project <- @projects}>
           <.link
             navigate={~p"/projects/#{project.id}/sessions"}
             class={[
-              "gap-2 text-sm",
+              "gap-2 text-message",
               Scope.project?(@scope) && @scope.project_id == project.id && "active"
             ]}
           >
@@ -133,7 +133,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def scope_badge(assigns) do
     ~H"""
-    <p class="text-xs text-base-content/40 mt-0.5">
+    <p class="text-mini text-base-content/40 mt-0.5">
       <%= if Scope.workspace?(@scope) do %>
         Across all projects
       <% else %>
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def scope_breadcrumb(assigns) do
     ~H"""
-    <nav class="flex items-center gap-1.5 text-xs text-base-content/50">
+    <nav class="flex items-center gap-1.5 text-mini text-base-content/50">
       <span class="font-medium text-base-content/70">
         {if Scope.project?(@scope), do: @scope.project.name, else: @scope.workspace.name}
       </span>

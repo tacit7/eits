@@ -6,15 +6,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
     ~H"""
     <div class="space-y-6">
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           External Editor
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Preferred Editor</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Preferred Editor</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Command used when opening files externally
                 </p>
               </div>
@@ -31,8 +31,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Custom Command</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Override with any editor command</p>
+                <p class="text-message font-medium text-base-content">Custom Command</p>
+                <p class="text-mini text-base-content/50 mt-0.5">Override with any editor command</p>
               </div>
               <form phx-change="save_setting" class="flex items-center gap-2">
                 <input type="hidden" name="key" value="preferred_editor" />
@@ -41,16 +41,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
                   name="value"
                   value={@settings["preferred_editor"]}
                   placeholder="e.g. code, vim, zed"
-                  class="input input-bordered input-sm w-36 text-base min-h-[44px]"
+                  class="input input-bordered input-sm w-36 text-message min-h-[44px]"
                   phx-debounce="500"
                 />
               </form>
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Preferred Terminal</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
-                  Used when opening terminal editors (vim, nvim, helix…)
+                <p class="text-message font-medium text-base-content">Preferred Terminal</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
+                  Used when opening terminal editors (vim, nvim, helix...)
                 </p>
               </div>
               <form phx-change="save_setting" class="flex items-center gap-2">
@@ -68,15 +68,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
         </div>
       </section>
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           CodeMirror
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Tab Size</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Spaces per indent level</p>
+                <p class="text-message font-medium text-base-content">Tab Size</p>
+                <p class="text-mini text-base-content/50 mt-0.5">Spaces per indent level</p>
               </div>
               <form phx-change="save_setting" class="flex items-center gap-2">
                 <input type="hidden" name="key" value="cm_tab_size" />
@@ -88,8 +88,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Font Size</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Editor font size in pixels</p>
+                <p class="text-message font-medium text-base-content">Font Size</p>
+                <p class="text-mini text-base-content/50 mt-0.5">Editor font size in pixels</p>
               </div>
               <form phx-change="save_setting" class="flex items-center gap-2">
                 <input type="hidden" name="key" value="cm_font_size" />
@@ -104,8 +104,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.EditorTab do
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Vim Keybindings</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Enable vim modal editing</p>
+                <p class="text-message font-medium text-base-content">Vim Keybindings</p>
+                <p class="text-mini text-base-content/50 mt-0.5">Enable vim modal editing</p>
               </div>
               <input
                 type="checkbox"

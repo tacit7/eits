@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
         type="button"
         disabled={@disabled?}
         data-selector-trigger
-        class="flex items-center gap-1.5 px-2 h-6 rounded-md text-[11px] font-medium text-base-content/55 bg-base-content/[0.05] border border-[var(--border-subtle)] hover:text-base-content/75 hover:bg-base-content/[0.08] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        class="flex h-6 items-center gap-1.5 rounded-box border border-[var(--border-subtle)] bg-base-content/[0.05] px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/[0.08] hover:text-base-content/75 focus-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         <img
           src={DmHelpers.provider_icon(@selected_provider)}
@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
       <div
         data-selector-popover
         class={[
-          "hidden absolute z-[1] w-80 rounded-xl border border-base-content/8 bg-base-100 shadow-lg",
+          "hidden absolute z-[1] w-80 rounded-box border border-base-content/8 bg-base-100 shadow-lg",
           if(@placement == :up, do: "bottom-full mb-2", else: "top-full mt-2")
         ]}
       >
@@ -81,17 +81,17 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
           <input
             type="text"
             data-selector-search
-            placeholder="Search models…"
-            class="w-full bg-transparent border-0 outline-none text-sm px-1"
+            placeholder="Search models..."
+            class="w-full bg-transparent border-0 outline-none text-message px-1"
           />
         </div>
         <ul data-selector-list role="listbox" class="max-h-96 overflow-y-auto p-1.5">
           <li :for={{group, group_entries} <- @sections} data-selector-group={group}>
-            <div class="menu-title text-xs px-3 pt-2 pb-0.5 text-base-content/40 flex items-center gap-1.5">
+            <div class="menu-title text-mini px-3 pt-2 pb-0.5 text-base-content/40 flex items-center gap-1.5">
               {group}
               <span
                 :if={pi_group?(group_entries)}
-                class="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary"
+                class="rounded-full bg-primary/10 px-1.5 py-0.5 text-nano text-primary"
               >
                 via Pi
               </span>
@@ -121,13 +121,13 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
       data-default={to_string(@entry.default?)}
       role="option"
       aria-selected={to_string(@active)}
-      class="flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer hover:bg-base-content/[0.04] aria-selected:bg-base-content/[0.06]"
+      class="flex cursor-pointer items-center gap-2 rounded-box px-3 py-2 text-message hover:bg-base-content/[0.04] focus-ring aria-selected:bg-base-content/[0.06]"
     >
       <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
       <span class="flex-1 truncate" data-selector-row-label>{@entry.label}</span>
       <span
         :if={@entry.default?}
-        class="text-[9px] px-1.5 py-0.5 rounded-full bg-success/10 text-success"
+        class="rounded-full bg-success/10 px-1.5 py-0.5 text-nano text-success"
       >
         Recommended
       </span>

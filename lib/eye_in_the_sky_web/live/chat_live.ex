@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.ChatLive do
           subscribe_channel_messages(channel_id)
         end
 
-        # else: same channel, already subscribed — do nothing
+        # else: same channel, already subscribed; do nothing
       else
         subscribe_channel_messages(channel_id)
       end
@@ -300,11 +300,11 @@ defmodule EyeInTheSkyWeb.ChatLive do
             <div class="relative group">
               <.live_img_preview
                 entry={entry}
-                class="w-16 h-16 object-cover rounded-lg border border-base-content/10"
+                class="w-16 h-16 object-cover rounded-box border border-base-content/10"
               />
               <%= if entry.progress < 100 do %>
-                <div class="absolute inset-0 flex items-center justify-center bg-base-100/70 rounded-lg">
-                  <span class="text-xs font-mono text-base-content/60">{entry.progress}%</span>
+                <div class="absolute inset-0 flex items-center justify-center bg-base-100/70 rounded-box">
+                  <span class="text-mini font-mono text-base-content/60">{entry.progress}%</span>
                 </div>
               <% end %>
               <button
@@ -323,13 +323,13 @@ defmodule EyeInTheSkyWeb.ChatLive do
       <label
         for="agent-image-upload"
         class={[
-          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs cursor-pointer transition-colors",
+          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-box text-mini cursor-pointer transition-colors",
           if(@uploads.agent_images.entries != [],
             do: "text-primary bg-primary/10 hover:bg-primary/15",
             else: "text-base-content/30 hover:text-base-content/60 hover:bg-base-content/5"
           )
         ]}
-        title="Attach image (jpg, png, gif, webp — up to 5 files, 20MB each)"
+        title="Attach image (jpg, png, gif, webp - up to 5 files, 20MB each)"
       >
         <.icon name="hero-paper-clip-mini" class="w-3.5 h-3.5" />
         <%= if @uploads.agent_images.entries != [] do %>

@@ -130,8 +130,8 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Model
     args =
-      if model = opts[:model] do
-        args ++ ["-m", to_string(model)]
+      if model = codex_model_arg(opts[:model]) do
+        args ++ ["-m", model]
       else
         args
       end
@@ -172,6 +172,7 @@ defmodule EyeInTheSky.Codex.CLI do
         {"EITS_PROJECT_ID", opts[:eits_project_id]},
         {"EITS_CHANNEL_ID", opts[:eits_channel_id]},
         {"EITS_MODEL", opts[:eits_model]},
+        {"ENTRYPOINT", opts[:entrypoint] || "cli"},
         {"EITS_URL",
          opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
       ]
@@ -211,6 +212,13 @@ defmodule EyeInTheSky.Codex.CLI do
 
   defp add_approval_policy(args, policy),
     do: args ++ ["-c", ~s(approval_policy="#{policy}")]
+
+  # ChatGPT-account Codex auth rejects the base GPT-5.2 slug. Keep the UI/storage
+  # value backward compatible, but send the Codex-scoped slug to the CLI.
+  defp codex_model_arg("gpt-5.2"), do: "gpt-5.2-codex"
+  defp codex_model_arg(model) when is_binary(model), do: model
+  defp codex_model_arg(model) when not is_nil(model), do: to_string(model)
+  defp codex_model_arg(nil), do: nil
 
   # ---------------------------------------------------------------------------
   # Binary cache
@@ -315,6 +323,7 @@ defmodule EyeInTheSky.Codex.CLI do
     ANTHROPIC_API_KEY
     CLAUDECODE
     CLAUDE_CODE_ENTRYPOINT
+    ENTRYPOINT
     BINDIR
     ROOTDIR
     EMU
@@ -350,6 +359,7 @@ defmodule EyeInTheSky.Codex.CLI do
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_AGENT_ID", opts[:eits_agent_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_PROJECT_ID", opts[:eits_project_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
+    |> EyeInTheSky.CLI.Port.maybe_add_env("ENTRYPOINT", opts[:entrypoint] || "cli")
     |> EyeInTheSky.CLI.Port.maybe_add_env(
       "EITS_URL",
       opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")

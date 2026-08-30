@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
   def render(assigns) do
     ~H"""
     <section>
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+      <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         Desktop App
       </h2>
       <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -15,8 +15,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
           <div class="px-5 py-4">
             <div class="flex items-center justify-between gap-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Server Port</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Server Port</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Port for the embedded server in the desktop app.
                   Default {DesktopConfig.default_port()}. If busy at launch, the
                   next 9 ports are tried automatically.
@@ -35,10 +35,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
                 <button type="submit" class="btn btn-primary btn-sm">Save</button>
               </form>
             </div>
-            <p class="text-xs text-warning mt-3">
+            <p class="text-mini text-warning mt-3">
               Takes effect the next time the desktop app is launched.
             </p>
-            <p :if={!@desktop_mode?} class="text-xs text-base-content/40 mt-1">
+            <p :if={!@desktop_mode?} class="text-mini text-base-content/40 mt-1">
               You're viewing this from the web app — the setting is written to
               <span class="font-mono">{DesktopConfig.config_path()}</span>
               on this machine and only affects the desktop app.
@@ -48,10 +48,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
           <div class="px-5 py-4">
             <div class="flex items-center justify-between gap-4">
               <div>
-                <p class="text-sm font-medium text-base-content">
+                <p class="text-message font-medium text-base-content">
                   Global Claude Code Integration
                 </p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Installs EITS hooks into <span class="font-mono">~/.claude/settings.json</span>
                   and skills into <span class="font-mono">~/.claude/skills/</span>
                   on launch — these affect every Claude Code session on this
@@ -66,10 +66,10 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
                 phx-value-granted={to_string(@hooks_consent != true)}
               />
             </div>
-            <p class="text-xs text-warning mt-3">
+            <p class="text-mini text-warning mt-3">
               Takes effect the next time the desktop app is launched.
             </p>
-            <p :if={@hooks_consent == nil} class="text-xs text-base-content/40 mt-1">
+            <p :if={@hooks_consent == nil} class="text-mini text-base-content/40 mt-1">
               Not yet decided — you'll be asked on first launch of the desktop app.
             </p>
           </div>

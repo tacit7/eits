@@ -209,6 +209,37 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperRegressionTest do
       refute cluster.meta.count == 0,
              "result-only cluster must have count > 0, not #{cluster.meta.count}"
     end
+
+    test "cluster meta summarizes failed commands and Codex file change paths" do
+      events = [
+        msg(1,
+          sender_role: "assistant",
+          metadata: %{
+            "stream_type" => "tool_use",
+            "tool_name" => "Bash",
+            "input" => %{"command" => "mix test", "exit_code" => 2},
+            "exit_code" => 2
+          }
+        ),
+        msg(2,
+          sender_role: "assistant",
+          body:
+            "Tool: File Changes\n" <>
+              Jason.encode!(%{"files" => [%{"path" => "lib/example.ex"}]}),
+          metadata: %{"stream_type" => "tool_use", "tool_name" => "File Changes"}
+        )
+      ]
+
+      rows = MessageGrouper.grouped_rows(events)
+      cluster = Enum.find(rows, &(&1.type == :cluster))
+      summary = Enum.find(rows, &(&1.type == :cluster_summary))
+
+      assert cluster.meta.failed_count == 1
+      assert cluster.meta.file_count == 1
+      assert "Bash" in cluster.meta.tool_labels
+      assert "File Changes" in cluster.meta.tool_labels
+      assert summary.data.files == ["lib/example.ex"]
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -229,6 +229,32 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
     end
   end
 
+  describe "codex error content mapping" do
+    test "unsupported ChatGPT account model is model_not_found and systemic" do
+      payload =
+        Jason.encode!(%{
+          "type" => "error",
+          "status" => 400,
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" =>
+              "The 'gpt-5.2' model is not supported when using Codex with a ChatGPT account."
+          }
+        })
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :model_not_found
+      assert ErrorClassifier.systemic?({:codex_error, payload})
+      assert ErrorClassifier.status_reason({:codex_error, payload}) == "model_not_found"
+    end
+
+    test "codex rate limits stay retryable" do
+      payload = %{"type" => "error", "status" => 429, "message" => "rate limit exceeded"}
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :rate_limit_error
+      refute ErrorClassifier.systemic?({:codex_error, payload})
+    end
+  end
+
   describe "status_reason/1" do
     test "billing_error returns \"billing_error\" string" do
       assert ErrorClassifier.status_reason({:billing_error, "low"}) == "billing_error"

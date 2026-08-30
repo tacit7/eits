@@ -38,14 +38,14 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
                 class="size-3 opacity-50"
               />
             </summary>
-            <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[140px]">
+            <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-1 min-w-[140px]">
               <%= for state <- @workflow_states do %>
                 <li>
                   <button
                     phx-click="bulk_set_state"
                     phx-value-state_id={state.id}
                     onclick="this.closest('details').removeAttribute('open')"
-                    class="flex items-center gap-2 w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 text-base-content/70 hover:text-base-content"
+                    class="flex items-center gap-2 w-full px-3 py-1.5 text-left text-mini rounded-box hover:bg-base-content/5 text-base-content/70 hover:text-base-content"
                   >
                     <span
                       class="inline-block w-2 h-2 rounded-full flex-shrink-0"
@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
     >
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive tasks</h3>
-        <p class="py-4 text-sm text-base-content/70">
+        <p class="py-4 text-message text-base-content/70">
           <% count = MapSet.size(@selected_task_ids) %> Archive {count} selected task{if count == 1,
             do: "",
             else: "s"}?

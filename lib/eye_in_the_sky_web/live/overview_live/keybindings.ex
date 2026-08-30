@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
     },
     %{
       group: "navigation",
-      label: "Leader — quick (Space prefix)",
+      label: "Leader - quick (Space prefix)",
       scope_note: "Space is the leader key",
       bindings: [
         %{keys: ["Space", "e"], desc: "Toggle Files flyout"},
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
     },
     %{
       group: "navigation",
-      label: "Leader — go to (Space g …)",
+      label: "Leader - go to (Space g ...)",
       bindings: [
         %{keys: ["Space", "g", "s"], desc: "Sessions"},
         %{keys: ["Space", "g", "t"], desc: "Tasks"},
@@ -150,7 +150,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
     },
     %{
       group: "toggle",
-      label: "Leader — toggle (Space t …)",
+      label: "Leader - toggle (Space t ...)",
       bindings: [
         %{keys: ["Space", "t", "s"], desc: "Sessions"},
         %{keys: ["Space", "t", "t"], desc: "Tasks"},
@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
     },
     %{
       group: "create",
-      label: "Leader — create (Space n …)",
+      label: "Leader - create (Space n ...)",
       bindings: [
         %{keys: ["Space", "n", "a"], desc: "New agent"},
         %{keys: ["Space", "n", "t"], desc: "New task"},
@@ -206,7 +206,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
       <div class="max-w-3xl mx-auto space-y-8">
         <div>
           <h1 class="text-lg font-semibold text-base-content">Vim Keybinding Reference</h1>
-          <p class="mt-1 text-sm text-base-content/60">
+          <p class="mt-1 text-message text-base-content/60">
             Press <kbd class="kbd kbd-sm">?</kbd>
             anywhere for a filtered overlay. This page shows all bindings.
           </p>
@@ -214,19 +214,19 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
 
         <div :for={group <- @commands} class="space-y-2">
           <div class="flex items-baseline gap-3">
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/50">
+            <h2 class="text-mini font-semibold uppercase tracking-normal text-base-content/50">
               {group.label}
             </h2>
-            <span :if={Map.get(group, :scope_note)} class="text-xs text-base-content/40 italic">
-              — {group.scope_note}
+            <span :if={Map.get(group, :scope_note)} class="text-mini text-base-content/40 italic">
+              - {group.scope_note}
             </span>
           </div>
-          <div class="rounded-lg border border-base-300 divide-y divide-base-300 overflow-hidden">
+          <div class="rounded-box border border-base-300 divide-y divide-base-300 overflow-hidden">
             <div
               :for={b <- group.bindings}
               class="flex items-center justify-between px-4 py-2.5 bg-base-100 hover:bg-base-200/50"
             >
-              <span class="text-sm text-base-content/80">{b.desc}</span>
+              <span class="text-message text-base-content/80">{b.desc}</span>
               <span class="flex items-center gap-1">
                 <kbd :for={k <- b.keys} class="kbd kbd-sm">{k}</kbd>
               </span>
@@ -234,8 +234,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
           </div>
         </div>
 
-        <p class="text-xs text-base-content/40">
-          Enable vim navigation in <.link navigate={~p"/settings"} class="underline">Settings → General</.link>.
+        <p class="text-mini text-base-content/40">
+          Enable vim navigation in <.link navigate={~p"/settings"} class="underline">Settings / General</.link>.
         </p>
       </div>
     </div>

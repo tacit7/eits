@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       |> assign(:sidebar_project, project)
       |> assign(:workspace, workspace)
       |> assign(:workspace_id, workspace && workspace.id)
-      |> assign(:palette_projects, palette_projects_for_workspace(workspace))
+      |> assign(:palette_projects, palette_projects())
     else
       socket
       |> assign(:project, nil)
@@ -90,11 +90,8 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       else: project
   end
 
-  defp palette_projects_for_workspace(%Workspaces.Workspace{id: workspace_id}) do
-    workspace_id
-    |> Projects.list_projects_for_workspace()
+  defp palette_projects do
+    Projects.list_projects_for_sidebar()
     |> Enum.map(&%{id: &1.id, name: &1.name})
   end
-
-  defp palette_projects_for_workspace(_workspace), do: []
 end

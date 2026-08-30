@@ -137,6 +137,67 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
       assert updated_agent.status == "failed"
     end
 
+    test "does not auto-archive terminal-owned idle sessions" do
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Terminal-owned Codex agent",
+          source: "test",
+          status: "idle"
+        })
+
+      stale = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "idle",
+          started_at: stale,
+          last_activity_at: stale,
+          provider: "openai",
+          entrypoint: "cli",
+          managed_by_app: false
+        })
+
+      {:ok, pid} = GenServer.start(AgentStatus, nil)
+      send(pid, :mark_stale)
+      Process.sleep(100)
+      GenServer.stop(pid)
+
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "idle"
+      assert is_nil(updated.archived_at)
+    end
+
+    test "does not zombie-sweep terminal-owned working sessions" do
+      {:ok, agent} =
+        Agents.create_agent(%{
+          uuid: Ecto.UUID.generate(),
+          description: "Terminal-owned working Codex agent",
+          source: "test",
+          status: "working"
+        })
+
+      stale = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+
+      {:ok, session} =
+        Sessions.create_session(%{
+          agent_id: agent.id,
+          status: "working",
+          started_at: stale,
+          last_activity_at: stale,
+          provider: "openai",
+          entrypoint: "cli",
+          managed_by_app: false
+        })
+
+      AgentStatus.sweep_zombie_sessions_for_testing()
+
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "working"
+      assert is_nil(updated.status_reason)
+    end
+
     test "sweep_zombie_sessions marks stuck working sessions as failed" do
       # Create an agent first (required for session)
       {:ok, agent} =

@@ -7,7 +7,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
     ~H"""
     <div class="space-y-4">
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           API Keys
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -16,27 +16,29 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
             <div class="px-5 py-4">
               <div class="flex items-center justify-between">
                 <div>
-                  <p class="text-sm font-medium text-base-content">Anthropic API Key</p>
-                  <p class="text-xs text-base-content/50 mt-0.5">
+                  <p class="text-message font-medium text-base-content">Anthropic API Key</p>
+                  <p class="text-mini text-base-content/50 mt-0.5">
                     Set via ANTHROPIC_API_KEY in your .env
                   </p>
                 </div>
                 <%= case mask_env_var("ANTHROPIC_API_KEY") do %>
                   <% {:set, masked} -> %>
-                    <span class="badge badge-success badge-sm font-mono">{masked}</span>
+                    <span class="eits-chip eits-chip--success eits-chip--mono">
+                      {masked}
+                    </span>
                   <% {:not_set, _} -> %>
-                    <span class="text-xs text-warning">Not configured</span>
+                    <span class="text-mini text-warning">Not configured</span>
                 <% end %>
               </div>
               <%!-- Pass-through toggle --%>
               <div class="flex items-start justify-between mt-3 pt-3 border-t border-base-300">
                 <div class="pr-4">
-                  <p class="text-sm font-medium text-base-content">
+                  <p class="text-message font-medium text-base-content">
                     Pass key to spawned agents
                   </p>
-                  <p class="text-xs text-base-content/50 mt-0.5">
+                  <p class="text-mini text-base-content/50 mt-0.5">
                     When on, ANTHROPIC_API_KEY is forwarded to Claude CLI processes.
-                    Overrides Max plan OAuth — you will be billed per-token.
+                    Overrides Max plan OAuth - you will be billed per-token.
                   </p>
                 </div>
                 <input
@@ -52,19 +54,23 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
             <div class="px-5 py-4">
               <div class="flex items-center justify-between mb-2">
                 <div>
-                  <p class="text-sm font-medium text-base-content">EITS REST API Key</p>
-                  <p class="text-xs text-base-content/50 mt-0.5">Set via EITS_API_KEY in your .env</p>
+                  <p class="text-message font-medium text-base-content">EITS REST API Key</p>
+                  <p class="text-mini text-base-content/50 mt-0.5">
+                    Set via EITS_API_KEY in your .env
+                  </p>
                 </div>
                 <%= case mask_env_var("EITS_API_KEY") do %>
                   <% {:set, masked} -> %>
-                    <span class="badge badge-success badge-sm font-mono">{masked}</span>
+                    <span class="eits-chip eits-chip--success eits-chip--mono">
+                      {masked}
+                    </span>
                   <% {:not_set, _} -> %>
-                    <span class="text-xs text-warning">Not configured</span>
+                    <span class="text-mini text-warning">Not configured</span>
                 <% end %>
               </div>
               <%= if @generated_api_key do %>
-                <div class="alert alert-warning mt-2 p-3 text-xs">
-                  <p class="font-semibold mb-1">Copy this key now — it will not be shown again.</p>
+                <div class="alert alert-warning mt-2 p-3 text-mini">
+                  <p class="font-semibold mb-1">Copy this key now - it will not be shown again.</p>
                   <p class="mb-2">
                     Add to .env: <code class="font-mono">EITS_API_KEY=&lt;value&gt;</code>
                     then restart.
@@ -73,11 +79,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
                     type="text"
                     readonly
                     value={@generated_api_key}
-                    class="input input-bordered input-xs font-mono w-full text-base"
+                    class="input input-bordered input-xs font-mono w-full text-message"
                   />
                 </div>
               <% else %>
-                <button phx-click="regenerate_api_key" class="btn btn-sm btn-outline mt-2">
+                <button
+                  phx-click="regenerate_api_key"
+                  class="eits-action eits-action--secondary mt-2"
+                >
                   Regenerate
                 </button>
               <% end %>

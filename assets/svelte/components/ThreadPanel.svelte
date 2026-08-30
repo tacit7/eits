@@ -60,15 +60,15 @@
     font-family: ui-monospace, monospace;
     font-size: 0.8em;
     padding: 0.1em 0.3em;
-    border-radius: 3px;
-    background-color: rgb(127 127 127 / 0.1);
+    border-radius: var(--radius-box);
+    background-color: color-mix(in oklab, var(--color-base-content) 8%, transparent);
   }
   :global(.thread-body pre) {
     font-family: ui-monospace, monospace;
     font-size: 0.8em;
     padding: 0.6em 0.8em;
-    border-radius: 5px;
-    background-color: rgb(127 127 127 / 0.07);
+    border-radius: var(--radius-box);
+    background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
     overflow-x: auto;
     margin: 0.35em 0;
   }
@@ -85,11 +85,11 @@
       <svg class="w-3.5 h-3.5 text-base-content/40" viewBox="0 0 20 20" fill="currentColor">
         <path fill-rule="evenodd" d="M2 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-4 4V5Z" clip-rule="evenodd"/>
       </svg>
-      <span class="text-sm font-semibold text-base-content/70">Thread</span>
+      <span class="text-message font-semibold text-base-content/70">Thread</span>
     </div>
     <button
       on:click={close}
-      class="w-6 h-6 flex items-center justify-center rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
+      class="w-6 h-6 flex items-center justify-center rounded-box text-base-content/30 hover:text-base-content/70 hover:bg-base-content/5 transition-colors"
       aria-label="Close thread"
     >
       <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -105,14 +105,14 @@
       <!-- Parent message -->
       <div class="px-4 pt-4 pb-3 border-b border-base-content/5">
         <div class="flex items-baseline gap-2 mb-1.5">
-          <span class="text-[13px] font-semibold text-primary/80">
+          <span class="text-message font-semibold text-primary/80">
             {senderLabel(thread.parent_message)}
           </span>
-          <span class="text-[11px] text-base-content/25">
+          <span class="text-mini text-base-content/25">
             {formatTime(thread.parent_message.inserted_at)}
           </span>
         </div>
-        <div class="thread-body text-sm leading-relaxed text-base-content/80 break-words">
+        <div class="thread-body text-message leading-relaxed text-base-content/80 break-words">
           {@html renderBody(thread.parent_message.body)}
         </div>
       </div>
@@ -120,31 +120,31 @@
       <!-- Replies -->
       <div class="px-4 pt-3">
         {#if thread.replies && thread.replies.length > 0}
-          <div class="text-[11px] font-medium text-base-content/30 uppercase tracking-wider mb-3">
+          <div class="text-mini font-medium text-base-content/30 uppercase tracking-normal mb-3">
             {thread.replies.length} {thread.replies.length === 1 ? 'reply' : 'replies'}
           </div>
           {#each thread.replies as reply (reply.id)}
             <div class="mb-4">
               <div class="flex items-baseline gap-2 mb-1">
-                <span class="text-[13px] font-semibold {reply.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
+                <span class="text-message font-semibold {reply.sender_role === 'user' ? 'text-base-content/70' : 'text-primary/80'}">
                   {senderLabel(reply)}
                 </span>
-                <span class="text-[11px] text-base-content/25">{formatTime(reply.inserted_at)}</span>
+                <span class="text-mini text-base-content/25">{formatTime(reply.inserted_at)}</span>
               </div>
-              <div class="thread-body text-sm leading-relaxed text-base-content/80 break-words">
+              <div class="thread-body text-message leading-relaxed text-base-content/80 break-words">
                 {@html renderBody(reply.body)}
               </div>
             </div>
           {/each}
         {:else}
           <div class="py-8 text-center">
-            <p class="text-xs text-base-content/30">No replies yet</p>
+            <p class="text-mini text-base-content/30">No replies yet</p>
           </div>
         {/if}
       </div>
     {:else}
       <div class="flex items-center justify-center h-full">
-        <p class="text-xs text-base-content/30">Loading thread…</p>
+        <p class="text-mini text-base-content/30">Loading thread...</p>
       </div>
     {/if}
   </div>
@@ -156,9 +156,9 @@
         bind:value={replyInput}
         on:keydown={handleKeydown}
         aria-label="Reply to thread"
-        placeholder="Reply to thread… (⌘↵ to send)"
+        placeholder="Reply to thread... (⌘↵ to send)"
         rows="3"
-        class="w-full textarea textarea-sm bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 text-sm resize-none focus:border-primary/30 focus:bg-base-100 transition-colors"
+        class="w-full textarea textarea-sm rounded-box bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 text-message resize-none focus:border-primary/30 focus:bg-base-100 transition-colors"
       ></textarea>
       <div class="flex justify-end mt-2">
         <button

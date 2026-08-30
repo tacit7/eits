@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       <div class="flex items-center gap-3 px-4 py-2.5 border-b border-base-content/8 bg-base-100 flex-shrink-0">
         <.link
           navigate={@return_to}
-          class="flex items-center gap-1.5 text-xs text-base-content/40 hover:text-base-content/70 border border-base-content/10 rounded-md px-2.5 py-1.5 transition-colors flex-shrink-0"
+          class="flex items-center gap-1.5 text-mini text-base-content/40 hover:text-base-content/70 border border-base-content/10 rounded-box px-2.5 py-1.5 transition-colors flex-shrink-0"
         >
           <.icon name="hero-arrow-left" class="size-3.5" /> Notes
         </.link>
@@ -124,12 +124,12 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           value={@note.title || ""}
           placeholder="Untitled note"
           phx-blur="update_title"
-          class="flex-1 bg-transparent border-none outline-none text-sm font-semibold text-base-content/90 placeholder:text-base-content/30 min-w-0 px-1 rounded focus:bg-base-200/40"
+          class="flex-1 bg-transparent border-none outline-none text-message font-semibold text-base-content/90 placeholder:text-base-content/30 min-w-0 px-1 rounded-box focus:bg-base-200/40"
         />
 
         <%= if @note.parent_type do %>
           <span class={[
-            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0",
+            "hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-box text-mini font-medium flex-shrink-0",
             parent_type_class(@note.parent_type)
           ]}>
             <.icon name={parent_type_icon(@note.parent_type)} class="w-2.5 h-2.5" />
@@ -141,7 +141,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           type="button"
           id="note-save-btn"
           class={[
-            "flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all flex-shrink-0",
+            "flex items-center gap-1.5 text-mini font-medium px-3 py-1.5 rounded-box transition-all flex-shrink-0",
             if(@saved,
               do: "bg-success/10 text-success border border-success/30",
               else: "bg-primary text-primary-content hover:bg-primary/80"
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
           <%= if @saved do %>
             <.icon name="hero-check" class="size-3.5" /> Saved
           <% else %>
-            Save <kbd class="text-xs opacity-70 ml-0.5">⌘S</kbd>
+            Save <kbd class="text-mini opacity-70 ml-0.5">⌘S</kbd>
           <% end %>
         </button>
       </div>
@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.NoteLive.Edit do
       </div>
 
       <%!-- Status bar --%>
-      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-xs text-base-content/35">
+      <div class="flex items-center justify-between px-4 py-1 border-t border-base-content/8 bg-base-100 flex-shrink-0 text-mini text-base-content/35">
         <div class="flex items-center gap-4">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-success inline-block"></span> Markdown

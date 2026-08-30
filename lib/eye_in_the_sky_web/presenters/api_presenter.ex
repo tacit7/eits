@@ -149,6 +149,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       intent: session.intent,
       intent_set_at: session.intent_set_at,
       turn_start_at: session.turn_start_at,
+      managed_by_app: managed_by_app(session),
       read_only: session.read_only || false
     }
   end
@@ -179,6 +180,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       name: session.name,
       description: session.description,
       is_spawned: Keyword.get(opts, :is_spawned, false),
+      managed_by_app: managed_by_app(session),
       read_only: session.read_only || false,
       initialized: true,
       worktree_path: Keyword.get(opts, :worktree_path),
@@ -216,6 +218,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       inserted_at: to_string(commit.created_at)
     }
   end
+
+  defp managed_by_app(session), do: Map.get(session, :managed_by_app, true)
 
   @doc """
   Resolves a human-readable sender name from a session struct.

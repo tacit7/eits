@@ -30,7 +30,7 @@ export function createEnumAutocomplete(ctx) {
       const row = document.createElement('button')
       row.type = 'button'
       row.dataset.slashIdx = idx
-      row.className = 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
+      row.className = 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-message'
       row.innerHTML = `<span class="min-w-0 flex-1"><span class="font-medium text-base-content">${highlightMatch(v, partial)}</span></span>`
       row.addEventListener('mouseenter', () => {
         ctx.slashIndex = idx
@@ -45,7 +45,7 @@ export function createEnumAutocomplete(ctx) {
     }
 
     const hint = document.createElement('div')
-    hint.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+    hint.className = 'px-3 py-1.5 text-mini text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
     hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
     ctx.popup.appendChild(hint)
 

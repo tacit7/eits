@@ -28,9 +28,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
         <%!-- Top controls: content toggle + view mode toggle --%>
         <div class="flex items-center justify-between gap-3">
           <%!-- Commits / Full diff --%>
-          <div class="flex items-center gap-1 bg-base-300/50 rounded-lg p-1">
+          <div class="flex items-center gap-1 bg-base-300/50 rounded-box p-1">
             <button
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+              class={"px-3 py-1 rounded-box text-mini font-medium transition-colors " <>
                 if @commits_view == :list,
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/50 hover:text-base-content/70"}
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
               Commits
             </button>
             <button
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+              class={"px-3 py-1 rounded-box text-mini font-medium transition-colors " <>
                 if @commits_view == :cumulative,
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/50 hover:text-base-content/70"}
@@ -52,9 +52,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
           </div>
 
           <%!-- Unified / Side by side --%>
-          <div class="flex items-center gap-1 bg-base-300/50 rounded-lg p-1">
+          <div class="flex items-center gap-1 bg-base-300/50 rounded-box p-1">
             <button
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+              class={"px-3 py-1 rounded-box text-mini font-medium transition-colors " <>
                 if @diff_mode == :unified,
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/50 hover:text-base-content/70"}
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
               Unified
             </button>
             <button
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-colors " <>
+              class={"px-3 py-1 rounded-box text-mini font-medium transition-colors " <>
                 if @diff_mode == :side_by_side,
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/50 hover:text-base-content/70"}
@@ -78,14 +78,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
 
         <%= if @commits_view == :list do %>
           <div
-            class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
+            class="space-y-1 bg-base-200 rounded-box shadow-sm p-4"
             id="dm-commit-list"
           >
             <%= for commit <- @commits do %>
               <% hash = commit.commit_hash || "" %>
               <% diff = Map.get(@diff_cache, hash) %>
               <div
-                class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
                 id={"dm-commit-#{commit.id}"}
                 phx-hook="DiffCollapse"
                 data-hash={hash}
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                   <div class="flex items-center gap-3">
                     <.icon name="hero-code-bracket" class="size-4 flex-shrink-0 text-base-content/30" />
                     <div class="flex-1 min-w-0">
-                      <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                      <h3 class="text-message font-semibold text-base-content/85 truncate">
                         {extract_commit_title(commit.commit_message)}
                       </h3>
                       <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                     <% is_nil(diff) -> %>
                       <div></div>
                     <% diff == :error -> %>
-                      <div class="px-4 py-2 text-xs text-error/60">
+                      <div class="px-4 py-2 text-mini text-error/60">
                         Could not load diff — repo path unavailable
                       </div>
                     <% @diff_mode == :side_by_side -> %>
@@ -148,14 +148,14 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
           </div>
         <% else %>
           <%!-- Cumulative / full diff view --%>
-          <div class="bg-base-200 rounded-xl shadow-sm p-4" id="dm-cumulative-diff">
+          <div class="bg-base-200 rounded-box shadow-sm p-4" id="dm-cumulative-diff">
             <%= cond do %>
               <% is_nil(@cumulative_diff) -> %>
-                <div class="flex items-center gap-2 py-4 text-xs text-base-content/40">
+                <div class="flex items-center gap-2 py-4 text-mini text-base-content/40">
                   <span class="loading loading-spinner loading-xs"></span> Loading full diff&hellip;
                 </div>
               <% @cumulative_diff == :error -> %>
-                <div class="py-4 text-xs text-error/60">
+                <div class="py-4 text-mini text-error/60">
                   Could not load diff — repo path unavailable
                 </div>
               <% @diff_mode == :side_by_side -> %>

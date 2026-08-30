@@ -485,18 +485,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
             <h3 class="font-bold text-lg mb-4">Confirm Run Job</h3>
             <div class="space-y-3 mb-6">
               <div>
-                <p class="text-xs font-medium text-base-content/70">Job Name</p>
-                <p class="text-sm font-mono">{@confirm_run_modal_job.name}</p>
+                <p class="text-mini font-medium text-base-content/70">Job Name</p>
+                <p class="text-message font-mono">{@confirm_run_modal_job.name}</p>
               </div>
               <%= if @confirm_run_modal_job.description do %>
                 <div>
-                  <p class="text-xs font-medium text-base-content/70">Description</p>
-                  <p class="text-sm text-base-content/80">{@confirm_run_modal_job.description}</p>
+                  <p class="text-mini font-medium text-base-content/70">Description</p>
+                  <p class="text-message text-base-content/80">
+                    {@confirm_run_modal_job.description}
+                  </p>
                 </div>
               <% end %>
               <div>
-                <p class="text-xs font-medium text-base-content/70">Type</p>
-                <p class="text-sm">
+                <p class="text-mini font-medium text-base-content/70">Type</p>
+                <p class="text-message">
                   <span class="badge badge-xs badge-ghost">
                     <%= case @confirm_run_modal_job.job_type do %>
                       <% "spawn_agent" -> %>
@@ -513,8 +515,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                   </span>
                 </p>
               </div>
-              <div class="rounded-lg bg-warning/10 border border-warning/30 p-3">
-                <p class="text-xs font-medium text-warning flex items-center gap-1.5">
+              <div class="rounded-box bg-warning/10 border border-warning/30 p-3">
+                <p class="text-mini font-medium text-warning flex items-center gap-1.5">
                   <.icon name="hero-exclamation-triangle" class="w-4 h-4" />
                   This will spawn a Claude agent
                 </p>
@@ -600,16 +602,18 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                     ]} />
                   <% end %>
                   <div class="min-w-0">
-                    <h2 class="text-base font-semibold text-base-content truncate">{job.name}</h2>
+                    <h2 class="text-message font-semibold text-base-content truncate">
+                      {job.name}
+                    </h2>
                     <div class="flex items-center gap-1.5 mt-0.5">
-                      <span class="text-xs text-base-content/40">{type_label(job.job_type)}</span>
+                      <span class="text-mini text-base-content/40">{type_label(job.job_type)}</span>
                       <%= if is_nil(job.project_id) do %>
-                        <span class="text-base-content/20 text-xs">&middot;</span>
-                        <span class="text-xs text-base-content/30">global</span>
+                        <span class="text-base-content/20 text-mini">|</span>
+                        <span class="text-mini text-base-content/30">global</span>
                       <% end %>
                       <%= if job.origin == "system" do %>
-                        <span class="text-base-content/20 text-xs">&middot;</span>
-                        <span class="text-xs text-base-content/30">system</span>
+                        <span class="text-base-content/20 text-mini">|</span>
+                        <span class="text-mini text-base-content/30">system</span>
                       <% end %>
                     </div>
                   </div>
@@ -637,7 +641,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                     phx-value-id={job.id}
                     phx-target={@myself}
                   />
-                  <span class="text-xs text-base-content/60">
+                  <span class="text-mini text-base-content/60">
                     {if job.enabled, do: "Enabled", else: "Disabled"}
                   </span>
                 </label>
@@ -680,18 +684,20 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               <%!-- Description --%>
               <%= if job.description && job.description != "" do %>
                 <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-1">Description</p>
-                  <p class="text-sm text-base-content/80 leading-relaxed">{job.description}</p>
+                  <p class="text-mini font-medium text-base-content/50 mb-1">Description</p>
+                  <p class="text-message text-base-content/80 leading-relaxed">{job.description}</p>
                 </div>
               <% end %>
 
               <%!-- Schedule --%>
               <div>
-                <p class="text-xs font-medium text-base-content/50 mb-1">Schedule</p>
+                <p class="text-mini font-medium text-base-content/50 mb-1">Schedule</p>
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-mono text-base-content/80">{format_schedule(job)}</span>
+                  <span class="text-message font-mono text-base-content/80">
+                    {format_schedule(job)}
+                  </span>
                   <%= if job.timezone && job.timezone not in ["Etc/UTC", "UTC"] do %>
-                    <span class="text-xs text-base-content/40">({job.timezone})</span>
+                    <span class="text-mini text-base-content/40">({job.timezone})</span>
                   <% end %>
                 </div>
               </div>
@@ -699,21 +705,21 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               <%!-- Stats row --%>
               <div class="flex items-start gap-6">
                 <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-0.5">Runs</p>
-                  <p class="text-sm font-mono text-base-content/80">{job.run_count || 0}</p>
+                  <p class="text-mini font-medium text-base-content/50 mb-0.5">Runs</p>
+                  <p class="text-message font-mono text-base-content/80">{job.run_count || 0}</p>
                 </div>
                 <%= if job.last_run_at do %>
                   <div>
-                    <p class="text-xs font-medium text-base-content/50 mb-0.5">Last run</p>
-                    <p class="text-sm font-mono text-base-content/80">
+                    <p class="text-mini font-medium text-base-content/50 mb-0.5">Last run</p>
+                    <p class="text-message font-mono text-base-content/80">
                       {format_relative_time(job.last_run_at)}
                     </p>
                   </div>
                 <% end %>
                 <%= if not is_nil(job.next_run_at) and job.enabled do %>
                   <div>
-                    <p class="text-xs font-medium text-base-content/50 mb-0.5">Next run</p>
-                    <p class="text-sm font-mono text-base-content/80">
+                    <p class="text-mini font-medium text-base-content/50 mb-0.5">Next run</p>
+                    <p class="text-message font-mono text-base-content/80">
                       {format_relative_time(job.next_run_at)}
                     </p>
                   </div>
@@ -723,7 +729,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               <%!-- Trend dots --%>
               <%= if trend_runs != [] do %>
                 <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-2">Trend</p>
+                  <p class="text-mini font-medium text-base-content/50 mb-2">Trend</p>
                   <div class="flex items-center gap-1">
                     <%= for run <- trend_runs do %>
                       <span
@@ -741,7 +747,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               <%!-- Run history --%>
               <%= if @runs != [] do %>
                 <div>
-                  <p class="text-xs font-medium text-base-content/50 mb-2">Run history</p>
+                  <p class="text-mini font-medium text-base-content/50 mb-2">Run history</p>
                   <div class="divide-y divide-base-content/5">
                     <%= for run <- @runs do %>
                       <div class="py-2 flex items-center gap-3">
@@ -752,19 +758,21 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                         <div class="flex-1 min-w-0">
                           <div class="flex items-center gap-2">
                             <span class={[
-                              "text-xs font-medium",
+                              "text-mini font-medium",
                               run_status_text_class(run.status)
                             ]}>
                               {String.capitalize(run.status)}
                             </span>
                             <%= if run.started_at do %>
-                              <span class="text-[10px] text-base-content/30 font-mono">
+                              <span class="text-micro text-base-content/30 font-mono">
                                 {format_relative_time(run.started_at)}
                               </span>
                             <% end %>
                           </div>
                           <%= if run.result && run.result != "" do %>
-                            <p class="text-xs text-base-content/50 truncate mt-0.5">{run.result}</p>
+                            <p class="text-mini text-base-content/50 truncate mt-0.5">
+                              {run.result}
+                            </p>
                           <% end %>
                         </div>
                       </div>

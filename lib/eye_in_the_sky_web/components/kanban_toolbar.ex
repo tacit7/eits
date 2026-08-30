@@ -29,19 +29,19 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
             value={@search_query}
             placeholder="Search tasks..."
             phx-debounce="300"
-            class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-base min-h-[44px]"
+            class="input input-sm w-full pl-9 bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 focus:border-primary/30 focus:bg-base-100 transition-colors text-message min-h-[44px]"
             autocomplete="off"
           />
         </div>
         <%= if String.length(String.trim(@search_query)) == 1 do %>
-          <p class="text-xs text-base-content/30 mt-1 pl-9">Type at least 2 characters to search</p>
+          <p class="text-mini text-base-content/30 mt-1 pl-9">Type at least 2 characters to search</p>
         <% end %>
       </form>
 
       <div class="flex items-center gap-1.5">
         <button
           phx-click="toggle_show_completed"
-          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@show_completed, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={toolbar_button_class(@show_completed)}
           title="Show completed tasks"
         >
           <.icon name="hero-check-circle-mini" class="size-3.5" />
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </button>
         <button
           phx-click="toggle_bulk_mode"
-          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@bulk_mode, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={toolbar_button_class(@bulk_mode)}
           title={if @bulk_mode, do: "Exit select mode", else: "Bulk select mode"}
         >
           <%= if @bulk_mode do %>
@@ -62,19 +62,21 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </button>
         <button
           phx-click="toggle_filter_drawer"
-          class={"btn btn-sm sm:btn-xs gap-1 h-11 sm:h-7 min-h-0 " <> if(@active_filter_count > 0, do: "btn-neutral", else: "btn-ghost border border-base-content/10")}
+          class={toolbar_button_class(@active_filter_count > 0)}
           title="Filter tasks"
         >
           <.icon name="hero-funnel-mini" class="size-3.5" />
           <span class="hidden sm:inline">Filter</span>
           <%= if @active_filter_count > 0 do %>
-            <span class="badge badge-xs badge-primary">{@active_filter_count}</span>
+            <span class="inline-flex size-4 items-center justify-center rounded-full bg-primary text-nano font-bold text-primary-content">
+              {@active_filter_count}
+            </span>
           <% end %>
         </button>
         <.link
           :if={@project_id}
           navigate={~p"/projects/#{@project_id}/tasks"}
-          class="btn btn-sm sm:btn-xs btn-ghost border border-base-content/10 gap-1 h-11 sm:h-7 min-h-0"
+          class="focus-ring flex h-11 items-center gap-1 rounded-box border border-base-content/10 px-2 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70 sm:h-7"
           title="List view"
         >
           <.icon name="hero-list-bullet-mini" class="size-3.5" />
@@ -82,12 +84,21 @@ defmodule EyeInTheSkyWeb.Components.KanbanToolbar do
         </.link>
         <button
           phx-click="toggle_new_task_drawer"
-          class="btn btn-sm btn-primary gap-1.5 h-11 sm:h-7 min-h-0 text-xs"
+          class="focus-ring flex h-11 items-center gap-1.5 rounded-box bg-primary px-2 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85 sm:h-7"
         >
-          <.icon name="hero-plus-mini" class="size-3.5" /> New Task
+          <.icon name="hero-plus-mini" class="size-3.5" />
+          <span>New Task</span>
         </button>
       </div>
     </div>
     """
+  end
+
+  defp toolbar_button_class(true) do
+    "focus-ring flex h-11 items-center gap-1 rounded-box bg-base-content/10 px-2 text-mini font-medium text-base-content transition-colors sm:h-7"
+  end
+
+  defp toolbar_button_class(false) do
+    "focus-ring flex h-11 items-center gap-1 rounded-box border border-base-content/10 px-2 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70 sm:h-7"
   end
 end

@@ -99,7 +99,7 @@
   {/if}
 
   {#if showLabel}
-    <span class="text-xs">{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+    <span class="text-mini">{isBookmarked ? 'Bookmarked' : 'Bookmark'}</span>
   {/if}
 </button>
 

@@ -229,7 +229,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           <.icon name="hero-exclamation-triangle" class="size-5" />
           <div>
             <div class="font-semibold">This is a built-in system policy.</div>
-            <div class="text-sm">
+            <div class="text-message">
               Matcher fields are locked — you can only edit:
               <code class="font-mono">
                 {Enum.join(@policy.editable_fields || [], ", ")}
@@ -352,12 +352,12 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
         <details class="collapse collapse-arrow bg-base-200">
           <summary class="collapse-title font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
             <.icon name="hero-code-bracket" class="size-4 text-primary" /> Matcher source
-            <code class="font-mono text-xs text-base-content/60 ml-1">
+            <code class="font-mono text-mini text-base-content/60 ml-1">
               {@policy.builtin_matcher}.ex
             </code>
           </summary>
           <div class="collapse-content px-0 pb-0">
-            <pre class="overflow-x-auto text-xs font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
+            <pre class="overflow-x-auto text-mini font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
           </div>
         </details>
       <% end %>

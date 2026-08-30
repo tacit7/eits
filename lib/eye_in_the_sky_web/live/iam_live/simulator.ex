@@ -189,10 +189,12 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
       <div class="flex items-center gap-3">
         <.icon name="hero-beaker" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">IAM Simulator</h1>
-        <span class="badge badge-ghost">dry-run</span>
+        <span class="inline-flex items-center rounded-box bg-base-content/10 px-2 py-0.5 text-mini font-medium text-base-content/55">
+          dry-run
+        </span>
       </div>
 
-      <p class="text-sm text-base-content/70">
+      <p class="text-message text-base-content/70">
         Evaluate a hypothetical Claude Code hook payload against the live policy set. No state is written.
       </p>
 
@@ -204,7 +206,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
             <div class="flex flex-wrap gap-2">
               <button
                 type="button"
-                class="btn btn-xs btn-outline"
+                class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 phx-click="preset"
                 phx-value-preset="rm_rf"
               >
@@ -212,7 +214,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               </button>
               <button
                 type="button"
-                class="btn btn-xs btn-outline"
+                class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 phx-click="preset"
                 phx-value-preset="sudo"
               >
@@ -220,7 +222,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               </button>
               <button
                 type="button"
-                class="btn btn-xs btn-outline"
+                class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 phx-click="preset"
                 phx-value-preset="push_main"
               >
@@ -228,7 +230,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               </button>
               <button
                 type="button"
-                class="btn btn-xs btn-outline"
+                class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 phx-click="preset"
                 phx-value-preset="curl_sh"
               >
@@ -236,7 +238,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               </button>
               <button
                 type="button"
-                class="btn btn-xs btn-outline"
+                class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
                 phx-click="preset"
                 phx-value-preset="env_read"
               >
@@ -247,7 +249,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
             <form phx-submit="simulate" phx-change="update_form" class="space-y-3">
               <div class="grid grid-cols-2 gap-3">
                 <label class="form-control">
-                  <span class="label-text text-xs">Event</span>
+                  <span class="label-text text-mini">Event</span>
                   <select name="form[event]" class="select select-bordered select-sm">
                     <option value="pre_tool_use" selected={@form["event"] == "pre_tool_use"}>
                       pre_tool_use
@@ -260,7 +262,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control">
-                  <span class="label-text text-xs">Agent type</span>
+                  <span class="label-text text-mini">Agent type</span>
                   <input
                     type="text"
                     name="form[agent_type]"
@@ -270,7 +272,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control">
-                  <span class="label-text text-xs">Tool</span>
+                  <span class="label-text text-mini">Tool</span>
                   <input
                     type="text"
                     name="form[tool]"
@@ -280,7 +282,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control">
-                  <span class="label-text text-xs">Project ID (optional)</span>
+                  <span class="label-text text-mini">Project ID (optional)</span>
                   <input
                     type="text"
                     name="form[project_id]"
@@ -291,7 +293,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control col-span-2">
-                  <span class="label-text text-xs">Resource path</span>
+                  <span class="label-text text-mini">Resource path</span>
                   <input
                     type="text"
                     name="form[resource_path]"
@@ -302,17 +304,17 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control col-span-2">
-                  <span class="label-text text-xs">Resource content</span>
+                  <span class="label-text text-mini">Resource content</span>
                   <textarea
                     name="form[resource_content]"
                     rows="4"
-                    class="textarea textarea-bordered textarea-sm font-mono text-xs"
+                    class="textarea textarea-bordered textarea-sm font-mono text-mini"
                     placeholder="command or file contents"
                   ><%= @form["resource_content"] %></textarea>
                 </label>
 
                 <label class="form-control col-span-2">
-                  <span class="label-text text-xs">Session UUID (optional)</span>
+                  <span class="label-text text-mini">Session UUID (optional)</span>
                   <input
                     type="text"
                     name="form[session_uuid]"
@@ -322,7 +324,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                 </label>
 
                 <label class="form-control">
-                  <span class="label-text text-xs">Fallback permission</span>
+                  <span class="label-text text-mini">Fallback permission</span>
                   <select name="form[fallback_permission]" class="select select-bordered select-sm">
                     <option value="allow" selected={@form["fallback_permission"] == "allow"}>
                       allow
@@ -341,15 +343,24 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
                     class="checkbox checkbox-sm"
                     checked={@form["skip_builtins"] in ["true", "on", true]}
                   />
-                  <span class="label-text text-xs">Skip built-in matchers</span>
+                  <span class="label-text text-mini">Skip built-in matchers</span>
                 </label>
               </div>
 
               <div class="flex gap-2 pt-2">
-                <button type="submit" class="btn btn-primary btn-sm">
+                <button
+                  type="submit"
+                  class="focus-ring inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+                >
                   <.icon name="hero-play" class="size-4" /> Simulate
                 </button>
-                <button type="button" class="btn btn-ghost btn-sm" phx-click="reset">Reset</button>
+                <button
+                  type="button"
+                  class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+                  phx-click="reset"
+                >
+                  Reset
+                </button>
               </div>
             </form>
           </div>
@@ -378,15 +389,15 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
               </h2>
               <div class="flex flex-wrap gap-2">
                 <%= for dc <- @result.document_contributions do %>
-                  <div class="badge badge-outline gap-1 py-3 px-3">
+                  <div class="inline-flex min-h-[44px] items-center gap-1 rounded-box border border-base-content/15 px-3 py-2 text-mini text-base-content/60">
                     <.link
                       navigate={"/iam/documents/#{dc.document_id}"}
                       class="link link-hover font-medium"
                     >
                       {dc.document_name}
                     </.link>
-                    <span class="text-base-content/50">→ {dc.agent_type}</span>
-                    <span class="badge badge-ghost badge-sm">
+                    <span class="text-base-content/35">/ {dc.agent_type}</span>
+                    <span class="rounded-box bg-base-content/10 px-1.5 py-0.5 text-micro font-medium text-base-content/50">
                       {dc.effective_policy_count} matched
                     </span>
                   </div>
@@ -400,7 +411,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
           <div class="card-body">
             <h2 class="card-title text-lg flex items-center gap-2">
               <.icon name="hero-queue-list" class="size-5" /> Trace
-              <span class="badge badge-ghost">{length(@result.traces)}</span>
+              <span class="rounded-box bg-base-content/10 px-2 py-0.5 text-mini font-medium text-base-content/55">
+                {length(@result.traces)}
+              </span>
             </h2>
             <.trace_table traces={@result.traces} winner_id={@result.winner_id} />
           </div>

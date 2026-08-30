@@ -19,6 +19,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   require Logger
 
   alias EyeInTheSky.{Agents, Channels, Messages, Notifications, Sessions, Settings}
+  alias EyeInTheSky.Codex.Error, as: CodexError
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
@@ -113,7 +114,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   """
   def on_session_failed(session_id, provider_conversation_id, reason) do
     error_text = provider_error_text(reason)
-    Messages.record_incoming_reply(session_id, "system", "[provider error] " <> error_text)
+    record_provider_error_message(session_id, reason, error_text)
     Events.stream_error(session_id, provider_conversation_id, error_text)
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
@@ -182,10 +183,58 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   defp provider_error_text({:pi_turn_error, msg}) when is_binary(msg), do: Redaction.redact(msg)
 
+  defp provider_error_text({:codex_error, payload}),
+    do: CodexError.normalize(payload, "Codex error").message
+
+  defp provider_error_text({:turn_failed, payload}),
+    do: CodexError.normalize(payload, "Codex turn failed").message
+
   defp provider_error_text({:claude_result_error, %{result: result}}) when is_binary(result),
     do: Redaction.redact(result)
 
   defp provider_error_text(reason), do: Redaction.redact_inspect(reason, limit: 500)
+
+  defp record_provider_error_message(session_id, {:codex_error, payload}, _error_text) do
+    record_codex_error_message(
+      session_id,
+      CodexError.normalize(payload, "Codex error"),
+      "codex_error"
+    )
+  end
+
+  defp record_provider_error_message(session_id, {:turn_failed, payload}, _error_text) do
+    record_codex_error_message(
+      session_id,
+      CodexError.normalize(payload, "Codex turn failed"),
+      "codex_turn_failed"
+    )
+  end
+
+  defp record_provider_error_message(session_id, _reason, error_text) do
+    Messages.record_incoming_reply(session_id, "system", "[provider error] " <> error_text)
+  end
+
+  defp record_codex_error_message(session_id, normalized, stream_type) do
+    title =
+      case stream_type do
+        "codex_turn_failed" -> "Codex turn failed"
+        _ -> "Codex error"
+      end
+
+    metadata =
+      %{
+        "stream_type" => stream_type,
+        "error_title" => title,
+        "error_message" => normalized.message,
+        "status" => normalized.status,
+        "error_type" => normalized.error_type,
+        "model" => normalized.model
+      }
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Map.new()
+
+    Messages.record_incoming_reply(session_id, "codex", normalized.message, metadata: metadata)
+  end
 
   # --- Data Events ---
 

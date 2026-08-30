@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.TopBar.Teams do
     <button
       phx-click="toggle_archived"
       class={[
-        "flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border transition-colors select-none",
+        "flex items-center gap-1 h-7 px-2 rounded-box text-mini font-medium border transition-colors select-none",
         if(@show_archived,
           do: "border-base-content/15 bg-base-content/5 text-base-content/70",
           else: "border-base-content/8 bg-base-100 text-base-content/45 hover:text-base-content/70"

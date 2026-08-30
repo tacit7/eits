@@ -32,11 +32,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     <div class="px-3 py-4 flex flex-col gap-4">
       <div :for={_ <- 1..3} class="flex flex-col gap-1.5">
         <div class="flex justify-between">
-          <div class="skeleton h-3 w-28 rounded"></div>
-          <div class="skeleton h-3 w-14 rounded"></div>
+          <div class="skeleton h-3 w-28 rounded-box"></div>
+          <div class="skeleton h-3 w-14 rounded-box"></div>
         </div>
         <div class="skeleton h-1.5 w-full rounded-full"></div>
-        <div class="skeleton h-2.5 w-20 rounded"></div>
+        <div class="skeleton h-2.5 w-20 rounded-box"></div>
       </div>
     </div>
     """
@@ -48,7 +48,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
 
   defp usage_error(assigns) do
     ~H"""
-    <div class="px-3 py-4 text-xs text-base-content/40 italic">
+    <div class="px-3 py-4 text-mini text-base-content/40 italic">
       {@message}
     </div>
     """
@@ -92,8 +92,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     ~H"""
     <div class="px-3 py-3 flex flex-col gap-1.5">
       <div class="flex items-baseline justify-between gap-2">
-        <span class="text-xs font-medium text-base-content/80 truncate">{@label}</span>
-        <span class="text-xs font-medium text-primary flex-shrink-0">{@pct}% used</span>
+        <span class="text-mini font-medium text-base-content/80 truncate">{@label}</span>
+        <span class="text-mini font-medium text-primary flex-shrink-0">{@pct}% used</span>
       </div>
       <div class="w-full h-1.5 rounded-full bg-base-content/15 overflow-hidden">
         <div
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
         >
         </div>
       </div>
-      <span :if={@rate.resets_at} class="text-[10px] text-base-content/40 leading-none">
+      <span :if={@rate.resets_at} class="text-micro text-base-content/40 leading-none">
         resets in {format_reset(@rate.resets_at)}
       </span>
     </div>
@@ -123,8 +123,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     ~H"""
     <div class="px-3 py-3 flex flex-col gap-1.5">
       <div class="flex items-baseline justify-between gap-2">
-        <span class="text-xs font-medium text-base-content/80">Monthly spend</span>
-        <span class="text-xs font-medium text-primary flex-shrink-0">{@spend_label}</span>
+        <span class="text-mini font-medium text-base-content/80">Monthly spend</span>
+        <span class="text-mini font-medium text-primary flex-shrink-0">{@spend_label}</span>
       </div>
       <div class="w-full h-1.5 rounded-full bg-base-content/15 overflow-hidden">
         <div
@@ -159,7 +159,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.UsageSection do
     "$#{format_dollars(used_dollars)} / $#{format_dollars(limit_dollars)}"
   end
 
-  defp spend_label(_), do: "—"
+  defp spend_label(_), do: "-"
 
   defp format_dollars(n) when is_float(n), do: :erlang.float_to_binary(n, decimals: 2)
 

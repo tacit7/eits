@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
   :agent_schedules, this component loads its data via maybe_reload_agent_schedule_data.
 
   cancel_schedule and save_schedule come from agent_schedule_form (no phx-target),
-  so they bubble to the parent LiveView → jobs_page relay → send_update here with
+  so they bubble to the parent LiveView, then jobs_page relay and send_update here with
   event_relay: {event, params}.
 
   schedule_prompt, edit_schedule, run_now, delete_job buttons in this component's
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
     end
   end
 
-  # Normal attrs update — called on every parent re-render with project_id + active_tab
+  # Normal attrs update: called on every parent re-render with project_id + active_tab.
   def update(assigns, socket) do
     prev_tab = Map.get(socket.assigns, :active_tab, :all_jobs)
     prev_project_id = Map.get(socket.assigns, :project_id)
@@ -168,24 +168,34 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                 <div class="card-body p-4 gap-2">
                   <div class="flex items-start justify-between">
                     <div class="flex items-center gap-1.5">
-                      <h3 class="font-semibold text-sm leading-tight">{prompt.name}</h3>
+                      <h3 class="font-semibold text-message leading-tight">{prompt.name}</h3>
                       <%= if Map.get(prompt, :source) do %>
-                        <span class={"badge badge-xs #{if prompt.source == :project, do: "badge-info", else: "badge-ghost"}"}>
+                        <span class={[
+                          "eits-chip",
+                          if(prompt.source == :project,
+                            do: "eits-chip--info",
+                            else: "eits-chip--neutral"
+                          )
+                        ]}>
                           {if prompt.source == :project, do: "project", else: "global"}
                         </span>
                       <% end %>
                     </div>
                     <%= if job do %>
-                      <span class="badge badge-success badge-xs whitespace-nowrap">● active</span>
+                      <span class="eits-chip eits-chip--success whitespace-nowrap">
+                        <.icon name="hero-check-circle-mini" class="size-3" /> active
+                      </span>
                     <% end %>
                   </div>
-                  <p class="text-xs text-base-content/60 line-clamp-2">{prompt.description}</p>
+                  <p class="text-mini text-base-content/60 line-clamp-2">{prompt.description}</p>
                   <div class="flex items-center justify-between mt-1">
                     <%= if job do %>
-                      <span class="font-mono text-xs text-base-content/50">{job.schedule_value}</span>
+                      <span class="font-mono text-mini text-base-content/50">
+                        {job.schedule_value}
+                      </span>
                       <div class="flex gap-1">
                         <button
-                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                          class="eits-action eits-action--ghost eits-action--icon"
                           phx-click="edit_schedule"
                           phx-value-job_id={job.id}
                           phx-target={@myself}
@@ -193,23 +203,24 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
                           Edit
                         </button>
                         <button
-                          class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                          class="eits-action eits-action--ghost eits-action--icon hover:text-primary"
                           phx-click="run_now"
                           phx-value-id={job.id}
                           phx-target={@myself}
+                          aria-label="Run schedule now"
                         >
-                          ▶
+                          <.icon name="hero-play-mini" class="size-3.5" />
                         </button>
                       </div>
                     <% else %>
-                      <span class="text-xs text-base-content/40">not scheduled</span>
+                      <span class="text-mini text-base-content/40">not scheduled</span>
                       <button
-                        class="btn btn-primary btn-xs"
+                        class="eits-action eits-action--primary gap-1.5"
                         phx-click="schedule_prompt"
                         phx-value-id={prompt.id}
                         phx-target={@myself}
                       >
-                        + Schedule
+                        <.icon name="hero-plus-mini" class="size-3.5" /> Schedule
                       </button>
                     <% end %>
                   </div>
@@ -220,29 +231,32 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
 
           <%= if @orphaned_jobs != [] do %>
             <div>
-              <p class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-2">
+              <p class="text-mini font-semibold uppercase tracking-normal text-base-content/40 mb-2">
                 Detached Schedules
               </p>
               <div class="space-y-2">
                 <%= for job <- @orphaned_jobs do %>
-                  <div class="flex items-center gap-3 p-3 rounded-lg bg-base-200 border border-warning/40">
+                  <div class="flex items-center gap-3 p-3 rounded-box bg-base-200 border border-warning/40">
                     <div class="flex-1 min-w-0">
-                      <span class="text-sm truncate">{job.name}</span>
-                      <span class="badge badge-warning badge-xs ml-2">Prompt deactivated</span>
+                      <span class="text-message truncate">{job.name}</span>
+                      <span class="eits-chip eits-chip--warning ml-2">
+                        Prompt deactivated
+                      </span>
                     </div>
-                    <span class="font-mono text-xs text-base-content/50 shrink-0">
+                    <span class="font-mono text-mini text-base-content/50 shrink-0">
                       {job.schedule_value}
                     </span>
                     <button
-                      class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                      class="eits-action eits-action--ghost eits-action--icon hover:text-primary"
                       phx-click="run_now"
                       phx-value-id={job.id}
                       phx-target={@myself}
+                      aria-label="Run detached schedule now"
                     >
-                      ▶
+                      <.icon name="hero-play-mini" class="size-3.5" />
                     </button>
                     <button
-                      class="btn btn-ghost btn-xs text-error min-h-[44px] min-w-[44px]"
+                      class="eits-action eits-action--danger"
                       phx-click="delete_job"
                       phx-value-id={job.id}
                       phx-target={@myself}
@@ -257,7 +271,7 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
         </div>
       <% end %>
 
-      <%!-- Agent Schedule Form — save_schedule / cancel_schedule events have no phx-target,
+      <%!-- Agent Schedule Form: save_schedule / cancel_schedule events have no phx-target,
            so they bubble to the parent LiveView which relays them back here via jobs_page
            send_update event_relay. Rendered outside the tab guard so it can show
            regardless of which tab is active. --%>

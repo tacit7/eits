@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     style={"background-color: #{state_dot_color(state.color)}"}
                   />
                 </div>
-                <span class="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                <span class="text-mini font-semibold text-base-content/70 uppercase tracking-normal">
                   {state.name}
                 </span>
                 <span class="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-mini font-medium tabular-nums bg-base-content/[0.06] text-base-content/40">
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     phx-click="archive_column"
                     phx-value-state-id={state.id}
                     phx-confirm={"Archive all #{task_count} done tasks?"}
-                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
+                    class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box text-base-content/20 hover:text-warning hover:bg-warning/10 transition-colors"
                     title="Archive all done tasks"
                   >
                     <.icon name="hero-archive-box-mini" class="size-3.5" />
@@ -88,7 +88,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
 
             <%!-- Column body --%>
             <div
-              class="flex-1 min-h-0 overflow-y-auto rounded-xl bg-base-content/[0.04] p-2 space-y-1.5"
+              class="flex-1 min-h-0 overflow-y-auto rounded-box bg-base-content/[0.04] p-2 space-y-1.5"
               id={"kanban-col-#{state.id}"}
               phx-hook="SortableKanban"
               data-state-id={state.id}
@@ -97,7 +97,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
               <%= if column_tasks == [] do %>
                 <div
                   data-empty-placeholder
-                  class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-lg pointer-events-none"
+                  class="flex flex-col items-center justify-center h-24 border border-dashed border-base-content/8 rounded-box pointer-events-none"
                 >
                   <.icon name="hero-inbox" class="size-5 text-base-content/15 mb-1" />
                   <span class="text-mini text-base-content/20">No tasks</span>
@@ -163,14 +163,14 @@ defmodule EyeInTheSkyWeb.Components.KanbanBoard do
                     autofocus
                     phx-keydown="hide_quick_add"
                     phx-key="Escape"
-                    class="input input-md sm:input-sm w-full bg-base-100 border-base-content/10 text-base placeholder:text-base-content/25 focus:border-primary/30"
+                    class="input input-md sm:input-sm w-full bg-base-100 border-base-content/10 text-message placeholder:text-base-content/25 focus:border-primary/30"
                   />
                 </form>
               <% else %>
                 <button
                   phx-click="show_quick_add"
                   phx-value-state_id={state.id}
-                  class="mt-1 w-full flex items-center justify-center sm:justify-start gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-lg text-xs sm:text-mini text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors min-h-[44px]"
+                  class="mt-1 w-full flex items-center justify-center sm:justify-start gap-1.5 px-2 py-2.5 sm:py-1.5 rounded-box text-mini text-base-content/25 hover:text-base-content/50 hover:bg-base-content/[0.04] transition-colors min-h-[44px]"
                 >
                   <.icon name="hero-plus-mini" class="size-4 sm:w-3.5 sm:h-3.5" />
                   <span>Add task</span>

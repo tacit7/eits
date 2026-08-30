@@ -17,11 +17,11 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
     ~H"""
     <div class="card bg-base-200 border border-base-300 hover:shadow-lg transition-all group" {@rest}>
       <div class="card-body p-5">
-        <!-- Task Header with Priority -->
+        <%!-- Task header with priority --%>
         <div class="flex items-start justify-between gap-2 mb-3">
           <div class="flex-1 min-w-0">
             <h3
-              class="text-base font-semibold text-base-content hover:text-primary transition-colors line-clamp-2 cursor-pointer"
+              class="text-message font-semibold text-base-content hover:text-primary transition-colors line-clamp-2 cursor-pointer"
               phx-click={@on_click}
               phx-value-task_id={@task.uuid}
             >
@@ -30,29 +30,29 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
           </div>
           <.priority_badge priority={@task.priority} />
         </div>
-        
-    <!-- Description -->
+
+        <%!-- Description --%>
         <%= if @task.description do %>
-          <p class="text-sm text-base-content/60 line-clamp-3 mb-3">
+          <p class="text-message text-base-content/60 line-clamp-3 mb-3">
             {@task.description}
           </p>
         <% end %>
-        
-    <!-- Task Metadata -->
+
+        <%!-- Task metadata --%>
         <div class="flex flex-wrap items-center gap-2 mt-auto pt-3 border-t border-base-300">
           <%= if @task.uuid do %>
-            <span class="badge badge-ghost badge-sm font-mono text-xs">
+            <span class="eits-chip eits-chip--muted eits-chip--mono">
               {String.slice(@task.uuid, 0..7)}
             </span>
           <% end %>
           <%= if @task.created_at do %>
-            <span class="badge badge-ghost badge-sm text-xs tabular-nums">
+            <span class="eits-chip eits-chip--muted tabular-nums">
               {relative_time(@task.created_at)}
             </span>
           <% end %>
           <button
             type="button"
-            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-ring rounded"
+            class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] cursor-pointer hover:text-primary transition-colors z-10 focus-ring rounded-box"
             phx-hook="CopyToClipboard"
             id={"copy-task-grid-#{@task.id}"}
             data-copy={@task.uuid}
@@ -66,15 +66,15 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
           <% end %>
 
           <%= if @task.due_at do %>
-            <span class="badge badge-ghost badge-sm">
-              <.icon name="hero-calendar" class="size-3 mr-1" />
+            <span class="eits-chip eits-chip--muted">
+              <.icon name="hero-calendar" class="size-3" />
               {format_due_date(@task.due_at)}
             </span>
           <% end %>
 
           <%= if not is_nil(@task.tags) && @task.tags != [] do %>
             <%= for tag <- Enum.take(@task.tags, 3) do %>
-              <span class="badge badge-ghost badge-sm">
+              <span class="eits-chip eits-chip--muted">
                 {tag.name}
               </span>
             <% end %>

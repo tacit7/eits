@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
   def render(assigns) do
     ~H"""
     <section>
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+      <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         System
       </h2>
       <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -14,8 +14,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
           <%!-- Debug Logging --%>
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Log Raw Claude Output</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Log Raw Claude Output</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Log raw JSONL output from Claude CLI to console
               </p>
             </div>
@@ -30,8 +30,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Log Raw Codex Output</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Log Raw Codex Output</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Log raw output from Codex CLI to console
               </p>
             </div>
@@ -46,8 +46,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Per-session Rate-Limit Bucket</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Per-session Rate-Limit Bucket</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Per-session rate-limit bucket (Phase 2). Requires eits CLI with x-eits-session header support. Leaving off keeps the current IP-keyed bucket.
               </p>
             </div>
@@ -62,8 +62,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <%!-- Database Info --%>
           <div class="px-5 py-4">
-            <p class="text-sm font-medium text-base-content mb-3">Database</p>
-            <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+            <p class="text-message font-medium text-base-content mb-3">Database</p>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-mini">
               <div class="text-base-content/50">Path</div>
               <div class="font-mono text-base-content truncate" title={@db_info.path}>
                 {@db_info.path}
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
               <div class="text-base-content">{format_db_size(@db_info.size)}</div>
             </div>
             <div class="mt-3">
-              <p class="text-xs text-base-content/50 mb-2">Table Counts</p>
+              <p class="text-mini text-base-content/50 mb-2">Table Counts</p>
               <div class="flex flex-wrap gap-2">
                 <span
                   :for={{table, count} <- @db_info.table_counts}

@@ -21,10 +21,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
           subtitle="Session context will appear here once set"
         />
       <% else %>
-        <div class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4" id="dm-context-list">
+        <div class="space-y-1 bg-base-200 rounded-box shadow-sm p-4" id="dm-context-list">
           <%= for {title, body, idx} <- @sections do %>
             <div
-              class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+              class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
               id={"dm-context-section-#{idx}"}
             >
               <input type="checkbox" />
@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
                 <div class="flex items-center gap-3">
                   <.icon name="hero-document-text" class="size-4 flex-shrink-0 text-base-content/30" />
                   <div class="flex-1 min-w-0">
-                    <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                    <h3 class="text-message font-semibold text-base-content/85 truncate">
                       {title}
                     </h3>
                     <%= if idx == 0 and @session_context do %>
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
                 <div class="pl-7">
                   <div
                     id={"context-body-#{idx}"}
-                    class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                    class="dm-markdown text-message text-base-content/70 leading-relaxed"
                     phx-hook="MarkdownMessage"
                     data-raw-body={body}
                   >

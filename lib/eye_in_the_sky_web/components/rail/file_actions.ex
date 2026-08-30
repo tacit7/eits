@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
       {:noreply, socket2}
     else
       {:error, :binary_file} ->
-        {:noreply, put_flash(socket, :info, "Binary file — cannot open")}
+        {:noreply, put_flash(socket, :info, "Binary file | cannot open")}
 
       {:error, :file_too_large} ->
         {:noreply, put_flash(socket, :info, "File too large to open (over 1 MB)")}
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
       {:noreply, assign(socket, :file_tabs, tabs)}
     else
       {:error, :conflict} ->
-        {:noreply, put_flash(socket, :error, "Save conflict — file changed on disk")}
+        {:noreply, put_flash(socket, :error, "Save conflict | file changed on disk")}
 
       {:error, :symlink_not_saveable} ->
         {:noreply, put_flash(socket, :error, "Cannot save symlinked files")}
@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   Reveals a file or directory in the OS file manager. The Phoenix server
   always runs on the user's machine (dev server or the desktop app's
   embedded release), so a server-side `open -R` works for both web and
-  desktop — same trust boundary as RailSessionActions.handle_open_worktree.
+  desktop | same trust boundary as RailSessionActions.handle_open_worktree.
   """
   def handle_reveal_file(%{"path" => rel_path}, socket) do
     with %{path: root} when not is_nil(root) <- socket.assigns.sidebar_project,
@@ -211,9 +211,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   end
 
   @doc """
-  Renames a file on disk (regular files only — see FileTree.rename/3) and
+  Renames a file on disk (regular files only | see FileTree.rename/3) and
   keeps any open editor tab in sync. Renaming a directory's open descendant
-  tabs is NOT remapped — a save against a stale tab path will error rather
+  tabs is NOT remapped | a save against a stale tab path will error rather
   than corrupt data, but the user needs to re-open the tab. Acceptable
   because rename here is deliberately scoped to files, not directories.
   """

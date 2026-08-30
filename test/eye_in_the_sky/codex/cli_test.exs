@@ -28,6 +28,20 @@ defmodule EyeInTheSky.Codex.CLITest do
       assert "--json" in args
       refute nil in args
     end
+
+    test "injects app-spawned ENTRYPOINT into shell environment policy" do
+      args = CLI.build_args(prompt: "x")
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(shell_environment_policy.set.ENTRYPOINT="cli")]))
+    end
+
+    test "entrypoint opt overrides shell environment policy default" do
+      args = CLI.build_args(prompt: "x", entrypoint: "custom")
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(shell_environment_policy.set.ENTRYPOINT="custom")]))
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -45,6 +59,15 @@ defmodule EyeInTheSky.Codex.CLITest do
     test "nil model omits -m" do
       args = CLI.build_args(prompt: "x", model: nil)
       refute "-m" in args
+    end
+
+    test "rewrites ChatGPT-account unsupported gpt-5.2 to the Codex model slug" do
+      args = CLI.build_args(prompt: "x", model: "gpt-5.2")
+      idx = Enum.find_index(args, &(&1 == "-m"))
+
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "gpt-5.2-codex"
+      refute "gpt-5.2" in args
     end
   end
 

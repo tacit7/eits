@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
         <select
           id="global-prompts-sort-mobile"
           name="by"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="name_asc" selected={@sort_by == "name_asc"}>Name A–Z</option>
           <option value="name_desc" selected={@sort_by == "name_desc"}>Name Z–A</option>
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
         <select
           id="global-prompts-scope-mobile"
           name="scope"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="all" selected={@scope_filter == "all"}>All Sources</option>
           <option value="global" selected={@scope_filter == "global"}>Global</option>
@@ -161,9 +161,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                   />
                   <div
                     class={[
-                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
                       if(selected?,
-                        do: "bg-primary/5 border-l-2 border-primary",
+                        do: "bg-primary/5",
                         else: "hover:bg-base-content/4"
                       )
                     ]}
@@ -182,17 +182,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                         class={"size-3.5 flex-shrink-0 " <>
                           if(selected?, do: "text-primary", else: "text-base-content/35")}
                       />
-                      <code class={"text-sm font-semibold " <>
+                      <code class={"text-message font-semibold " <>
                         if(selected?, do: "text-primary", else: "text-base-content/85")}>
                         /{prompt.slug}
                       </code>
                     </div>
-                    <p class="text-xs text-base-content/55 leading-snug pl-5 line-clamp-2">
+                    <p class="text-mini text-base-content/55 leading-snug pl-5 line-clamp-2">
                       {prompt.description || "No description"}
                     </p>
                     <div class="flex items-center gap-1.5 pl-5 mt-0.5">
                       <span class={[
-                        "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                        "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
                         if(is_nil(prompt.project_id),
                           do: "bg-primary/10 text-primary/70",
                           else: "bg-secondary/10 text-secondary/70"
@@ -200,8 +200,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                       ]}>
                         {if is_nil(prompt.project_id), do: "global", else: "project"}
                       </span>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 font-mono">
+                      <span class="text-base-content/20 text-mini">|</span>
+                      <span class="text-micro text-base-content/35 font-mono">
                         v{prompt.version}
                       </span>
                     </div>
@@ -209,7 +209,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                   <div class="collapse-content md:hidden px-3 pb-3">
                     <div
                       id={"global-prompt-mobile-#{prompt.id}"}
-                      class="dm-markdown text-sm text-base-content leading-relaxed mt-2"
+                      class="dm-markdown text-message text-base-content leading-relaxed mt-2"
                       phx-hook="MarkdownMessage"
                       data-raw-body={prompt.prompt_text}
                     >
@@ -244,11 +244,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <code class="text-base font-semibold text-base-content">
+                  <code class="text-message font-semibold text-base-content">
                     /{@selected_prompt.slug}
                   </code>
                   <span class={[
-                    "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                    "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
                     if(is_nil(@selected_prompt.project_id),
                       do: "bg-primary/10 text-primary/70",
                       else: "bg-secondary/10 text-secondary/70"
@@ -257,13 +257,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                     {if is_nil(@selected_prompt.project_id), do: "global", else: "project"}
                   </span>
                 </div>
-                <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                <p class="text-message text-base-content/60 mt-1.5 leading-snug">
                   {@selected_prompt.description || "No description"}
                 </p>
               </div>
               <button
                 phx-click="close_viewer"
-                class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                class="eits-action eits-action--ghost eits-action--icon !min-h-9 !min-w-9 flex-shrink-0"
+                aria-label="Close prompt details"
               >
                 <.icon name="hero-x-mark" class="size-4" />
               </button>
@@ -272,7 +273,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
               <button
                 phx-click="set_detail_tab"
                 phx-value-tab="preview"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
+                class={"px-3 py-1 rounded-box text-mini font-medium " <>
                   if(@detail_tab == :preview,
                     do: "bg-base-content/8 text-base-content",
                     else: "text-base-content/50 hover:text-base-content")}
@@ -282,14 +283,14 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
               <button
                 phx-click="set_detail_tab"
                 phx-value-tab="raw"
-                class={"px-3 py-1 rounded text-xs font-medium " <>
+                class={"px-3 py-1 rounded-box text-mini font-medium " <>
                   if(@detail_tab == :raw,
                     do: "bg-base-content/8 text-base-content",
                     else: "text-base-content/50 hover:text-base-content")}
               >
                 Raw
               </button>
-              <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+              <span class="ml-auto text-micro text-base-content/35 tabular-nums">
                 v{@selected_prompt.version}
               </span>
             </div>
@@ -298,13 +299,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
             <%= if @detail_tab == :preview do %>
               <div
                 id={"global-prompt-viewer-#{@selected_prompt.id}"}
-                class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                class="dm-markdown px-6 py-4 text-message text-base-content leading-relaxed"
                 phx-hook="MarkdownMessage"
                 data-raw-body={@selected_prompt.prompt_text}
               >
               </div>
             <% else %>
-              <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
+              <pre class="px-6 py-4 text-mini font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
             <% end %>
           </div>
         </div>

@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
     assign(socket, :documents, docs)
   end
 
-  defp agent_types_string([]), do: "—"
+  defp agent_types_string([]), do: "-"
 
   defp agent_types_string(agent_type_docs) do
     Enum.map_join(agent_type_docs, ", ", & &1.agent_type)
@@ -149,10 +149,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
                       </.link>
                     </td>
                     <td class="text-base-content/70 max-w-xs truncate">
-                      {doc.description || "—"}
+                      {doc.description || "-"}
                     </td>
-                    <td class="font-mono text-xs">{policy_count(doc)}</td>
-                    <td class="text-xs">{agent_types_string(doc.agent_type_documents)}</td>
+                    <td class="font-mono text-mini">{policy_count(doc)}</td>
+                    <td class="text-mini">{agent_types_string(doc.agent_type_documents)}</td>
                     <td class="text-right whitespace-nowrap">
                       <.link
                         navigate={~p"/iam/documents/#{doc.id}"}

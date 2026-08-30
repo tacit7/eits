@@ -13,7 +13,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
         not is_nil(@active_channel_id) && to_string(@active_channel_id) == to_string(channel.id) %>
       <% unread = Map.get(@unread_counts, channel.id, 0) %>
       <div
-        class="group flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:bg-base-content/5"
+        class="group flex h-8 items-center gap-2 rounded-box px-3 text-mini transition-colors hover:bg-base-content/5"
         data-ctx="channel"
         data-ctx-id={channel.id}
         data-ctx-name={channel.name}
@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
           navigate={"/chat?channel_id=#{channel.id}"}
           data-vim-flyout-item
           class={[
-            "flex items-center gap-2 flex-1",
+            "focus-ring flex flex-1 items-center gap-2 rounded-box",
             if(active,
               do: "text-primary font-medium",
               else: "text-base-content/60 hover:text-base-content/85"
@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
           ]}
         >
           <span class={[
-            "text-[13px] flex-shrink-0",
+            "text-mini flex-shrink-0",
             if(active, do: "text-primary/60", else: "text-base-content/25")
           ]}>
             #
@@ -46,18 +46,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.ChatSection do
           <% end %>
         </.link>
         <button
+          type="button"
           phx-click="delete_channel"
           phx-value-channel_id={channel.id}
           title="Delete channel"
           data-confirm={"Delete ##{channel.name}?"}
-          class="opacity-0 group-hover:opacity-100 flex items-center justify-center text-base-content/35 hover:text-base-content/70 transition-all flex-shrink-0 size-5"
+          class="focus-ring flex size-5 flex-shrink-0 items-center justify-center rounded-box text-base-content/35 opacity-0 transition-all hover:bg-base-content/8 hover:text-base-content/70 group-hover:opacity-100"
         >
           <.icon name="hero-x-mark-mini" class="size-3.5" />
         </button>
       </div>
     <% end %>
     <%= if @channels == [] do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No channels</div>
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">No channels</div>
     <% end %>
     """
   end

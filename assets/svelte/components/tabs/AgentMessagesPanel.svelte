@@ -102,10 +102,17 @@
   }
 
   // Search
-  let showSearch = false
-  let searchQuery = ''
+  let showSearch = !!messageSearchQuery?.trim()
+  let searchQuery = messageSearchQuery || ''
+  let lastMessageSearchQuery = messageSearchQuery || ''
   let searchInput
   let searchDebounce = null
+
+  $: if ((messageSearchQuery || '') !== lastMessageSearchQuery) {
+    lastMessageSearchQuery = messageSearchQuery || ''
+    searchQuery = lastMessageSearchQuery
+    if (searchQuery.trim()) showSearch = true
+  }
 
   // Use server-side FTS results when a query is active; fall back to live message list.
   $: filteredMessages = searchQuery.trim() ? messageSearchResults : liveMessages
@@ -284,7 +291,7 @@
     const escapedQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     return escaped.replace(
       new RegExp(`(${escapedQuery})`, 'gi'),
-      '<mark class="bg-warning/30 text-base-content rounded px-0.5">$1</mark>'
+      '<mark class="bg-warning/30 text-base-content rounded-box px-0.5">$1</mark>'
     )
   }
 
@@ -295,11 +302,11 @@
     const escaped = escapeHtml(body)
     return escaped.replace(/@(all|\d+)/g, (match, token) => {
       if (token === 'all') {
-        return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
+        return `<span class="inline-flex items-center px-1 py-0.5 rounded-box text-mini font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
       }
       const name = nameMap[token]
       const display = name ? escapeHtml(name) : token
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded-box text-mini font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
   }
 
@@ -319,11 +326,11 @@
     const clean = DOMPurify.sanitize(html, DOMPURIFY_CONFIG)
     return clean.replace(/@(all|\d+)/g, (match, token) => {
       if (token === 'all') {
-        return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
+        return `<span class="inline-flex items-center px-1 py-0.5 rounded-box text-mini font-mono font-semibold bg-warning/10 text-warning/80">@all</span>`
       }
       const name = nameMap[token]
       const display = name ? escapeHtml(name) : token
-      return `<span class="inline-flex items-center px-1 py-0.5 rounded text-xs font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
+      return `<span class="inline-flex items-center px-1 py-0.5 rounded-box text-mini font-mono font-semibold bg-primary/10 text-primary" data-session-id="${token}">@${display}</span>`
     })
   }
 
@@ -358,22 +365,22 @@
   // Returns sanitized HTML for a compact collapsible tool call row.
   function renderToolCall(name, rest) {
     const stripped = (rest || '').replace(/^\s*[{[]\s*/, '').replace(/\s*[}\]]\s*$/, '')
-    const preview = stripped.slice(0, 80) + (stripped.length > 80 ? '…' : '')
+    const preview = stripped.slice(0, 80) + (stripped.length > 80 ? '...' : '')
     const escapedName = escapeHtml(name)
     const escapedPreview = escapeHtml(preview)
     const escapedFull = escapeHtml(rest || '')
-    return '<details class="my-0.5 rounded border border-base-content/[0.08] overflow-hidden">' +
-      '<summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none text-xs font-mono text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.05] transition-colors">' +
+    return '<details class="my-0.5 rounded-box border border-base-content/[0.08] overflow-hidden">' +
+      '<summary class="flex items-center gap-1.5 px-2 py-1 cursor-pointer select-none text-mini font-mono text-base-content/50 hover:text-base-content/70 hover:bg-base-content/[0.05] transition-colors">' +
       '<span class="text-primary/60 font-semibold">' + escapedName + '</span>' +
       (escapedPreview ? '<span class="ml-1.5 text-base-content/35 truncate max-w-xs">' + escapedPreview + '</span>' : '') +
       '</summary>' +
-      '<pre class="px-2 py-1.5 text-xs font-mono text-base-content/50 bg-base-200 overflow-x-auto whitespace-pre-wrap break-all m-0">' + escapedFull + '</pre>' +
+      '<pre class="px-2 py-1.5 text-mini font-mono text-base-content/50 bg-base-200 overflow-x-auto whitespace-pre-wrap break-all m-0">' + escapedFull + '</pre>' +
       '</details>'
   }
 
   function truncate(str, max = 10) {
     if (!str) return str
-    return str.length > max ? str.slice(0, max) + '…' : str
+    return str.length > max ? str.slice(0, max) + '...' : str
   }
 
   function navigateToDm(sessionId) {
@@ -648,7 +655,7 @@
     font-family: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
     font-size: 0.8em;
     padding: 0.1em 0.35em;
-    border-radius: 3px;
+    border-radius: var(--radius-box);
     background-color: rgb(127 127 127 / 0.1);
   }
   :global(.message-body pre) {
@@ -656,7 +663,7 @@
     font-size: 0.8em;
     line-height: 1.5;
     padding: 0.65em 0.9em;
-    border-radius: 6px;
+    border-radius: var(--radius-box);
     background-color: rgb(127 127 127 / 0.07);
     overflow-x: auto;
     margin: 0.4em 0;
@@ -716,14 +723,14 @@
             type="text"
             placeholder="Search messages..."
             aria-label="Search messages"
-            class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-base placeholder:text-base-content/25 focus:border-primary/30"
+            class="w-full input input-xs bg-base-200/50 border-base-content/8 pl-8 pr-4 text-message placeholder:text-base-content/25 focus:border-primary/30"
             autocomplete="off"
           />
         </div>
         {#if searchQuery.trim() && filteredMessages.length > 0}
-          <span class="text-[11px] text-base-content/40 ml-2 flex-shrink-0">{filteredMessages.length} result{filteredMessages.length === 1 ? '' : 's'}</span>
+          <span class="text-mini text-base-content/40 ml-2 flex-shrink-0">{filteredMessages.length} result{filteredMessages.length === 1 ? '' : 's'}</span>
         {:else if searchQuery}
-          <span class="text-[11px] text-base-content/30 whitespace-nowrap">0 results</span>
+          <span class="text-mini text-base-content/30 whitespace-nowrap">0 results</span>
         {/if}
         <button on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)">
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
@@ -746,11 +753,11 @@
         <button
           on:click={loadOlderMessages}
           disabled={loadingOlder}
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-box text-mini text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {#if loadingOlder}
             <span class="w-3 h-3 rounded-full border border-base-content/30 border-t-transparent animate-spin"></span>
-            Loading…
+            Loading...
           {:else}
             <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 17a.75.75 0 0 1-.75-.75V5.612L5.29 9.77a.75.75 0 0 1-1.08-1.04l5.25-5.5a.75.75 0 0 1 1.08 0l5.25 5.5a.75.75 0 1 1-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0 1 10 17Z" clip-rule="evenodd"/></svg>
             Load older messages
@@ -766,7 +773,7 @@
           {#if idx === 0 || formatDateRelative(processedMessages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
             <div class="flex items-center gap-3 my-4">
               <div class="flex-1 h-px bg-base-content/5"></div>
-              <span class="text-xs uppercase tracking-wider font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
+              <span class="text-mini uppercase tracking-normal font-medium text-base-content/25 whitespace-nowrap">{formatDateRelative(message.inserted_at)}</span>
               <div class="flex-1 h-px bg-base-content/5"></div>
             </div>
           {/if}
@@ -776,13 +783,13 @@
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
-            class="group relative px-2 -mx-2 rounded-lg transition-colors {isTurnBoundary ? 'mt-6' : isSameSender ? 'mt-0.5' : 'mt-3'} {message.sender_role === 'system' ? 'py-0.5' : 'py-3 hover:bg-base-content/[0.07]'}"
+            class="group relative px-2 -mx-2 rounded-box transition-colors {isTurnBoundary ? 'mt-6' : isSameSender ? 'mt-0.5' : 'mt-3'} {message.sender_role === 'system' ? 'py-0.5' : 'py-3 hover:bg-base-content/[0.07]'}"
           >
             {#if message.sender_role === 'system'}
               <!-- System message — centered annotation, off main reading axis -->
               <div class="flex items-center gap-3 my-0.5">
                 <div class="flex-1 h-px bg-base-content/[0.04]"></div>
-                <span class="text-[10px] text-base-content/25 select-none">
+                <span class="text-micro text-base-content/25 select-none">
                   {#if message._collapsed}
                     {message._runCount} system events
                   {:else}
@@ -806,7 +813,7 @@
                     </div>
                   {:else}
                     <div
-                      class="w-7 h-7 mt-0.5 flex-shrink-0 rounded-md flex items-center justify-center"
+                      class="w-7 h-7 mt-0.5 flex-shrink-0 rounded-box flex items-center justify-center"
                       style="background-color: {sessionBg(message.session_uuid)};"
                     >
                       <img src={getProviderIcon(message)} class="w-3.5 h-3.5 flex-shrink-0 opacity-60" title="{message.provider || 'agent'}" alt={message.provider || 'Agent'} />
@@ -819,25 +826,25 @@
                     <!-- Identity line: no flex-wrap; hover actions removed from this flow -->
                     <div class="flex items-baseline gap-2">
                       {#if message.sender_role === 'user'}
-                        <span class="text-[13px] font-semibold text-base-content/85">You</span>
+                        <span class="text-message font-semibold text-base-content/85">You</span>
                       {:else if message.session_id}
                         {@const agent = activeAgents.find(a => a.id === message.session_id)}
                         <button
-                          class="text-[13px] font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
+                          class="text-message font-semibold text-primary hover:text-primary/80 transition-colors cursor-pointer"
                           on:click={() => navigateToDm(message.session_id)}
                           title="{[message.provider, agent?.model].filter(Boolean).join(' · ') || 'Open DM'}"
                         >
                           {agent?.name || message.session_name || `session ${message.session_id}`}
                         </button>
-                        <span class="font-mono text-[11px] text-base-content/35">·&nbsp;{message.session_id}</span>
+                        <span class="font-mono text-mini text-base-content/35">·&nbsp;{message.session_id}</span>
                       {:else}
-                        <span class="text-[13px] font-semibold text-primary/80">{message.provider || 'Agent'}</span>
+                        <span class="text-message font-semibold text-primary/80">{message.provider || 'Agent'}</span>
                       {/if}
 
-                      <span class="text-[11px] text-base-content/30">&nbsp;·&nbsp;</span><span class="text-[11px] text-base-content/60">{formatTime(message.inserted_at)}</span>
+                      <span class="text-mini text-base-content/30">&nbsp;·&nbsp;</span><span class="text-mini text-base-content/60">{formatTime(message.inserted_at)}</span>
 
                       {#if message.number}
-                        <span class="font-mono text-[11px] text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
+                        <span class="font-mono text-mini text-base-content/20 opacity-0 group-hover:opacity-100 transition-opacity">#{message.number}</span>
                       {/if}
                     </div>
                   {/if}
@@ -846,17 +853,17 @@
                     {#if message.sender_role === 'agent' && message.metadata?.thinking}
                       {@const thinking = message.metadata.thinking}
                       <details
-                        class="border-l-2 border-primary/50 bg-base-200/60 rounded overflow-hidden mb-2"
+                        class="border border-primary/15 bg-primary/5 rounded-box overflow-hidden mb-2"
                         open={!!(searchQuery && thinking.toLowerCase().includes(searchQuery.toLowerCase()))}
                       >
-                        <summary class="flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none text-xs text-base-content/50 hover:text-base-content/70 transition-colors">
-                          <span aria-hidden="true">✦</span>
+                        <summary class="flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none text-mini text-base-content/50 hover:text-base-content/70 transition-colors">
+                          <svg class="w-3 h-3 text-primary/60" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M10 2.5a.75.75 0 0 1 .7.48l1.47 3.77 3.77 1.47a.75.75 0 0 1 0 1.4l-3.77 1.47-1.47 3.77a.75.75 0 0 1-1.4 0l-1.47-3.77-3.77-1.47a.75.75 0 0 1 0-1.4l3.77-1.47L9.3 2.98a.75.75 0 0 1 .7-.48Z" /></svg>
                           <span class="font-medium">Thinking</span>
                         </summary>
-                        <pre class="px-2.5 py-2 text-xs font-mono text-base-content/50 overflow-x-auto whitespace-pre-wrap break-words">{thinking}</pre>
+                        <pre class="px-2.5 py-2 text-mini font-mono text-base-content/50 overflow-x-auto whitespace-pre-wrap break-words">{thinking}</pre>
                       </details>
                     {/if}
-                    <div class="message-body mt-2 text-sm leading-relaxed text-base-content/85 break-words">
+                    <div class="message-body mt-2 text-message leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@const segments = parseBodySegments(message.body)}
                         {#each segments as seg}
@@ -868,7 +875,7 @@
                         {/each}
                       {:else if searchQuery.trim()}
                         <!-- highlightMatch escapes via escapeHtml() before injecting <mark>; do not bypass -->
-                        <span class="message-body mt-1 text-sm leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
+                        <span class="message-body mt-1 text-message leading-relaxed text-base-content/85 break-words whitespace-pre-wrap" contenteditable="false">{@html highlightMatch(message.body || '', searchQuery)}</span>
                       {:else}
                         <p class="whitespace-pre-wrap">{@html renderBody(message.body, mentionNameMap)}</p>
                       {/if}
@@ -883,7 +890,7 @@
                               <img
                                 src={attachment.url}
                                 alt={attachment.original_filename || attachment.filename}
-                                class="max-w-[200px] max-h-[150px] rounded-lg border border-base-content/10 object-cover hover:opacity-90 transition-opacity cursor-pointer"
+                                class="max-w-[200px] max-h-[150px] rounded-box border border-base-content/10 object-cover hover:opacity-90 transition-opacity cursor-pointer"
                               />
                             </a>
                           {/if}
@@ -894,7 +901,7 @@
                     <!-- Usage metadata for agent messages -->
                     <!-- Default: duration + turns visible. Hover: cost + tokens expand in (opacity, no layout shift). -->
                     {#if message.sender_role === 'agent' && message.metadata && (message.metadata.total_cost_usd || message.metadata.duration_ms || message.metadata.num_turns)}
-                      <div class="mt-1 flex items-center gap-0 text-[10px] font-mono tabular-nums text-base-content/40 min-w-0 flex-wrap">
+                      <div class="mt-1 flex items-center gap-0 text-micro font-mono tabular-nums text-base-content/40 min-w-0 flex-wrap">
                         <!-- Hover-only: cost + tokens + trailing separator -->
                         <span class="inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                           {#if message.metadata.total_cost_usd}
@@ -928,12 +935,12 @@
                       <div class="mt-2 flex flex-wrap gap-1">
                         {#each message.reactions as reaction (reaction.emoji)}
                           <button
-                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] bg-base-content/[0.05] hover:bg-primary/10 hover:text-primary transition-colors"
+                            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-box text-mini bg-base-content/[0.05] hover:bg-primary/10 hover:text-primary transition-colors"
                             on:click={() => live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji: reaction.emoji })}
                             title="React with {reaction.emoji}"
                           >
                             {reaction.emoji}
-                            <span class="text-base-content/50 text-[11px] tabular-nums">{reaction.count}</span>
+                            <span class="text-base-content/50 text-mini tabular-nums">{reaction.count}</span>
                           </button>
                         {/each}
                       </div>
@@ -942,7 +949,7 @@
                     <!-- Thread reply count -->
                     {#if message.thread_reply_count > 0}
                       <button
-                        class="mt-2 flex items-center gap-1.5 text-[11px] text-primary/60 hover:text-primary transition-colors"
+                        class="mt-2 flex items-center gap-1.5 text-mini text-primary/60 hover:text-primary transition-colors"
                         on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
                       >
                         <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
@@ -958,7 +965,7 @@
                 <!-- Reaction picker -->
                 <div class="relative">
                   <button
-                    class="p-1 rounded text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    class="p-1 rounded-box text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
                     title="Add reaction"
                     aria-label="Add reaction"
@@ -967,12 +974,14 @@
                   </button>
                   {#if openReactionPickerId === message.id}
                     <div
-                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-xl shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
+                      class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
+                      role="presentation"
                       on:click|stopPropagation
+                      on:keydown|stopPropagation
                     >
                       {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji (emoji)}
                         <button
-                          class="text-lg hover:bg-base-content/[0.08] rounded p-1 transition-colors cursor-pointer leading-none"
+                          class="text-lg hover:bg-base-content/[0.08] rounded-box p-1 transition-colors cursor-pointer leading-none"
                           on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
                           title={emoji}
                         >{emoji}</button>
@@ -982,7 +991,7 @@
                 </div>
                 <!-- Reply in thread -->
                 <button
-                  class="p-1 rounded text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  class="p-1 rounded-box text-base-content/30 hover:text-primary/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => live.pushEvent('open_thread', { message_id: String(message.id) })}
                   title="Reply in thread"
                   aria-label="Reply in thread"
@@ -991,7 +1000,7 @@
                 </button>
                 <!-- Copy -->
                 <button
-                  class="p-1 rounded text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                  class="p-1 rounded-box text-base-content/30 hover:text-base-content/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                   on:click={() => navigator.clipboard.writeText(message.body || '')}
                   title="Copy message"
                   aria-label="Copy message"
@@ -1001,7 +1010,7 @@
                 <!-- Overflow (contains destructive actions) -->
                 <div class="relative">
                   <button
-                    class="p-1 rounded text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
+                    class="p-1 rounded-box text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
                     title="More actions"
                     aria-label="More actions"
@@ -1009,17 +1018,17 @@
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
                   </button>
                   {#if openOverflowId === message.id}
-                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-lg shadow-lg py-0.5 w-32 z-20">
+                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-box shadow-lg py-0.5 w-32 z-20">
                       <button
                         type="button"
-                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-message text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { openInspect(message); openOverflowId = null }}
                       >
                         Inspect
                       </button>
                       <div class="my-0.5 border-t border-base-content/5"></div>
                       <button
-                        class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
+                        class="w-full flex items-center gap-2 px-3 py-1.5 text-message text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
                       >
                         <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
@@ -1038,17 +1047,17 @@
       </div>
     {:else}
       <div class="flex flex-col items-center justify-center h-full text-center py-16">
-        <div class="w-16 h-16 rounded-2xl bg-base-content/[0.03] border border-base-content/5 flex items-center justify-center mb-4">
+        <div class="w-16 h-16 rounded-box bg-base-content/[0.03] border border-base-content/5 flex items-center justify-center mb-4">
           <svg class="w-7 h-7 text-base-content/15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
         </div>
         {#if searchQuery}
-          <p class="text-sm font-semibold text-base-content/60">No results for "{searchQuery}"</p>
-          <p class="mt-1 text-xs text-base-content/30">Try a different search term</p>
+          <p class="text-message font-semibold text-base-content/60">No results for "{searchQuery}"</p>
+          <p class="mt-1 text-mini text-base-content/30">Try a different search term</p>
         {:else}
-          <p class="text-sm font-semibold text-base-content/60">No messages yet</p>
-          <p class="mt-1 text-xs text-base-content/30">Messages from agents will appear here</p>
+          <p class="text-message font-semibold text-base-content/60">No messages yet</p>
+          <p class="mt-1 text-mini text-base-content/30">Messages from agents will appear here</p>
         {/if}
       </div>
     {/if}
@@ -1074,23 +1083,23 @@
         {@const state = streamStates[String(member.id)]}
         {#if state && (state.content || state.tool)}
           <!-- Stream preview bubble for this member -->
-          <div class="rounded-xl border border-base-content/10 bg-base-200/60 px-3 py-2 text-xs text-base-content/70 max-w-[720px]">
+          <div class="rounded-box border border-base-content/10 bg-base-200/60 px-3 py-2 text-mini text-base-content/70 max-w-[720px]">
             <div class="flex items-center gap-1.5 mb-1">
               <span class="inline-block w-1.5 h-1.5 rounded-full bg-success animate-pulse flex-shrink-0"></span>
               <span class="font-medium text-base-content/50 font-mono">{member.name}</span>
               {#if state.tool}
-                <span class="ml-auto font-mono text-[10px] text-primary/60 bg-primary/10 px-1.5 py-0.5 rounded">{state.tool}</span>
+                <span class="ml-auto font-mono text-micro text-primary/60 bg-primary/10 px-1.5 py-0.5 rounded-box">{state.tool}</span>
               {/if}
             </div>
             {#if state.content}
-              <p class="font-mono text-[11px] text-base-content/50 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">
-                {state.content.length > 300 ? '…' + state.content.slice(-300) : state.content}
+              <p class="font-mono text-mini text-base-content/50 leading-relaxed line-clamp-3 whitespace-pre-wrap break-words">
+                {state.content.length > 300 ? '...' + state.content.slice(-300) : state.content}
               </p>
             {/if}
           </div>
         {:else}
           <!-- Plain pulsing dot when no stream content yet -->
-          <div class="flex items-center gap-2 text-xs text-base-content/50">
+          <div class="flex items-center gap-2 text-mini text-base-content/50">
             <span class="inline-block w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0"></span>
             <span class="font-medium text-base-content/50">{member.name}</span>
             <span>is working</span>
@@ -1105,7 +1114,7 @@
   <div class="max-w-[960px]">
     <form
       on:submit|preventDefault={handleSubmit}
-      class="relative bg-base-100 rounded-xl border border-base-300 p-3 flex flex-col"
+      class="relative bg-base-100 rounded-box border border-base-300 p-3 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
@@ -1114,9 +1123,9 @@
             bind:this={inputElement}
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
             on:keydown={handleInputKeydown}
-            placeholder="Message agents…"
+            placeholder="Message agents..."
             aria-label="Message"
-            class="textarea w-full text-sm rounded-lg bg-transparent border-0 placeholder:text-base-content/25 focus:ring-0 focus:outline-none transition-colors resize-none overflow-y-auto text-base-content p-0"
+            class="textarea w-full text-message rounded-box bg-transparent border-0 placeholder:text-base-content/25 focus:ring-0 focus:outline-none transition-colors resize-none overflow-y-auto text-base-content p-0"
             rows="1"
             style="max-height: 7.5rem; line-height: 1.5rem;"
             autocomplete="off"
@@ -1124,17 +1133,17 @@
 
           <!-- @ Autocomplete Dropdown -->
           {#if showAutocomplete && autocompleteOptions.length > 0}
-            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-lg max-h-56 overflow-y-auto z-50 p-1">
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-box shadow-lg max-h-56 overflow-y-auto z-50 p-1">
               {#each autocompleteOptions as option, idx (option.id)}
                 <button
                   type="button"
-                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
+                  class="w-full flex items-center gap-2.5 px-3 py-2 rounded-box text-left transition-colors {idx === selectedAutocompleteIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
                   on:click={() => selectAutocomplete(option.id)}
                   on:mouseenter={() => selectedAutocompleteIndex = idx}
                 >
-                  <span class="font-mono text-[13px] font-semibold text-base-content">@{option.id}</span>
-                  <span class="text-[13px] text-base-content/70 flex-1 truncate">{option.name}</span>
-                  <span class="font-mono text-[11px] text-base-content/50">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
+                  <span class="font-mono text-message font-semibold text-base-content">@{option.id}</span>
+                  <span class="text-message text-base-content/70 flex-1 truncate">{option.name}</span>
+                  <span class="font-mono text-mini text-base-content/50">{option.provider}{option.model ? ` / ${option.model}` : ''}</span>
                 </button>
               {/each}
             </div>
@@ -1142,22 +1151,22 @@
 
           <!-- / Slash Command Autocomplete Dropdown -->
           {#if showSlashAutocomplete && slashOptions.length > 0}
-            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-xl shadow-xl max-h-[280px] overflow-y-auto z-50">
+            <div class="absolute bottom-full left-0 right-0 mb-1.5 bg-base-200 border border-base-content/20 rounded-box shadow-xl max-h-[280px] overflow-y-auto z-50">
               {#each groupSlashItems(slashOptions) as entry, idx (entry.header ? `header:${entry.type}` : `${entry.type}:${entry.slug}`)}
                 {#if entry.header}
-                  <div class="px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/60 bg-base-content/[0.06] sticky top-0">
+                  <div class="px-3 py-1 text-mini font-semibold uppercase tracking-normal text-base-content/60 bg-base-content/[0.06] sticky top-0">
                     {{ skill: 'Skills', command: 'Commands', agent: 'Agents', prompt: 'Prompts' }[entry.type] || entry.type}
                   </div>
                 {:else}
                   {@const flatIdx = slashOptions.indexOf(entry)}
                   <button
                     type="button"
-                    class="w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm {flatIdx === selectedSlashIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
+                    class="w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-message {flatIdx === selectedSlashIndex ? 'bg-base-content/[0.12]' : 'hover:bg-base-content/[0.08]'}"
                     on:click={() => selectSlashItem(entry)}
                     on:mouseenter={() => { selectedSlashIndex = flatIdx }}
                   >
                     {#if typeBadges[entry.type]}
-                      <span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {typeBadges[entry.type].cls}">
+                      <span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium {typeBadges[entry.type].cls}">
                         {typeBadges[entry.type].label}
                       </span>
                     {/if}
@@ -1166,7 +1175,7 @@
                         <span class="font-medium text-base-content">{entry.type === 'agent' ? '@' : '/'}{entry.slug}</span>
                       </span>
                       {#if entry.description}
-                        <span class="text-xs text-base-content/50 truncate block">{entry.description}</span>
+                        <span class="text-mini text-base-content/50 truncate block">{entry.description}</span>
                       {/if}
                     </span>
                   </button>
@@ -1190,10 +1199,10 @@
       </div>
       <!-- Hint row: always-visible affordance hints -->
       <div class="flex items-center justify-between mt-2 px-0.5 select-none">
-        <span class="text-[11px] text-base-content/30">
+        <span class="text-mini text-base-content/30">
           <span class="font-mono">@</span> to mention · <span class="font-mono">/skill</span> for commands
         </span>
-        <span class="text-[11px] text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
+        <span class="text-mini text-base-content/25 font-mono">⏎ send · ⇧⏎ newline</span>
       </div>
     </form>
   </div><!-- end max-w constraint -->
@@ -1209,10 +1218,10 @@
     <dialog bind:this={inspectDialog} class="modal" aria-labelledby="inspect-title" on:close={closeInspect}>
       <div class="modal-box max-w-2xl">
         <div class="flex items-center justify-between mb-3">
-          <h3 id="inspect-title" class="font-bold text-sm">Message #{inspectMessage.id}</h3>
+          <h3 id="inspect-title" class="font-bold text-message">Message #{inspectMessage.id}</h3>
           <button class="btn btn-xs btn-ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
         </div>
-        <pre class="text-xs bg-base-200 rounded-lg p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
+        <pre class="text-mini bg-base-200 rounded-box p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>
       <form method="dialog" class="modal-backdrop">
         <button>close</button>

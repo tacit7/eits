@@ -42,6 +42,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
           project_id: project_id,
           git_worktree_path: params["worktree_path"],
           entrypoint: params["entrypoint"],
+          managed_by_app: managed_by_app_from_hook(params),
           read_only: params["read_only"] == true or params["read_only"] == "true"
         }
 
@@ -77,4 +78,14 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
   defp runtime_provider_for_model_provider("gemini"), do: "gemini"
   defp runtime_provider_for_model_provider("pi"), do: "pi"
   defp runtime_provider_for_model_provider(_), do: "claude"
+
+  defp managed_by_app_from_hook(%{"managed_by_app" => value}), do: managed_by_app_value(value)
+  defp managed_by_app_from_hook(%{"process_owner" => "app"}), do: true
+  defp managed_by_app_from_hook(%{"process_owner" => "terminal"}), do: false
+  defp managed_by_app_from_hook(%{"entrypoint" => "cli"}), do: false
+  defp managed_by_app_from_hook(_params), do: true
+
+  defp managed_by_app_value(value) when value in [true, "true", "1", 1], do: true
+  defp managed_by_app_value(value) when value in [false, "false", "0", 0], do: false
+  defp managed_by_app_value(_value), do: true
 end

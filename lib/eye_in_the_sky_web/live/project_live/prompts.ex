@@ -147,7 +147,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
 
   def handle_info({:editor_sync_failed, :prompt, id, _reason}, socket) do
     if socket.assigns.selected_prompt && socket.assigns.selected_prompt.id == id do
-      {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+      {:noreply, put_flash(socket, :error, "Editor sync failed | check your editor")}
     else
       {:noreply, socket}
     end
@@ -209,7 +209,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               <div class="py-0.5">
                 <div
                   class={[
-                    "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-lg transition-colors",
+                    "py-2.5 px-3 flex flex-col gap-0.5 cursor-pointer rounded-box transition-colors",
                     "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
                     if(selected?,
                       do: "bg-primary/5",
@@ -231,10 +231,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                       name="hero-chat-bubble-left-right"
                       class={"size-3.5 flex-shrink-0 " <> if(selected?, do: "text-primary", else: "text-base-content/35")}
                     />
-                    <span class={"text-sm font-semibold " <> if(selected?, do: "text-primary", else: "text-base-content/85")}>
+                    <span class={"text-message font-semibold " <> if(selected?, do: "text-primary", else: "text-base-content/85")}>
                       {prompt.name}
                     </span>
-                    <code class="text-[10px] font-mono text-base-content/40 bg-base-content/5 px-1.5 py-0.5 rounded">
+                    <code class="text-micro font-mono text-base-content/40 bg-base-content/5 px-1.5 py-0.5 rounded-box">
                       {prompt.slug}
                     </code>
                     <%= if !prompt.active do %>
@@ -242,13 +242,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                     <% end %>
                   </div>
                   <%= if prompt.description do %>
-                    <p class="text-xs text-base-content/55 leading-snug pl-5 line-clamp-2">
+                    <p class="text-mini text-base-content/55 leading-snug pl-5 line-clamp-2">
                       {prompt.description}
                     </p>
                   <% end %>
                   <div class="flex items-center gap-1.5 pl-5 mt-0.5">
                     <span class={[
-                      "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                      "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
                       if(is_nil(prompt.project_id),
                         do: "bg-primary/10 text-primary/70",
                         else: "bg-secondary/10 text-secondary/70"
@@ -256,13 +256,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                     ]}>
                       {if is_nil(prompt.project_id), do: "global", else: "project"}
                     </span>
-                    <span class="text-base-content/20 text-xs">&middot;</span>
-                    <span class="text-[10px] text-base-content/40 tabular-nums">
+                    <span class="text-base-content/20 text-mini">|</span>
+                    <span class="text-micro text-base-content/40 tabular-nums">
                       v{prompt.version}
                     </span>
                     <%= if prompt.tags do %>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 truncate">
+                      <span class="text-base-content/20 text-mini">|</span>
+                      <span class="text-micro text-base-content/35 truncate">
                         {prompt.tags}
                       </span>
                     <% end %>
@@ -290,10 +290,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
           <%= if @detail_tab == :edit do %>
             <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
-              <span class="text-xs text-base-content/50 font-mono truncate flex-1">
+              <span class="text-mini text-base-content/50 font-mono truncate flex-1">
                 {@selected_prompt.slug}
               </span>
-              <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
+              <span class="text-micro text-base-content/40">Ctrl+S to save</span>
               <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
             </div>
           <% else %>
@@ -301,11 +301,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
                   <div class="flex items-center gap-2 mb-1 flex-wrap">
-                    <span class="text-base font-semibold text-base-content">
+                    <span class="text-message font-semibold text-base-content">
                       {@selected_prompt.name}
                     </span>
                     <span class={[
-                      "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
+                      "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
                       if(is_nil(@selected_prompt.project_id),
                         do: "bg-primary/10 text-primary/70",
                         else: "bg-secondary/10 text-secondary/70"
@@ -313,16 +313,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                     ]}>
                       {if is_nil(@selected_prompt.project_id), do: "global", else: "project"}
                     </span>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-base-content/5 text-base-content/50">
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium bg-base-content/5 text-base-content/50">
                       v{@selected_prompt.version}
                     </span>
                     <%= if !@selected_prompt.active do %>
                       <span class="badge badge-xs badge-ghost">Inactive</span>
                     <% end %>
                   </div>
-                  <p class="text-xs text-base-content/45 font-mono">{@selected_prompt.slug}</p>
+                  <p class="text-mini text-base-content/45 font-mono">{@selected_prompt.slug}</p>
                   <%= if @selected_prompt.description do %>
-                    <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                    <p class="text-message text-base-content/60 mt-1.5 leading-snug">
                       {@selected_prompt.description}
                     </p>
                   <% end %>
@@ -354,7 +354,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
-                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
                     if(@detail_tab == :preview,
                       do: "bg-base-content/8 text-base-content",
                       else: "text-base-content/50 hover:text-base-content")}
@@ -364,7 +364,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="raw"
-                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
                     if(@detail_tab == :raw,
                       do: "bg-base-content/8 text-base-content",
                       else: "text-base-content/50 hover:text-base-content")}
@@ -373,7 +373,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 </button>
                 <button
                   phx-click="edit_content"
-                  class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                  class="px-3 py-1 rounded-box text-mini font-medium text-base-content/50 hover:text-base-content"
                 >
                   Edit
                 </button>
@@ -396,16 +396,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
               <%= if @detail_tab == :preview do %>
                 <div
                   id={"proj-prompt-viewer-#{@selected_prompt.uuid}"}
-                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  class="dm-markdown px-6 py-4 text-message text-base-content leading-relaxed"
                   phx-hook="MarkdownMessage"
                   data-raw-body={@selected_prompt.prompt_text}
                 >
                 </div>
               <% else %>
-                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
+                <pre class="px-6 py-4 text-mini font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_prompt.prompt_text}</pre>
               <% end %>
               <%= if @selected_prompt.created_by do %>
-                <div class="px-6 pb-4 text-xs text-base-content/40">
+                <div class="px-6 pb-4 text-mini text-base-content/40">
                   Created by <span class="text-base-content/60">{@selected_prompt.created_by}</span>
                 </div>
               <% end %>

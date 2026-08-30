@@ -8,6 +8,8 @@ defmodule EyeInTheSky.Codex.SessionReader do
   - Relevant payload types: "session_meta", "user_message", "agent_message", "token_count"
   """
 
+  alias EyeInTheSky.Codex.Error
+
   @doc """
   Finds the Codex session JSONL file for a given thread_id.
   Codex stores sessions in: ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<thread_id>.jsonl
@@ -111,6 +113,15 @@ defmodule EyeInTheSky.Codex.SessionReader do
       {:ok, %{"type" => "response_item", "payload" => payload}} ->
         extract_response_item(payload, nil)
 
+      {:ok, %{"type" => "turn.failed"} = event} ->
+        extract_turn_failed(event, event["timestamp"])
+
+      {:ok, %{"type" => "error"} = event} ->
+        extract_codex_error(event, event["timestamp"])
+
+      {:ok, %{"error" => _error} = event} ->
+        extract_codex_error(event, event["timestamp"])
+
       {:ok, %{"type" => "event_msg", "payload" => payload, "timestamp" => timestamp}} ->
         extract_payload_message(payload, timestamp)
 
@@ -139,10 +150,60 @@ defmodule EyeInTheSky.Codex.SessionReader do
           content: text,
           timestamp: timestamp,
           usage: nil,
-          stream_type: nil
+          stream_type: nil,
+          metadata: %{"codex_item_type" => "message"}
         }
       ]
     end
+  end
+
+  defp extract_response_item(%{"type" => "reasoning"} = payload, timestamp) do
+    text = content_text(payload["text"] || payload["content"])
+
+    if text == "" do
+      []
+    else
+      [
+        %{
+          uuid: source_uuid(payload["id"], "reasoning:#{text}", timestamp),
+          role: "assistant",
+          content: text,
+          timestamp: timestamp,
+          usage: nil,
+          stream_type: "thinking",
+          metadata: %{
+            "codex_item_type" => "reasoning",
+            "stream_type" => "thinking",
+            "thinking" => text
+          }
+        }
+      ]
+    end
+  end
+
+  defp extract_response_item(%{"type" => "command_execution"} = payload, timestamp) do
+    input = %{
+      "command" => payload["command"] || payload["call"] || "",
+      "exit_code" => payload["exit_code"],
+      "output" => payload["aggregated_output"] || payload["output"],
+      "working_directory" => payload["working_directory"]
+    }
+
+    [tool_message(payload, timestamp, "Bash", input)]
+  end
+
+  defp extract_response_item(%{"type" => type} = payload, timestamp)
+       when type in [
+              "file_change",
+              "file_changes",
+              "mcp_tool_call",
+              "mcp_tool_calls",
+              "web_search",
+              "web_searches",
+              "plan_update",
+              "plan_updates"
+            ] do
+    [tool_message(payload, timestamp, codex_tool_label(type), payload)]
   end
 
   defp extract_response_item(_payload, _timestamp), do: []
@@ -156,7 +217,8 @@ defmodule EyeInTheSky.Codex.SessionReader do
         content: text,
         timestamp: timestamp,
         usage: nil,
-        stream_type: nil
+        stream_type: nil,
+        metadata: %{"codex_item_type" => "legacy_user_message"}
       }
     ]
   end
@@ -170,9 +232,18 @@ defmodule EyeInTheSky.Codex.SessionReader do
         content: text,
         timestamp: timestamp,
         usage: nil,
-        stream_type: nil
+        stream_type: nil,
+        metadata: %{"codex_item_type" => "legacy_agent_message"}
       }
     ]
+  end
+
+  defp extract_payload_message(%{"type" => "turn.failed"} = payload, timestamp) do
+    extract_turn_failed(payload, timestamp)
+  end
+
+  defp extract_payload_message(%{"type" => "error"} = payload, timestamp) do
+    extract_codex_error(payload, timestamp)
   end
 
   defp extract_payload_message(_payload, _timestamp), do: []
@@ -190,6 +261,103 @@ defmodule EyeInTheSky.Codex.SessionReader do
   end
 
   defp content_text(_content), do: ""
+
+  defp tool_message(payload, timestamp, label, input) do
+    compact_input = compact_json(input)
+    encoded_input = Jason.encode!(compact_input)
+
+    %{
+      uuid: source_uuid(payload["id"], "#{payload["type"]}:#{encoded_input}", timestamp),
+      role: "assistant",
+      content: "Tool: #{label}\n#{encoded_input}",
+      timestamp: timestamp,
+      usage: nil,
+      stream_type: "tool_use",
+      metadata:
+        %{
+          "codex_item_type" => payload["type"],
+          "stream_type" => "tool_use",
+          "tool_name" => label,
+          "input" => compact_input,
+          "exit_code" => Map.get(compact_input, "exit_code")
+        }
+        |> compact_json()
+    }
+  end
+
+  defp extract_turn_failed(event, timestamp) do
+    normalized = Error.normalize(event, "Turn failed")
+    message = normalized.message
+
+    [
+      %{
+        uuid: source_uuid(event["id"], "turn_failed:#{message}", timestamp),
+        role: "assistant",
+        content: message,
+        timestamp: timestamp,
+        usage: nil,
+        stream_type: "codex_turn_failed",
+        metadata:
+          %{
+            "codex_item_type" => "turn.failed",
+            "stream_type" => "codex_turn_failed",
+            "error_title" => "Codex turn failed",
+            "error_message" => message,
+            "status" => normalized.status,
+            "error_type" => normalized.error_type,
+            "model" => normalized.model
+          }
+          |> compact_json()
+      }
+    ]
+  end
+
+  defp extract_codex_error(event, timestamp) do
+    normalized = Error.normalize(event, "Unknown error")
+    message = normalized.message
+
+    [
+      %{
+        uuid: source_uuid(event["id"], "codex_error:#{message}", timestamp),
+        role: "assistant",
+        content: message,
+        timestamp: timestamp,
+        usage: nil,
+        stream_type: "codex_error",
+        metadata:
+          %{
+            "codex_item_type" => "error",
+            "stream_type" => "codex_error",
+            "error_title" => "Codex error",
+            "error_message" => message,
+            "status" => normalized.status,
+            "error_type" => normalized.error_type,
+            "model" => normalized.model
+          }
+          |> compact_json()
+      }
+    ]
+  end
+
+  defp codex_tool_label("command_execution"), do: "Bash"
+  defp codex_tool_label("web_search"), do: "WebSearch"
+  defp codex_tool_label("web_searches"), do: "WebSearch"
+  defp codex_tool_label("mcp_tool_call"), do: "MCP Tool"
+  defp codex_tool_label("mcp_tool_calls"), do: "MCP Tool"
+
+  defp codex_tool_label(type) when is_binary(type) do
+    type
+    |> String.split("_")
+    |> Enum.map_join(" ", &String.capitalize/1)
+  end
+
+  defp compact_json(map) when is_map(map) do
+    map
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
+
+  defp compact_json(value), do: value
 
   defp dedupe_messages(messages) do
     {_seen, deduped} =

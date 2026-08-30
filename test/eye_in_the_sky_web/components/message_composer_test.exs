@@ -47,6 +47,31 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     refute html =~ "Claude Code"
   end
 
+  test "codex composer does not offer unsupported gpt-5.2" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "codex", selected_model: "gpt-5.6-sol"})
+      )
+
+    assert html =~ "GPT-5.6 Sol"
+    refute html =~ "gpt-5.2"
+    refute html =~ "GPT-5.2"
+  end
+
+  test "codex composer replaces stale selected gpt-5.2 with the default option" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "codex", selected_model: "gpt-5.2"})
+      )
+
+    assert html =~ ~s(data-selected-model="gpt-5.6-sol")
+    assert html =~ ~s(id="composer-model-adjustment-notice")
+    assert html =~ "gpt-5.2 unavailable"
+    refute html =~ "GPT-5.2"
+  end
+
   test "trigger is disabled while processing" do
     html =
       render_component(&MessageComposer.message_composer/1, base_assigns(%{processing: true}))

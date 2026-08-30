@@ -108,6 +108,37 @@ defmodule EyeInTheSky.SessionsTest do
       assert session.model_name == "gpt-5"
     end
 
+    test "marks cli hook sessions as terminal-owned" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "terminal codex startup",
+        "model" => "gpt-5",
+        "entrypoint" => "cli"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.entrypoint == "cli"
+      assert session.managed_by_app == false
+      refute Sessions.app_managed?(session)
+    end
+
+    test "allows hook sessions to explicitly stay app-managed" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "app managed hook",
+        "entrypoint" => "cli",
+        "managed_by_app" => true
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.managed_by_app == true
+      assert Sessions.app_managed?(session)
+    end
+
     test "creates session without model info when model string is nil" do
       uuid = Ecto.UUID.generate()
 

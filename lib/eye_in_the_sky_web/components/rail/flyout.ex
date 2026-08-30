@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
               <button
                 phx-click="refresh_usage"
                 title="Refresh usage"
-                class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+                class="focus-ring size-5 flex items-center justify-center rounded-box text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
               >
                 <.icon name="hero-arrow-path-mini" class="size-3.5" />
               </button>
@@ -148,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
                 <span class="flex-shrink-0 flex items-center justify-center text-base-content/20">
                   <.icon name={Helpers.section_icon(@active_section)} class="size-3.5" />
                 </span>
-                <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 truncate">
+                <span class="text-micro font-semibold uppercase tracking-normal text-base-content/40 truncate">
                   {Helpers.section_label(@active_section)}
                 </span>
               </div>
@@ -176,7 +176,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
             <button
               phx-click="file_refresh"
               title="Refresh file tree"
-              class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+              class="focus-ring size-5 flex items-center justify-center rounded-box text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
             >
               <.icon name="hero-arrow-path-mini" class="size-3.5" />
             </button>
@@ -353,7 +353,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout do
     ~H"""
     <button
       title={@title}
-      class="size-5 flex items-center justify-center rounded text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
+      class="focus-ring size-5 flex items-center justify-center rounded-box text-base-content/35 hover:text-base-content/70 hover:bg-base-content/8 transition-colors flex-shrink-0"
       {@rest}
     >
       <.icon name="hero-plus-mini" class="size-3.5" />

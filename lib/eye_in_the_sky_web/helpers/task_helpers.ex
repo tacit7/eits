@@ -147,8 +147,8 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   def card_aging_indicator(updated_at) do
     case days_since_update(updated_at) do
       nil -> nil
-      days when days >= 14 -> {"border-l-2 border-l-error/60", "#{days}d stale"}
-      days when days >= 7 -> {"border-l-2 border-l-warning/60", "#{days}d idle"}
+      days when days >= 14 -> {"border-l border-l-error/60", "#{days}d stale"}
+      days when days >= 7 -> {"border-l border-l-warning/60", "#{days}d idle"}
       _days -> nil
     end
   end

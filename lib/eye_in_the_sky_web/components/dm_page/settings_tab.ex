@@ -3,8 +3,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   Settings tab for the DM page.
 
   Layout:
-    * Scope toggle (pinned)    — Session | Agent. Controls where writes land.
-    * Sub-tabs                 — General | Claude flags | Codex flags.
+    * Scope toggle (pinned)    | Session | Agent. Controls where writes land.
+    * Sub-tabs                 | General | Claude flags | Codex flags.
                                  Claude/Codex sub-tabs are hidden based on
                                  @session.provider.
   """
@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
 
       <.subtab_nav subtab={@active_subtab} provider={@session.provider} />
 
-      <div class="bg-base-200 rounded-xl shadow-sm">
+      <div class="bg-base-200 rounded-box shadow-sm">
         <%= case @active_subtab do %>
           <% "general" -> %>
             <.general_section
@@ -86,10 +86,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
 
   defp scope_toggle(assigns) do
     ~H"""
-    <div class="flex items-center justify-between bg-base-200 rounded-xl shadow-sm px-4 py-3">
+    <div class="flex items-center justify-between bg-base-200 rounded-box shadow-sm px-4 py-3">
       <div>
-        <div class="text-sm font-medium">Saving to</div>
-        <div class="text-xs text-base-content/50">
+        <div class="text-message font-medium">Saving to</div>
+        <div class="text-mini text-base-content/50">
           {scope_help(@scope)}
         </div>
       </div>
@@ -186,7 +186,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   attr :session, :map, required: true
   attr :session_state, :map, required: true
 
-  # Scope-appropriate effective map — agent-only when scope="agent", merged when scope="session".
+  # Scope-appropriate effective map | agent-only when scope="agent", merged when scope="session".
   attr :effective, :map, default: %{}
   attr :overrides, :list, default: []
 
@@ -198,8 +198,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Used for new messages in this session"
         override={"model" in @overrides}
       >
-        <div class="font-mono text-sm text-base-content/80">
-          {@session_state.model || "—"}
+        <div class="font-mono text-message text-base-content/80">
+          {@session_state.model || "-"}
         </div>
       </.row>
       <.row
@@ -208,8 +208,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         help="Codex reasoning effort level"
         override={"effort" in @overrides}
       >
-        <div class="font-mono text-sm text-base-content/80">
-          {@session_state.effort || "—"}
+        <div class="font-mono text-message text-base-content/80">
+          {@session_state.effort || "-"}
         </div>
       </.row>
       <.row
@@ -387,7 +387,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="Allowed tools"
         help="--allowedTools"
-        description="List of tools (Read, Edit, Bash…) Claude can use without asking for permission."
+        description="List of tools (Read, Edit, Bash...) Claude can use without asking for permission."
       >
         <.text_input
           key="anthropic.allowed_tools"
@@ -432,7 +432,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="MCP config file"
         help="--mcp-config"
-        description="Loads MCP servers from a JSON file or string — Jira, Google Drive, other external data sources."
+        description="Loads MCP servers from a JSON file or string | Jira, Google Drive, other external data sources."
       >
         <.text_input
           key="anthropic.mcp_config"
@@ -520,7 +520,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="Append system prompt"
         help="--append-system-prompt"
-        description="Adds your rules to the end of Claude's default instructions. Recommended for project rules (e.g. 'Always use TypeScript') — keeps tool abilities intact."
+        description="Adds your rules to the end of Claude's default instructions. Recommended for project rules (e.g. 'Always use TypeScript') | keeps tool abilities intact."
       >
         <.text_area
           key="anthropic.append_system_prompt"
@@ -564,7 +564,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="Bare mode"
         help="--bare"
-        description="Starts Claude minimally — skips CLAUDE.md discovery, plugins, and skills. Recommended for fast-starting automated scripts."
+        description="Starts Claude minimally | skips CLAUDE.md discovery, plugins, and skills. Recommended for fast-starting automated scripts."
       >
         <.toggle
           key="anthropic.bare"
@@ -575,7 +575,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="Verbose"
         help="--verbose"
-        description="Shows every step Claude takes — internal reasoning and exactly which tools it calls with what data."
+        description="Shows every step Claude takes | internal reasoning and exactly which tools it calls with what data."
       >
         <.toggle
           key="anthropic.verbose"
@@ -607,7 +607,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="No session persistence"
         help="--no-session-persistence"
-        description="Prevents the session from being saved to local history — cannot be resumed or rewound later."
+        description="Prevents the session from being saved to local history | cannot be resumed or rewound later."
       >
         <.toggle
           key="anthropic.no_session_persistence"
@@ -630,7 +630,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="OS sandbox isolation"
         help="--sandbox"
-        description="Enforces strict OS-level boundaries on the Bash tool — limits which files Claude can read/write and which sites it can visit."
+        description="Enforces strict OS-level boundaries on the Bash tool | limits which files Claude can read/write and which sites it can visit."
       >
         <.toggle
           key="anthropic.sandbox"
@@ -641,7 +641,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       <.row
         label="Dangerously skip permissions"
         help="--dangerously-skip-permissions"
-        description="Bypasses all permission prompts so Claude works autonomously. Use only in isolated environments (Docker, VMs) — Claude could delete files or run dangerous commands."
+        description="Bypasses all permission prompts so Claude works autonomously. Use only in isolated environments (Docker, VMs) | Claude could delete files or run dangerous commands."
       >
         <.toggle
           key="anthropic.dangerously_skip_permissions"
@@ -686,7 +686,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       </.row>
       <.row
         label="Dangerously bypass approvals & sandbox"
-        help="--dangerously-bypass-approvals-and-sandbox — for isolated VMs / CI only"
+        help="--dangerously-bypass-approvals-and-sandbox | for isolated VMs / CI only"
       >
         <.toggle
           key="openai.dangerously_bypass_approvals_and_sandbox"
@@ -706,7 +706,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
   defp section(assigns) do
     ~H"""
     <div class="px-4 py-3">
-      <h4 class="mb-2 text-mini font-medium uppercase tracking-wide text-base-content/50">
+      <h4 class="mb-2 text-mini font-medium uppercase tracking-normal text-base-content/50">
         {@title}
       </h4>
       <div class="flex flex-col divide-y divide-base-content/5">
@@ -732,7 +732,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     ~H"""
     <div class="flex items-start justify-between py-3 gap-4">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-1.5 text-sm text-base-content/90">
+        <div class="flex items-center gap-1.5 text-message text-base-content/90">
           {@label}
           <span :if={@help} class="text-mini font-mono text-base-content/40">{@help}</span>
           <span
@@ -742,7 +742,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
           >
           </span>
         </div>
-        <div :if={@description} class="text-xs text-base-content/55 mt-0.5 leading-snug max-w-md">
+        <div :if={@description} class="text-mini text-base-content/55 mt-0.5 leading-snug max-w-md">
           {@description}
         </div>
       </div>
@@ -788,7 +788,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       phx-blur="dm_setting_update"
       phx-value-scope={@scope}
       phx-value-key={@key}
-      class="input input-bordered input-sm w-28 text-sm"
+      class="input input-bordered input-sm w-28 text-message"
     />
     """
   end
@@ -808,7 +808,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       phx-blur="dm_setting_update"
       phx-value-scope={@scope}
       phx-value-key={@key}
-      class="input input-bordered input-sm w-56 text-sm"
+      class="input input-bordered input-sm w-56 text-message"
     />
     """
   end
@@ -825,7 +825,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       phx-blur="dm_setting_update"
       phx-value-scope={@scope}
       phx-value-key={@key}
-      class="textarea textarea-bordered textarea-sm w-56 text-sm font-mono"
+      class="textarea textarea-bordered textarea-sm w-56 text-message font-mono"
     >{@value}</textarea>
     """
   end
@@ -839,13 +839,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
     ~H"""
     <select
       id={"dm-setting-#{@key}"}
-      class="select select-bordered select-sm w-56 text-sm"
+      class="select select-bordered select-sm w-56 text-message"
       phx-change="dm_setting_update"
       phx-value-scope={@scope}
       phx-value-key={@key}
     >
       <option :for={opt <- @options} value={opt} selected={opt == @value}>
-        {if opt == "", do: "—", else: opt}
+        {if opt == "", do: "-", else: opt}
       </option>
     </select>
     """

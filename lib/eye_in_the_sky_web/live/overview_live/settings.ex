@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       {:noreply,
        socket
        |> assign(:desktop_port, port)
-       |> put_flash(:info, "Port saved — restart the desktop app to apply")}
+       |> put_flash(:info, "Port saved. Restart the desktop app to apply.")}
     else
       {:error, :out_of_range} ->
         {:noreply, put_flash(socket, :error, "Port must be between 1024 and 49151")}
@@ -158,7 +158,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
           if granted? do
             "Hooks/skills will be installed next launch"
           else
-            "Hooks/skills will not be installed next launch (existing ones are not removed — use eits uninstall)"
+            "Hooks/skills will not be installed next launch (existing ones are not removed; use eits uninstall)"
           end
 
         {:noreply,
@@ -482,6 +482,6 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   defp render_tab(%{active_tab: :providers} = assigns), do: ProvidersTab.render(assigns)
 
   defp render_tab(%{active_tab: _} = assigns) do
-    ~H[<p class="text-sm text-base-content/50 px-2 py-4">Coming soon</p>]
+    ~H[<p class="text-message text-base-content/50 px-2 py-4">Coming soon</p>]
   end
 end

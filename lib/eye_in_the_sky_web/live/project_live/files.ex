@@ -401,7 +401,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
               <.icon name="hero-arrow-left" class="size-4" />
             </.link>
           <% end %>
-          <span class="text-xs text-base-content/50 font-mono truncate flex-1 min-w-0">
+          <span class="text-mini text-base-content/50 font-mono truncate flex-1 min-w-0">
             {@file_path}
           </span>
           <.open_in_editor_button
@@ -425,7 +425,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <div class="text-center">
           <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
           <h3 class="text-lg font-semibold text-base-content/60 mb-2">{@empty_label}</h3>
-          <p class="text-sm text-base-content/40">{@empty_description}</p>
+          <p class="text-message text-base-content/40">{@empty_description}</p>
         </div>
       </div>
     <% end %>
@@ -566,13 +566,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         phx-update="ignore"
       >
         <div class="p-3 md:p-4">
-          <h2 class="text-sm font-semibold text-base-content/80 mb-2">Files</h2>
-          <ul class="menu menu-sm bg-base-200 rounded-lg max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
+          <h2 class="text-message font-semibold text-base-content/80 mb-2">Files</h2>
+          <ul class="menu menu-sm bg-base-200 rounded-box max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
             <.tree_item :for={item <- @file_tree} item={item} project_id={@project.id} />
           </ul>
         </div>
       </div>
-
+      
     <!-- File Content Viewer -->
       <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane

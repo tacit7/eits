@@ -50,11 +50,11 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
       data-session-id={@canvas_session.session_id}
       phx-hook="ChatWindowHook"
       style={"position: absolute; left: #{@canvas_session.pos_x}px; top: #{@canvas_session.pos_y}px; width: #{@canvas_session.width}px; height: #{@canvas_session.height}px; resize: both; overflow: auto;"}
-      class="bg-base-100 rounded-xl shadow-2xl border border-base-300 flex flex-col"
+      class="bg-base-100 rounded-box shadow-2xl border border-base-300 flex flex-col"
     >
       <div
         data-drag-handle
-        class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-xl cursor-move select-none shrink-0"
+        class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-300 rounded-t-box cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2 min-w-0">
           <img
@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             ]}
             alt={(@session && @session.provider) || "agent"}
           />
-          <span class="text-xs font-medium truncate">{session_label(@session)}</span>
+          <span class="text-mini font-medium truncate">{session_label(@session)}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <button
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           style="scrollbar-width: none; -ms-overflow-style: none;"
         >
           <%= if @messages == [] do %>
-            <div class="flex items-center justify-center h-full text-xs text-base-content/30">
+            <div class="flex items-center justify-center h-full text-mini text-base-content/30">
               No messages yet
             </div>
           <% else %>
@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <input
             type="text"
             name="body"
-            class="input input-xs flex-1 bg-base-200 text-base"
+            class="input input-xs flex-1 bg-base-200 text-message"
             placeholder="Message..."
             autocomplete="off"
           />
@@ -151,7 +151,9 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           >
             <.icon name="hero-arrow-down-mini" class="size-3.5" />
           </button>
-          <button type="submit" class="btn btn-primary btn-xs px-2">&#8593;</button>
+          <button type="submit" class="btn btn-primary btn-xs px-2" aria-label="Send message">
+            <.icon name="hero-arrow-up-mini" class="size-3.5" />
+          </button>
         </.form>
       </div>
     </div>
@@ -184,7 +186,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
              |> push_event("messages-updated-" <> to_string(cs_id), %{})}
 
           {:error, :queue_full} ->
-            {:noreply, put_flash(socket, :error, "Queue is full — max 5 messages pending")}
+            {:noreply, put_flash(socket, :error, "Queue is full | max 5 messages pending")}
 
           {:error, _reason} ->
             {:noreply, put_flash(socket, :error, "Failed to send message")}
@@ -253,7 +255,7 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
         <!-- System message: centered annotation with dividers -->
         <div class="flex items-center gap-2 my-1 px-1">
           <div class="flex-1 h-px bg-base-content/[0.04]"></div>
-          <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+          <span class="text-micro text-base-content/25 select-none whitespace-nowrap">
             {String.slice(@message.body || "system message", 0, 50)}
           </span>
           <div class="flex-1 h-px bg-base-content/[0.04]"></div>
@@ -267,8 +269,8 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
           <div class={["group flex items-end gap-1.5", @role == :user && "flex-row-reverse"]}>
             <div class={["max-w-[78%] flex flex-col", @role == :user && "items-end"]}>
               <div class={[
-                "text-sm leading-snug break-words",
-                @role == :user && "px-3 py-2 bg-base-200 text-base-content rounded-2xl rounded-br-sm",
+                "text-message leading-snug break-words",
+                @role == :user && "px-3 py-2 bg-base-200 text-base-content rounded-box",
                 @role == :agent && "py-1 text-base-content/90",
                 @is_dm && @role == :user && "border border-primary/20"
               ]}>

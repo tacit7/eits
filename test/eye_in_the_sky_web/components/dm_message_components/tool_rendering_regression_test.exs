@@ -130,6 +130,75 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
       assert html =~ "Bash",
              "stream_type='bash' with call body must route to call widget"
     end
+
+    test "bash tool JSON renders exit code and output" do
+      html =
+        render_component(
+          &ToolWidget.tool_widget/1,
+          name: "Bash",
+          rest: Jason.encode!(%{"command" => "mix test", "exit_code" => 2, "output" => "failed"}),
+          compact: false,
+          flat: false
+        )
+
+      assert html =~ "exit 2"
+      assert html =~ "Output"
+      assert html =~ "failed"
+    end
+  end
+
+  describe "thinking and Codex failure rendering" do
+    test "thinking metadata is hidden unless show_thinking_blocks is true" do
+      message =
+        msg(
+          body: "answer",
+          metadata: %{"thinking" => "private reasoning"}
+        )
+
+      hidden =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          show_thinking_blocks: false
+        )
+
+      visible =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          show_thinking_blocks: true
+        )
+
+      refute hidden =~ "private reasoning"
+      assert visible =~ "private reasoning"
+    end
+
+    test "Codex failure card renders normalized metadata badges" do
+      message =
+        msg(
+          body: "The 'gpt-5.2' model is not supported.",
+          metadata: %{
+            "stream_type" => "codex_error",
+            "error_title" => "Codex error",
+            "status" => 400,
+            "error_type" => "invalid_request_error",
+            "model" => "gpt-5.2"
+          }
+        )
+
+      html =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          compact: false,
+          flat: false
+        )
+
+      assert html =~ "Codex error"
+      assert html =~ "HTTP 400"
+      assert html =~ "invalid_request_error"
+      assert html =~ "model gpt-5.2"
+    end
   end
 
   # ---------------------------------------------------------------------------

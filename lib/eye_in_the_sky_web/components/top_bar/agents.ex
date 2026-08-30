@@ -22,18 +22,18 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
       data-label={scope_label(@scope_filter)}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         Source: <span class="js-sort-label">{scope_label(@scope_filter)}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[110px]">
+      <ul class="dropdown-content z-50 mt-1 min-w-[110px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- scope_options() do %>
           <li>
             <button
               phx-click="filter_scope"
               phx-value-scope={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
+              class={"focus-ring block w-full rounded-box px-3 py-1.5 text-left text-mini hover:bg-base-content/5 " <>
                 if(@scope_filter == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}
@@ -49,18 +49,18 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
       data-label={Helpers.sort_label(@sort_by, sort_options())}
       class="dropdown"
     >
-      <summary class="flex items-center gap-1 h-7 px-2 rounded-md text-mini font-medium border border-base-content/8 bg-base-100 text-base-content/60 hover:text-base-content cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
+      <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options())}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-lg shadow-lg p-1 min-w-[140px]">
+      <ul class="dropdown-content z-50 mt-1 min-w-[140px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- sort_options() do %>
           <li>
             <button
               phx-click="sort_agents"
               phx-value-by={value}
               onclick="var d=this.closest('details');d.querySelector('.js-sort-label').textContent=this.textContent.trim();d.removeAttribute('open')"
-              class={"block w-full px-3 py-1.5 text-left text-mini rounded hover:bg-base-content/5 " <>
+              class={"focus-ring block w-full rounded-box px-3 py-1.5 text-left text-mini hover:bg-base-content/5 " <>
                 if(@sort_by == value, do: "text-base-content font-medium", else: "text-base-content/60")}
             >
               {label}

@@ -43,6 +43,8 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       %{status: "working", last_activity_at: DateTime.utc_now()}
       |> Helpers.maybe_put(:name, params["name"])
       |> Helpers.maybe_put(:description, params["description"])
+      |> Helpers.maybe_put(:entrypoint, params["entrypoint"])
+      |> maybe_put_managed_by_app(params)
 
     case Sessions.update_session(session, update_attrs) do
       {:ok, updated} ->
@@ -131,6 +133,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     |> Helpers.maybe_put(:model_version, params["model_version"])
     |> Helpers.maybe_put(:compact_summary, params["compact_summary"])
     |> Helpers.maybe_put(:last_activity_at, DateTime.utc_now())
+    |> maybe_put_managed_by_app(params)
     |> maybe_clear_entrypoint(params)
     |> maybe_clear_status_reason(status, params)
     |> maybe_set_ended_at(status, params)
@@ -141,6 +144,28 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
     if params["clear_entrypoint"] in [true, "true"],
       do: Map.put(attrs, :entrypoint, nil),
       else: attrs
+  end
+
+  defp maybe_put_managed_by_app(attrs, params) do
+    cond do
+      params["managed_by_app"] in [true, "true", "1", 1] ->
+        Map.put(attrs, :managed_by_app, true)
+
+      params["managed_by_app"] in [false, "false", "0", 0] ->
+        Map.put(attrs, :managed_by_app, false)
+
+      params["process_owner"] == "app" ->
+        Map.put(attrs, :managed_by_app, true)
+
+      params["process_owner"] == "terminal" ->
+        Map.put(attrs, :managed_by_app, false)
+
+      params["entrypoint"] == "cli" ->
+        Map.put(attrs, :managed_by_app, false)
+
+      true ->
+        attrs
+    end
   end
 
   defp maybe_clear_status_reason(attrs, status, params) do
@@ -278,10 +303,17 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
         conn |> put_status(404) |> json(%{error: "not found"})
 
       {:ok, session} ->
-        alive = AgentWorker.alive?(session.id)
+        health = AgentWorker.health(session.id)
+        alive = health.alive
         last_activity_at = session.last_activity_at
         hung = alive && stale?(last_activity_at, 10)
-        json(conn, %{alive: alive, last_activity_at: last_activity_at, hung: hung})
+
+        json(
+          conn,
+          health
+          |> Map.put(:last_activity_at, last_activity_at)
+          |> Map.put(:hung, hung)
+        )
     end
   end
 

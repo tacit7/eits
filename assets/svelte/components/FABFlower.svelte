@@ -118,7 +118,7 @@
       on:click={() => handleAgentClick(agent)}
       title={agent.name || agent.session_id}
     >
-      <span class="font-bold text-xs">{getAgentInitials(agent.name)}</span>
+      <span class="font-bold text-nano">{getAgentInitials(agent.name)}</span>
       <span class="badge {getStatusBadgeClass(agent.status)} badge-xs absolute -bottom-1 -right-1"></span>
     </button>
   {/each}
@@ -135,22 +135,26 @@
           <span class="badge badge-sm badge-outline font-mono">{selectedAgent.session_id.substring(0, 8)}</span>
         {/if}
       </div>
-      <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close" on:click={closeChatModal}>✕</button>
+      <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close" on:click={closeChatModal}>
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+        </svg>
+      </button>
     </div>
 
       <!-- Messages Area -->
-      <div class="bg-base-200 rounded-lg p-4 h-96 overflow-y-auto mb-4">
+      <div class="bg-base-200 rounded-box p-4 h-96 overflow-y-auto mb-4">
         {#if messages.length === 0}
           <div class="text-center text-base-content/50 py-8">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
             </svg>
-            <p class="text-sm">No messages yet. Start a conversation!</p>
+            <p class="text-message">No messages yet. Start a conversation!</p>
           </div>
         {:else}
           <div class="space-y-0">
             {#each messages as message (message.inserted_at + message.sender_role)}
-              <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+              <div class="group py-2 px-1 rounded-box hover:bg-base-content/[0.02] transition-colors">
                 <div class="flex items-start gap-2">
                   {#if message.sender_role === 'user'}
                     <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
@@ -162,10 +166,10 @@
                     </div>
                   {/if}
                   <div class="min-w-0 flex-1">
-                    <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'} mr-1.5">
+                    <span class="text-mini font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'} mr-1.5">
                       {message.sender_role === 'user' ? 'You' : 'Agent'}
                     </span>
-                    <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
+                    <p class="text-message leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
                   </div>
                 </div>
               </div>
@@ -178,7 +182,7 @@
       <form on:submit|preventDefault={handleSubmit} class="flex gap-2">
         <input
           type="text"
-          class="input input-bordered flex-1"
+          class="input input-bordered flex-1 text-message"
           placeholder="Send message to agent..."
           bind:value={inputValue}
           autocomplete="off"

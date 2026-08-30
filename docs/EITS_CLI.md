@@ -184,6 +184,10 @@ eits sessions update <uuid> [--status <s>] [--intent <text>] \
   [--model <raw-model-string>] [--model-name <name>] \
   [--model-provider <provider>] [--model-version <version>]
 
+Hook/API calls that set `entrypoint=cli` mark the session terminal-owned
+(`managed_by_app=false`) unless ownership is explicitly overridden through the
+REST API. The Rust CLI does not expose a separate ownership flag yet.
+
 eits sessions end <uuid> [--final-status <completed|failed|waiting>]
 
 eits sessions archive <uuid>

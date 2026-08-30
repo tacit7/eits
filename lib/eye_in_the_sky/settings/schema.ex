@@ -52,8 +52,8 @@ defmodule EyeInTheSky.Settings.Schema do
 
     # ---- anthropic / claude flags -----------------------------------------
     "anthropic.permission_mode" => %{
-      type: {:enum, ["default", "acceptEdits", "plan", "bypassPermissions"]},
-      default: "acceptEdits",
+      type: {:enum_or_nil, ["default", "acceptEdits", "plan", "bypassPermissions"]},
+      default: nil,
       namespace: "anthropic",
       scopes: [:agent, :session]
     },
@@ -197,7 +197,7 @@ defmodule EyeInTheSky.Settings.Schema do
     },
     "anthropic.dangerously_skip_permissions" => %{
       type: :boolean,
-      default: false,
+      default: true,
       namespace: "anthropic",
       scopes: [:agent, :session]
     },

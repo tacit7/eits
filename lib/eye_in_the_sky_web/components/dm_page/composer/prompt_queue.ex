@@ -11,39 +11,39 @@ defmodule EyeInTheSkyWeb.Components.DmPage.Composer.PromptQueue do
   def prompt_queue(assigns) do
     ~H"""
     <details class="group mb-2" open>
-      <summary class="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-base-content/8 bg-base-content/[0.02] cursor-pointer list-none hover:bg-base-content/[0.04] transition-colors select-none">
+      <summary class="flex items-center gap-2 px-3 py-1.5 rounded-box border border-base-content/8 bg-base-content/[0.02] cursor-pointer list-none hover:bg-base-content/[0.04] transition-colors select-none">
         <.icon name="hero-clock" class="size-3.5 text-warning/70" />
-        <span class="text-mini font-medium text-base-content/40 flex-1 uppercase tracking-wide">
+        <span class="text-mini font-medium text-base-content/40 flex-1 uppercase tracking-normal">
           {length(@prompts)} queued
         </span>
         <.icon name="hero-chevron-down" class="size-3 text-base-content/20" />
       </summary>
-      <div class="mt-1 rounded-xl border border-base-content/8 bg-base-content/[0.02] divide-y divide-base-content/5 overflow-hidden">
+      <div class="mt-1 rounded-box border border-base-content/8 bg-base-content/[0.02] divide-y divide-base-content/5 overflow-hidden">
         <%= for prompt <- @prompts do %>
           <% msg = prompt.message || "" %>
           <% long? = String.length(msg) > 80 %>
           <div class="px-3 py-2">
             <div class="flex items-center gap-2">
-              <span class="flex-shrink-0 text-xs font-mono font-medium uppercase tracking-wide px-1.5 py-0.5 rounded bg-base-content/[0.06] text-base-content/40">
+              <span class="flex-shrink-0 text-mini font-mono font-medium uppercase tracking-normal px-1.5 py-0.5 rounded-box bg-base-content/[0.06] text-base-content/40">
                 {ViewHelpers.model_display_name(prompt.context[:model] || Settings.default_model())}
               </span>
               <%= if long? do %>
                 <details class="flex-1 min-w-0 group/pq">
                   <summary class="flex items-center gap-1 cursor-pointer list-none">
-                    <span class="text-xs text-base-content/50 truncate flex-1 min-w-0">
-                      {String.slice(msg, 0, 80)}…
+                    <span class="text-mini text-base-content/50 truncate flex-1 min-w-0">
+                      {String.slice(msg, 0, 80)}...
                     </span>
                     <.icon
                       name="hero-chevron-right"
                       class="size-3 text-base-content/20 flex-shrink-0 transition-transform group-open/pq:rotate-90"
                     />
                   </summary>
-                  <p class="mt-2 text-xs text-base-content/60 break-words leading-relaxed">
+                  <p class="mt-2 text-mini text-base-content/60 break-words leading-relaxed">
                     <span class="whitespace-pre-wrap">{msg}</span>
                   </p>
                 </details>
               <% else %>
-                <span class="text-xs text-base-content/50 flex-1 min-w-0">
+                <span class="text-mini text-base-content/50 flex-1 min-w-0">
                   {msg}
                 </span>
               <% end %>

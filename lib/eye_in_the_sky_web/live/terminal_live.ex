@@ -107,11 +107,11 @@ defmodule EyeInTheSkyWeb.TerminalLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col h-[100dvh] bg-zinc-950">
-      <div class="flex items-center gap-2 px-4 py-2 bg-zinc-900 border-b border-zinc-800 shrink-0">
-        <.icon name="hero-command-line" class="w-4 h-4 text-zinc-400" />
-        <span class="text-sm font-medium text-zinc-300">Terminal</span>
-        <span class="ml-auto text-xs text-zinc-600">bash</span>
+    <div class="flex flex-col h-[100dvh] bg-base-300">
+      <div class="flex items-center gap-2 px-4 py-2 bg-base-200 border-b border-base-content/10 shrink-0">
+        <.icon name="hero-command-line" class="w-4 h-4 text-base-content/50" />
+        <span class="text-message font-medium text-base-content/80">Terminal</span>
+        <span class="ml-auto text-mini text-base-content/35">bash</span>
       </div>
       <div
         id="terminal-container"

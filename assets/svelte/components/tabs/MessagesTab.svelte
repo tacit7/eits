@@ -38,7 +38,7 @@
         <!-- Date separator -->
         {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
           <div class="flex items-center justify-center my-6">
-            <div class="badge badge-ghost badge-sm text-xs font-semibold px-3 py-1">
+            <div class="badge badge-ghost badge-sm text-mini font-semibold px-3 py-1">
               {formatDateRelative(message.inserted_at)}
             </div>
           </div>
@@ -49,13 +49,13 @@
           <!-- System message: centered annotation with dividers -->
           <div class="flex items-center gap-3 my-2">
             <div class="flex-1 h-px bg-base-content/[0.04]"></div>
-            <span class="text-[10px] text-base-content/25 select-none whitespace-nowrap">
+            <span class="text-micro text-base-content/25 select-none whitespace-nowrap">
               {message.body.substring(0, 50)}
             </span>
             <div class="flex-1 h-px bg-base-content/[0.04]"></div>
           </div>
         {:else}
-          <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+          <div class="group py-2 px-1 rounded-box hover:bg-base-content/[0.02] transition-colors">
             <div class="flex items-start gap-2">
               {#if message.sender_role === 'user'}
                 <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
@@ -68,15 +68,15 @@
               {/if}
               <div class="min-w-0 flex-1">
                 <div class="flex items-baseline gap-1.5 mb-0.5">
-                  <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'}">
+                  <span class="text-mini font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'}">
                     {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
                   </span>
                   {#if message.provider}
                     <span class="badge badge-xs badge-ghost">{message.provider}</span>
                   {/if}
-                  <time class="text-[10px] text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
+                  <time class="text-micro text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
                 </div>
-                <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
+                <p class="text-message leading-relaxed text-base-content/85 whitespace-pre-wrap break-words">{message.body}</p>
               </div>
             </div>
           </div>
@@ -88,7 +88,7 @@
         <div class="text-center max-w-md">
           <span class="w-12 h-12 mx-auto mb-4 text-base-content/30 block">{@html ChatBubbleLeftSvg}</span>
           <h3 class="text-lg font-semibold text-base-content">No messages yet</h3>
-          <p class="mt-1 text-sm text-base-content/70">
+          <p class="mt-1 text-message text-base-content/70">
             Start a conversation with the agent below
           </p>
         </div>
@@ -133,7 +133,7 @@
         name="body"
         aria-label="Send instruction to agent"
         placeholder="Send instruction to agent..."
-        class="input input-bordered flex-1"
+        class="input input-bordered flex-1 text-message"
         autocomplete="off"
       />
 

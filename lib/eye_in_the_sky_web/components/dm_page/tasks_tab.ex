@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
         />
       <% else %>
         <div
-          class="divide-y divide-base-content/5 bg-base-200 rounded-xl shadow-sm px-4"
+          class="divide-y divide-base-content/5 bg-base-200 rounded-box shadow-sm px-4"
           id="dm-task-list"
         >
           <%= for task <- @tasks do %>
@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                 type="button"
                 phx-click="open_task_detail"
                 phx-value-task_id={task.uuid || to_string(task.id)}
-                class="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md text-base-content/25 hover:text-base-content/70 active:text-primary transition-all z-10 md:min-w-0 md:min-h-0 md:mt-3 md:p-1.5"
+                class="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-box text-base-content/25 hover:text-base-content/70 active:text-primary transition-all z-10 md:min-w-0 md:min-h-0 md:mt-3 md:p-1.5"
                 title="Edit task"
               >
                 <.icon name="hero-pencil-square" class="size-4 md:w-3.5 md:h-3.5" />
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                   <%!-- Content --%>
                   <div class="flex-1 min-w-0">
                     <span class={[
-                      "text-[13px] font-medium truncate block",
+                      "text-message font-medium truncate block",
                       task.completed_at && "text-base-content/40 line-through",
                       !task.completed_at && "text-base-content/85"
                     ]}>
@@ -91,23 +91,23 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                         </span>
                       <% end %>
                       <%= if task.tags not in [nil, []] do %>
-                        <span class="text-base-content/15">&middot;</span>
+                        <span class="text-base-content/15">|</span>
                         <span class="text-base-content/35">
                           {Enum.map_join(Enum.take(task.tags, 2), ", ", & &1.name)}
                         </span>
                       <% end %>
-                      <span class="text-base-content/15">&middot;</span>
+                      <span class="text-base-content/15">|</span>
                       <span class="font-mono text-base-content/30">
                         {String.slice(task.uuid || to_string(task.id), 0..7)}
                       </span>
                       <%= if task.created_at do %>
-                        <span class="text-base-content/15">&middot;</span>
+                        <span class="text-base-content/15">|</span>
                         <span class="tabular-nums text-base-content/30">
                           {relative_time(task.created_at)}
                         </span>
                       <% end %>
                       <%= if Map.get(task, :notes_count, 0) > 0 do %>
-                        <span class="text-base-content/15">&middot;</span>
+                        <span class="text-base-content/15">|</span>
                         <span class="flex items-center gap-0.5 text-base-content/35">
                           <.icon name="hero-chat-bubble-bottom-center-text" class="size-3" />
                           {Map.get(task, :notes_count)}
@@ -119,18 +119,18 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                 <%= if has_expandable do %>
                   <div class="collapse-content px-0 pt-0 pb-4 pl-8">
                     <%= if task.description do %>
-                      <div class="text-sm text-base-content/65 leading-relaxed mb-2">
+                      <div class="text-message text-base-content/65 leading-relaxed mb-2">
                         <span class="whitespace-pre-wrap">{String.trim(task.description)}</span>
                       </div>
                     <% end %>
                     <%= for note <- Map.get(task, :notes, []) do %>
-                      <div class="mt-1.5 rounded-lg bg-base-200/60 px-3 py-2">
+                      <div class="mt-1.5 rounded-box bg-base-200/60 px-3 py-2">
                         <%= if note.title do %>
                           <div class="text-mini font-semibold text-base-content/60 mb-0.5">
                             {note.title}
                           </div>
                         <% end %>
-                        <pre class="whitespace-pre-wrap text-xs text-base-content/55 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
+                        <pre class="whitespace-pre-wrap text-mini text-base-content/55 font-mono leading-relaxed">{String.trim(note.body || "")}</pre>
                       </div>
                     <% end %>
                   </div>
@@ -142,7 +142,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
       <% end %>
       <button
         phx-click="toggle_new_task_drawer"
-        class="flex items-center gap-2 w-full px-3 py-3 rounded-xl text-sm text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 active:bg-base-content/10 transition-colors border border-dashed border-base-content/15 hover:border-base-content/25"
+        class="flex items-center gap-2 w-full px-3 py-3 rounded-box text-message text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 active:bg-base-content/10 transition-colors border border-dashed border-base-content/15 hover:border-base-content/25"
       >
         <.icon name="hero-plus" class="size-4" /> Add task
       </button>

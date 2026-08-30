@@ -570,11 +570,11 @@ The `hooks.json` file uses a nested `"hooks"` object at the top level (not a fla
 }
 ```
 
-Most lifecycle events route through `eits-codex-notify.sh`. `PreToolUse`, `PostToolUse`, and `Stop` additionally run `codex-iam-guard.sh` as a second command in the same hook array.
+`SessionStart` runs the dedicated `codex-session-startup.sh` script. Most other lifecycle events route through `eits-codex-notify.sh`. `PreToolUse`, `PostToolUse`, and `Stop` additionally run `codex-iam-guard.sh` as a second command in the same hook array.
 
 | Hook | Matcher | Scripts | Purpose |
 |------|---------|---------|---------|
-| `SessionStart` | — | `eits-codex-notify.sh` | Startup/resume bookkeeping; mark session idle |
+| `SessionStart` | — | `codex-session-startup.sh` | Register/resolve session, write Codex env file, mark session idle |
 | `UserPromptSubmit` | — | `eits-codex-notify.sh` | Mark session as `"working"` |
 | `PreToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Tool guards + IAM deny check |
 | `PostToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Commit logging + IAM post-check |
@@ -585,9 +585,9 @@ Most lifecycle events route through `eits-codex-notify.sh`. `PreToolUse`, `PostT
 
 `eits-codex-notify.sh` also dispatches `apply_patch` into the `Edit|Write` guard path for `PreToolUse`.
 
-All hooks call the same `eits-codex-notify.sh` dispatcher script, which:
+For non-startup events, hooks call the `eits-codex-notify.sh` dispatcher script, which:
 1. Parses the JSON input from Codex to extract the hook event name
-2. Routes to the appropriate session-specific helper script (e.g., `eits-session-startup.sh` for SessionStart)
+2. Routes to the appropriate event-specific helper script
 3. Updates session status via `eits sessions update`
 4. Runs guards and validation checks (PreToolUse)
 

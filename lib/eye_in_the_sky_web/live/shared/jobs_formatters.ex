@@ -58,11 +58,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
     end
   end
 
-  def row_border_class(:disabled), do: "border-l-4 border-base-content/20"
-  def row_border_class(:running), do: "border-l-4 border-warning"
-  def row_border_class(:failed), do: "border-l-4 border-error"
-  def row_border_class(:healthy), do: "border-l-4 border-success"
-
   def cfg(config, key) do
     case config do
       %{^key => val} when is_binary(val) -> val

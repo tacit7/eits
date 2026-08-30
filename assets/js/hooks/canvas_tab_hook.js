@@ -29,17 +29,17 @@ function getOrCreateHelp() {
 
   const card = document.createElement("div")
   card.style.cssText = "position:relative;z-index:1;min-width:280px"
-  card.className = "card bg-base-100 shadow-xl"
+  card.className = "card bg-base-100 shadow-xl rounded-box"
 
   const body = document.createElement("div")
   body.className = "card-body p-5 gap-3"
 
   const title = document.createElement("h3")
-  title.className = "font-semibold text-sm text-base-content/80"
+  title.className = "font-semibold text-message text-base-content/80"
   title.textContent = "Canvas Shortcuts"
 
   const table = document.createElement("table")
-  table.className = "w-full text-xs"
+  table.className = "w-full text-mini"
   SHORTCUTS.forEach(({ keys, desc }) => {
     const tr = document.createElement("tr")
     tr.innerHTML = `<td class="py-1 pr-4 font-mono text-base-content/50 whitespace-nowrap">${keys}</td><td class="py-1 text-base-content/70">${desc}</td>`

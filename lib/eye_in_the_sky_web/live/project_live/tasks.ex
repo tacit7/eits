@@ -279,7 +279,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   end
 
   def handle_info({:editor_sync_failed, :task, _id, _reason}, socket) do
-    {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+    {:noreply, put_flash(socket, :error, "Editor sync failed | check your editor")}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -340,7 +340,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <button
             :if={!@tasks_select_mode && @task_count > 0}
             phx-click="enter_select_mode_tasks"
-            class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/50"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/75"
           >
             <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
           </button>
@@ -348,7 +348,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
+            class="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-box text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
           >
             <.icon name="hero-funnel-mini" class="size-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
@@ -361,7 +361,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           </button>
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1.5 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
           >
             <.icon name="hero-plus-mini" class="size-3.5" /> New Task
           </button>

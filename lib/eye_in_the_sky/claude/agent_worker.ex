@@ -23,6 +23,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   }
 
   alias EyeInTheSky.Claude.{Job, Message, StreamAssembler, StreamAssemblerDispatcher}
+  alias EyeInTheSky.Claude.SDK.Registry, as: SDKRegistry
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
 
@@ -132,6 +133,30 @@ defmodule EyeInTheSky.Claude.AgentWorker do
       end,
       ""
     )
+  end
+
+  @doc """
+  Returns a health snapshot for the AgentWorker and its active SDK subprocess.
+
+  `alive` reports the registered AgentWorker GenServer. `processing` reports the
+  worker's internal running state. `handler_alive` reports the SDK output handler
+  process, and `port_alive` reports the registered Port or test PID backing the
+  provider CLI.
+  """
+  def health(session_id) do
+    case Registry.lookup(@registry, {:session, session_id}) do
+      [{pid, provider}] ->
+        if Process.alive?(pid) do
+          GenServer.call(pid, :health)
+        else
+          stopped_health(provider)
+        end
+
+      [] ->
+        stopped_health(nil)
+    end
+  catch
+    :exit, _ -> stopped_health(nil)
   end
 
   def remove_queued_prompt(session_id, prompt_id) do
@@ -250,6 +275,28 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   def handle_call(:get_stream_state, _from, state) do
     buf = if state.stream, do: StreamAssemblerDispatcher.buffer(state.stream), else: ""
     {:reply, buf, state}
+  end
+
+  @impl true
+  def handle_call(:health, _from, state) do
+    port = if state.sdk_ref, do: SDKRegistry.lookup(state.sdk_ref)
+
+    health = %{
+      alive: true,
+      provider: state.provider,
+      status: Atom.to_string(state.status),
+      processing: state.status == :running,
+      handler_alive: pid_alive?(state.handler_pid),
+      sdk_active: not is_nil(state.sdk_ref),
+      port_alive: port_alive?(port),
+      port_type: port_type(port),
+      os_pid: os_pid(port),
+      current_job_active: not is_nil(state.current_job),
+      current_job_id: if(state.current_job, do: state.current_job.id),
+      queue_depth: length(state.queue)
+    }
+
+    {:reply, health, state}
   end
 
   @impl true
@@ -603,4 +650,41 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
   # "pi" intentionally uses the default (delta-based) assembler.
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
+
+  defp stopped_health(provider) do
+    %{
+      alive: false,
+      provider: provider,
+      status: nil,
+      processing: false,
+      handler_alive: false,
+      sdk_active: false,
+      port_alive: false,
+      port_type: nil,
+      os_pid: nil,
+      current_job_active: false,
+      current_job_id: nil,
+      queue_depth: 0
+    }
+  end
+
+  defp pid_alive?(pid) when is_pid(pid), do: Process.alive?(pid)
+  defp pid_alive?(_), do: false
+
+  defp port_alive?(port) when is_port(port), do: not is_nil(Port.info(port))
+  defp port_alive?(pid) when is_pid(pid), do: Process.alive?(pid)
+  defp port_alive?(_), do: false
+
+  defp port_type(port) when is_port(port), do: "port"
+  defp port_type(pid) when is_pid(pid), do: "pid"
+  defp port_type(_), do: nil
+
+  defp os_pid(port) when is_port(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, pid} -> pid
+      _ -> nil
+    end
+  end
+
+  defp os_pid(_), do: nil
 end

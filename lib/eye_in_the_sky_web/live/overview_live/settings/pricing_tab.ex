@@ -6,13 +6,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTab do
   def render(assigns) do
     ~H"""
     <section>
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+      <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         Token Pricing
       </h2>
       <div class="card bg-base-100 border border-base-300 shadow-sm">
         <div class="card-body p-5">
           <div class="flex items-center justify-between mb-4">
-            <p class="text-xs text-base-content/50">
+            <p class="text-mini text-base-content/50">
               Cost per 1M tokens (USD). Used for usage cost estimates.
             </p>
             <button phx-click="reset_pricing" class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]">

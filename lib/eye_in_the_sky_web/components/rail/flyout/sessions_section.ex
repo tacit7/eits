@@ -19,10 +19,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         <input
           type="text"
           value={@session_name_filter}
-          placeholder="Search sessions…"
+          placeholder="Search sessions..."
           phx-keyup="update_session_name_filter"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/[0.04] border border-base-content/[0.15] rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/35"
+          class="w-full pl-6 pr-2 py-1 text-mini bg-base-content/[0.04] border border-base-content/[0.15] rounded-box focus:outline-none focus:border-primary/40 placeholder:text-base-content/35"
         />
       </div>
       <%!-- Scope toggle --%>
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
       phx-click="set_session_scope"
       phx-value-scope={@value}
       class={[
-        "text-nano px-2 py-0.5 rounded transition-colors",
+        "text-nano px-2 py-0.5 rounded-box transition-colors",
         if(active,
           do: "bg-primary/15 text-primary font-medium",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
       <div class="flex-shrink-0 px-3 py-2 border-t border-base-content/[0.05]">
         <.link
           navigate={@view_all_href}
-          class="flex items-center gap-1 text-[11px] text-base-content/30 hover:text-base-content/55 transition-colors group select-none"
+          class="flex items-center gap-1 text-mini text-base-content/30 hover:text-base-content/55 transition-colors group select-none"
         >
           <.icon
             name="hero-arrow-right-mini"
@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   defp current_content(assigns) do
     ~H"""
     <%= if @sessions == [] do %>
-      <div class="px-3 py-5 text-xs text-base-content/35 text-center select-none">
+      <div class="px-3 py-5 text-mini text-base-content/35 text-center select-none">
         {if @is_searching, do: "No sessions found", else: "No sessions"}
       </div>
     <% else %>
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   defp all_projects_content(assigns) do
     ~H"""
     <%= if @projects == [] do %>
-      <div class="px-3 py-5 text-xs text-base-content/35 text-center select-none">
+      <div class="px-3 py-5 text-mini text-base-content/35 text-center select-none">
         No projects
       </div>
     <% else %>
@@ -235,11 +235,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
       data-ctx-uuid={@session.uuid}
       data-ctx-name={@session.name || "unnamed"}
       data-ctx-worktree={@session.git_worktree_path}
-      class="flyout-session-row flex items-start gap-2 px-3 py-1.5 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-[var(--surface-hover,theme(colors.base-content/6%))] transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded [&.active]:font-semibold [&.active]:text-base-content/92 [&.active]:bg-[var(--surface-selected,theme(colors.primary/12%))] [&.active]:border-l-2 [&.active]:border-primary/80 [&.active]:pl-[10px]"
+      class="focus-ring flyout-session-row flex items-start gap-2 px-3 py-1.5 text-mini text-base-content/65 transition-colors hover:bg-[var(--surface-hover,theme(colors.base-content/6%))] hover:text-base-content/90 [&.active]:border-l [&.active]:border-primary/80 [&.active]:bg-[var(--surface-selected,theme(colors.primary/12%))] [&.active]:pl-[11px] [&.active]:font-semibold [&.active]:text-base-content/92 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
     >
       <.status_dot status={@session.status} size="xs" class="mt-[3px] flex-shrink-0" />
       <div class="min-w-0 flex-1">
-        <div class="session-row-name truncate font-medium text-xs text-base-content/75 [.active_&]:font-semibold [.active_&]:text-base-content/92">
+        <div class="session-row-name truncate font-medium text-mini text-base-content/75 [.active_&]:font-semibold [.active_&]:text-base-content/92">
           {@session.name || "unnamed"}
         </div>
         <div class="text-nano text-base-content/48 mt-0.5 flex items-center gap-1">

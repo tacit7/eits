@@ -143,7 +143,7 @@
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-2">
-              <h1 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">{header.agent_type}</h1>
+              <h1 class="text-2xl font-semibold text-base-content">{header.agent_type}</h1>
 
               <span class="badge badge-outline font-mono">
                 {shortId(header.agent_id)}
@@ -155,8 +155,8 @@
             </div>
 
             <!-- Meta chips -->
-            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs sm:text-sm">
-              <div class="bg-base-200 rounded-lg px-3 py-1.5 flex items-center justify-between gap-2">
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-mini">
+              <div class="bg-base-200 rounded-box px-3 py-1.5 flex items-center justify-between gap-2">
                 <div>
                   <span class="text-base-content/70 font-medium">Session</span>
                   <span class="ml-2 font-mono font-semibold">#{shortId(header.session_id)}</span>
@@ -177,13 +177,13 @@
                 </button>
               </div>
 
-              <div class="bg-base-200 rounded-lg px-3 py-1.5">
+              <div class="bg-base-200 rounded-box px-3 py-1.5">
                 <span class="text-base-content/70 font-medium">Project</span>
                 <span class="ml-2 font-semibold">{header.project ?? "Unassigned"}</span>
               </div>
 
               {#if header.started}
-                <div class="bg-base-200 rounded-lg px-3 py-1.5">
+                <div class="bg-base-200 rounded-box px-3 py-1.5">
                   <span class="text-base-content/70 font-medium">Started</span>
                   <time datetime={parseDateLike(header.started)?.toISOString()} title={String(header.started) + " UTC"} class="ml-2 font-semibold">
                     {relativeFrom(parseDateLike(header.started))}
@@ -191,13 +191,13 @@
                 </div>
               {/if}
 
-              <div class="bg-base-200 rounded-lg px-3 py-1.5">
+              <div class="bg-base-200 rounded-box px-3 py-1.5">
                 <span class="text-base-content/70 font-medium">Duration</span>
                 <span class="ml-2 font-semibold">
                   {#if header.status === 'active'}
-                    {tick >= 0 ? elapsedTime(parseDateLike(header.started)) : '—'}
+                    {tick >= 0 ? elapsedTime(parseDateLike(header.started)) : '-'}
                   {:else}
-                    {header.duration ?? '—'}
+                    {header.duration ?? '-'}
                   {/if}
                 </span>
               </div>
@@ -306,7 +306,7 @@
                 id={`tab-${t.key}`}
                 aria-selected={activeTab === t.key}
                 aria-controls={`panel-${t.key}`}
-                class="flex items-center gap-2 px-4 py-2 border-b-2 text-sm transition-colors {activeTab === t.key ? 'border-primary font-medium text-base-content' : 'border-transparent text-base-content/60 hover:text-base-content hover:border-base-content/20'}"
+                class="focus-ring flex items-center gap-2 px-4 py-2 border-b-2 text-message transition-colors {activeTab === t.key ? 'border-primary font-medium text-base-content' : 'border-transparent text-base-content/60 hover:text-base-content hover:border-base-content/20'}"
                 on:click={() => changeTab(t.key)}
               >
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
@@ -349,7 +349,11 @@
 <dialog bind:this={noteDialog} class="modal" aria-labelledby="note-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>✕</button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
+        <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+        </svg>
+      </button>
     </form>
     <h3 id="note-modal-title" class="font-bold text-lg mb-4">Add Note</h3>
     <form on:submit|preventDefault={(e) => {
@@ -387,7 +391,11 @@
 <dialog bind:this={taskDialog} class="modal" aria-labelledby="task-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>✕</button>
+      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
+        <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+        </svg>
+      </button>
     </form>
     <h3 id="task-modal-title" class="font-bold text-lg mb-4">Create New Task</h3>
     <form on:submit|preventDefault={(e) => {

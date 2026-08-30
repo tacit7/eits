@@ -123,7 +123,7 @@ export const AgentCombobox = {
         data-slug="${this._esc(slug)}"
         data-label="${this._esc(name)}"
         role="option"
-        class="px-3 py-2 cursor-pointer text-sm flex items-center gap-2 hover:bg-base-300 aria-selected:bg-base-300"
+        class="px-3 py-2 cursor-pointer text-message flex items-center gap-2 hover:bg-base-300 aria-selected:bg-base-300"
         aria-selected="false"
       >${this._scopeIcon(scope)}<span class="flex-1">${this._highlight(name, q)}</span></li>`
     }).join("")

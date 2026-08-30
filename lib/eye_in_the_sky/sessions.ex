@@ -41,6 +41,9 @@ defmodule EyeInTheSky.Sessions do
   defdelegate list_sessions_for_scope(scope, opts \\ []), to: Query
   defdelegate preload_project(session), to: Query
 
+  def app_managed?(%Session{managed_by_app: false}), do: false
+  def app_managed?(%Session{}), do: true
+
   @doc """
   Creates a session.
   """

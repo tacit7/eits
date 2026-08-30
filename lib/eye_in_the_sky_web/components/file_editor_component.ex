@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
   def file_editor(assigns) do
     ~H"""
     <%= if @file_error do %>
-      <div class="alert alert-error text-sm">
+      <div class="alert alert-error text-message">
         <.icon name="hero-exclamation-circle" class="size-4" />
         <span>Could not load file: {@file_error}</span>
       </div>
@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorComponent do
         id="codemirror-editor"
         data-content={@file_content}
         data-lang={@file_lang}
-        class="border border-base-300 rounded-lg overflow-hidden min-h-64"
+        class="border border-base-300 rounded-box overflow-hidden min-h-64"
       >
       </div>
     <% end %>

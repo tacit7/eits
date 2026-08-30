@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
-    # Warm the Pi discovery cache on mount — Task 9's collapse of
+    # Warm the Pi discovery cache on mount - Task 9's collapse of
     # provider_changed/model_changed into one handler dropped the
     # refresh_async() call the old "pi" branch used to make, leaving the
     # cross-provider entry list (allow_provider_switch?: true) permanently
@@ -62,7 +62,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     file_uploads = Map.get(assigns, :file_uploads)
 
-    # Load projects fresh from the DB instead of trusting the host's assign —
+    # Load projects fresh from the DB instead of trusting the host's assign -
     # hosts load projects once at mount, so a project created after mount
     # (e.g. via the rail's folder picker) never appears in the dropdown
     # until the page reloads. Scope by workspace_id when provided so that
@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               phx-update="ignore"
             />
             <div>
-              <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Model</label>
+              <label class="text-message font-medium text-base-content/70 mb-1.5 block">Model</label>
               <.model_selector
                 id="new-session-model-selector"
                 entries={all_model_entries()}
@@ -252,10 +252,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         data-prefill-label={@prefill_agent_name}
         class="relative"
       >
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Agent</label>
+        <label class="text-message font-medium text-base-content/70 mb-1.5 block">Agent</label>
         <%!-- Hidden field carries the selected slug to the form submit --%>
         <input type="hidden" name="agent" data-combobox-value />
-        <%!-- Visible search input — not submitted, value used only for display --%>
+        <%!-- Visible search input - not submitted, value used only for display --%>
         <input
           type="text"
           data-combobox-input
@@ -265,7 +265,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           aria-autocomplete="list"
           aria-controls="agent-combobox-list"
           aria-expanded="false"
-          class="input input-bordered w-full text-base"
+          class="input input-bordered w-full text-message"
         />
         <ul
           id="agent-combobox-list"
@@ -287,7 +287,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     ~H"""
     <%= if (@prompts || []) != [] do %>
       <div>
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
+        <label class="text-message font-medium text-base-content/70 mb-1.5 block">
           Agent Prompt
         </label>
         <select
@@ -316,11 +316,11 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp name_field(assigns) do
     ~H"""
     <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Session Name</label>
+      <label class="text-message font-medium text-base-content/70 mb-1.5 block">Session Name</label>
       <input
         type="text"
         name="agent_name"
-        class="input input-bordered w-full text-base"
+        class="input input-bordered w-full text-message"
         placeholder="e.g., Fix login bug, Code review..."
         phx-mounted={if @focus_on_open, do: Phoenix.LiveView.JS.focus()}
       />
@@ -335,11 +335,11 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp description_field(assigns) do
     ~H"""
     <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Prompt</label>
+      <label class="text-message font-medium text-base-content/70 mb-1.5 block">Prompt</label>
       <textarea
         id={"desc-#{@selected_prompt_id || "none"}"}
         name="description"
-        class="textarea textarea-bordered w-full h-20 text-base"
+        class="textarea textarea-bordered w-full h-20 text-message"
         placeholder="What should this agent work on?"
         required
         phx-update="ignore"
@@ -347,7 +347,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       >{@prefill_text}</textarea>
       <label class="flex items-center gap-1.5 mt-2 cursor-pointer w-fit">
         <.icon name="hero-paper-clip-mini" class="size-3.5 text-base-content/40" />
-        <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">
+        <span class="text-mini text-base-content/40 hover:text-base-content/60 transition-colors">
           Attach file
         </span>
         <input
@@ -372,7 +372,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         <%= if @file_uploads.agent_images.entries != [] do %>
           <div class="flex flex-wrap gap-2 mb-2">
             <%= for entry <- @file_uploads.agent_images.entries do %>
-              <div class="flex items-center gap-1.5 rounded-lg bg-base-content/[0.04] px-2 py-1 text-xs">
+              <div class="flex items-center gap-1.5 rounded-box bg-base-content/[0.04] px-2 py-1 text-mini">
                 <.icon name="hero-photo" class="size-3.5 text-base-content/40" />
                 <span class="text-base-content/70">{entry.client_name}</span>
                 <button
@@ -393,7 +393,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           class="flex items-center gap-1.5 cursor-pointer w-fit"
         >
           <.icon name="hero-photo-mini" class="size-3.5 text-base-content/40" />
-          <span class="text-xs text-base-content/40 hover:text-base-content/60 transition-colors">
+          <span class="text-mini text-base-content/40 hover:text-base-content/60 transition-colors">
             Attach image
           </span>
         </label>
@@ -412,15 +412,15 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     <%= if @current_project do %>
       <input type="hidden" name="project_id" value={@current_project.id} />
       <div>
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Project</label>
-        <div class="flex items-center gap-2 px-3 py-2.5 bg-base-200/50 rounded-lg text-sm text-base-content/70 border border-base-content/10">
+        <label class="text-message font-medium text-base-content/70 mb-1.5 block">Project</label>
+        <div class="flex items-center gap-2 px-3 py-2.5 bg-base-200/50 rounded-box text-message text-base-content/70 border border-base-content/10">
           <.icon name="hero-folder-mini" class="size-3.5 text-base-content/40" />
           {@current_project.name}
         </div>
       </div>
     <% else %>
       <div>
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Project</label>
+        <label class="text-message font-medium text-base-content/70 mb-1.5 block">Project</label>
         <select
           name="project_id"
           class="select select-bordered w-full"
@@ -445,7 +445,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     ~H"""
     <%= if @selected_provider == "claude" and (String.starts_with?(@selected_model, "claude-opus") or @selected_model in ["opus", "opus[1m]"]) do %>
       <div>
-        <label class="text-sm font-medium text-base-content/70 mb-1.5 block">Effort</label>
+        <label class="text-message font-medium text-base-content/70 mb-1.5 block">Effort</label>
         <select name="effort_level" class="select select-bordered w-full">
           <option value="">Default</option>
           <option value="low">Low</option>
@@ -461,16 +461,16 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp worktree_field(assigns) do
     ~H"""
     <div>
-      <label class="text-sm font-medium text-base-content/70 mb-1.5 block">
-        Worktree Branch <span class="text-xs font-normal text-base-content/40 ml-1">Optional</span>
+      <label class="text-message font-medium text-base-content/70 mb-1.5 block">
+        Worktree Branch <span class="text-mini font-normal text-base-content/40 ml-1">Optional</span>
       </label>
       <input
         type="text"
         name="worktree"
-        class="input input-bordered w-full font-mono text-base"
+        class="input input-bordered w-full font-mono text-message"
         placeholder="e.g., fix-login-bug"
       />
-      <p class="text-xs text-base-content/35 mt-1">
+      <p class="text-mini text-base-content/35 mt-1">
         Isolates work in its own branch (worktree-&lt;name&gt;) and enables automatic PR creation.
       </p>
     </div>
@@ -488,7 +488,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         class="checkbox checkbox-sm"
         checked
       />
-      <span class="text-sm text-base-content/70">EITS Workflow</span>
+      <span class="text-message text-base-content/70">EITS Workflow</span>
     </label>
     """
   end
@@ -497,9 +497,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   defp cli_flags_section(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-lg">
+    <div class="collapse collapse-arrow bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-xs font-medium text-base-content/60">
+      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
       </div>
       <div class="collapse-content px-3 pb-3 space-y-3">
@@ -516,20 +516,20 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp claude_cli_flags(assigns) do
     ~H"""
     <div class="form-control">
-      <label class="label"><span class="label-text text-xs">Permission Mode</span></label>
+      <label class="label"><span class="label-text text-mini">Permission Mode</span></label>
       <select name="permission_mode" class="select select-bordered select-sm w-full">
         <option value="">Default</option>
-        <option value="acceptEdits">acceptEdits — auto-accept file edits</option>
-        <option value="bypassPermissions">bypassPermissions — skip all prompts</option>
-        <option value="dontAsk">dontAsk — never ask for confirmation</option>
-        <option value="plan">plan — read-only, no file changes</option>
+        <option value="acceptEdits">acceptEdits - auto-accept file edits</option>
+        <option value="bypassPermissions">bypassPermissions - skip all prompts</option>
+        <option value="dontAsk">dontAsk - never ask for confirmation</option>
+        <option value="plan">plan - read-only, no file changes</option>
       </select>
     </div>
 
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Max Turns</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+        <span class="label-text text-mini">Max Turns</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-mini">
           --max-turns
         </span>
       </label>
@@ -558,9 +558,9 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         checked
         class="checkbox checkbox-sm checkbox-primary"
       />
-      <span class="label-text text-xs">
+      <span class="label-text text-mini">
         Bypass approvals and sandbox
-        <span class="font-mono text-base-content/40 text-xs ml-1">
+        <span class="font-mono text-base-content/40 text-mini ml-1">
           --dangerously-bypass-approvals-and-sandbox
         </span>
       </span>
@@ -568,8 +568,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Sandbox Mode</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">--sandbox</span>
+        <span class="label-text text-mini">Sandbox Mode</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-mini">--sandbox</span>
       </label>
       <select name="sandbox" class="select select-bordered select-sm w-full">
         <option value="">Default</option>
@@ -581,8 +581,8 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     <div class="form-control">
       <label class="label">
-        <span class="label-text text-xs">Approval Policy</span>
-        <span class="label-text-alt text-base-content/40 font-mono text-xs">
+        <span class="label-text text-mini">Approval Policy</span>
+        <span class="label-text-alt text-base-content/40 font-mono text-mini">
           approval_policy
         </span>
       </label>
@@ -602,12 +602,15 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   defp modal_submit(assigns) do
     ~H"""
     <div class="flex gap-2 mt-2">
-      <button type="submit" class="btn btn-primary flex-1">
+      <button
+        type="submit"
+        class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+      >
         {@button_text || "Launch Agent"}
       </button>
       <button
         type="button"
-        class="btn btn-secondary flex-1 gap-1.5"
+        class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-box bg-secondary px-3 text-mini font-medium text-secondary-content transition-colors hover:bg-secondary/85"
         onclick="document.getElementById('new-session-submit-action').value='chat'; document.getElementById('new-session-form').requestSubmit();"
       >
         <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" /> Chat

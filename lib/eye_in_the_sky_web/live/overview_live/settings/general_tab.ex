@@ -10,12 +10,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
     ~H"""
     <div class="space-y-6">
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Appearance
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body px-5 py-4">
-            <p class="text-sm font-medium text-base-content mb-3">Theme</p>
+            <p class="text-message font-medium text-base-content mb-3">Theme</p>
             <div class="flex flex-wrap gap-2">
               <button
                 :for={{val, label} <- @themes}
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
       </section>
 
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Agent Defaults
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
@@ -39,8 +39,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
             <%!-- Default Model --%>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Default Model</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Default Model</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Model used when spawning new agents and sessions
                 </p>
               </div>
@@ -72,8 +72,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
             <%!-- CLI Idle Timeout --%>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">CLI Idle Timeout</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">CLI Idle Timeout</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   How long before an idle Claude process is killed (seconds). 0 = no timeout.
                 </p>
               </div>
@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                     class="input input-bordered input-sm w-24 text-right min-h-[44px]"
                     phx-debounce="500"
                   />
-                  <span class="text-xs text-base-content/50">sec</span>
+                  <span class="text-mini text-base-content/50">sec</span>
                 </form>
                 <button
                   :if={!default?(@settings, "cli_idle_timeout_ms")}
@@ -107,8 +107,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
             <%!-- TTS Voice --%>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">TTS Voice</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">TTS Voice</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Default voice for text-to-speech notifications
                 </p>
               </div>
@@ -136,8 +136,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
             <%!-- TTS Rate --%>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">TTS Rate</p>
-                <p class="text-xs text-base-content/50 mt-0.5">Speech rate in words per minute</p>
+                <p class="text-message font-medium text-base-content">TTS Rate</p>
+                <p class="text-mini text-base-content/50 mt-0.5">Speech rate in words per minute</p>
               </div>
               <div class="flex items-center gap-2">
                 <form phx-change="save_setting">
@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                     phx-debounce="500"
                   />
                 </form>
-                <span class="text-xs text-base-content/50">wpm</span>
+                <span class="text-mini text-base-content/50">wpm</span>
                 <button
                   :if={!default?(@settings, "tts_rate")}
                   phx-click="reset_setting"
@@ -170,15 +170,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
       </section>
 
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Notifications
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Agent status notifications</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Agent status notifications</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Show in-app notifications when an agent starts working and when it can be resumed.
                   Off by default.
                 </p>
@@ -196,15 +196,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
       </section>
 
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Terminal
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Use PTY terminal in DM sessions</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">
+                  Use PTY terminal in DM sessions
+                </p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Replace the web chat interface with an embedded PTY terminal.
                   Requires a page reload to take effect.
                 </p>
@@ -222,15 +224,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
       </section>
 
       <section>
-        <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+        <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Keyboard
         </h2>
         <div class="card bg-base-100 border border-base-300 shadow-sm">
           <div class="card-body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Vim navigation</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Vim navigation</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Keyboard-first navigation with normal/insert modes. Press ? for help.
                 </p>
               </div>
@@ -244,8 +246,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
             </div>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
-                <p class="text-sm font-medium text-base-content">Command Palette Shortcut</p>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-message font-medium text-base-content">Command Palette Shortcut</p>
+                <p class="text-mini text-base-content/50 mt-0.5">
                   Modifier key used to open the command palette with K
                 </p>
               </div>

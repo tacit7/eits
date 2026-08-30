@@ -56,10 +56,10 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
         phx-update="ignore"
       >
         <div class="p-4">
-          <h2 class="text-sm font-semibold text-base-content/80 mb-2 flex items-center gap-1">
+          <h2 class="text-message font-semibold text-base-content/80 mb-2 flex items-center gap-1">
             <.icon name="hero-cog-6-tooth" class="size-4" /> .claude/
           </h2>
-          <ul class="menu menu-sm bg-base-200 rounded-lg">
+          <ul class="menu menu-sm bg-base-200 rounded-box">
             <.tree_item :for={entry <- @entries} entry={entry} />
           </ul>
         </div>
@@ -71,7 +71,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
             <div class="card bg-base-100 border border-base-300 shadow-sm">
               <div class="card-body p-0">
                 <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
-                  <code class="text-sm font-semibold text-base-content">{@selected_file}</code>
+                  <code class="text-message font-semibold text-base-content">{@selected_file}</code>
                   <div class="flex items-center gap-1">
                     <button
                       phx-click="open_file"
@@ -92,13 +92,13 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                   <%= if @file_type == :markdown do %>
                     <div
                       id="config-viewer"
-                      class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
+                      class="dm-markdown p-4 text-message text-base-content leading-relaxed"
                       phx-hook="MarkdownMessage"
                       data-raw-body={@file_content}
                     >
                     </div>
                   <% else %>
-                    <pre class="p-4 text-xs font-mono text-base-content whitespace-pre-wrap break-all"><code class={"language-#{language_class(@file_type)}"}>{@file_content}</code></pre>
+                    <pre class="p-4 text-mini font-mono text-base-content whitespace-pre-wrap break-all"><code class={"language-#{language_class(@file_type)}"}>{@file_content}</code></pre>
                   <% end %>
                 </div>
               </div>
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 class="w-16 h-16 mx-auto text-base-content/20 mb-4"
               />
               <h3 class="text-lg font-semibold text-base-content/60 mb-2">Select a file</h3>
-              <p class="text-sm text-base-content/40">
+              <p class="text-message text-base-content/40">
                 Choose a file from the tree to view its contents
               </p>
             </div>
@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 <h2 class="text-lg font-semibold text-base-content">
                   {Path.basename(@current_path)}
                 </h2>
-                <p class="text-sm text-base-content/60">.claude/{@current_path}</p>
+                <p class="text-message text-base-content/60">.claude/{@current_path}</p>
               </div>
               <button
                 phx-click="open_file"
@@ -163,17 +163,17 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 <.icon name="hero-pencil-square" class="size-4" /> Edit
               </button>
             </div>
-            <div class="bg-base-200 rounded-lg overflow-x-auto">
+            <div class="bg-base-200 rounded-box overflow-x-auto">
               <%= if @file_type == :markdown do %>
                 <div
                   id="config-viewer-list"
-                  class="dm-markdown p-4 text-sm text-base-content leading-relaxed"
+                  class="dm-markdown p-4 text-message text-base-content leading-relaxed"
                   phx-hook="MarkdownMessage"
                   data-raw-body={@file_content}
                 >
                 </div>
               <% else %>
-                <pre class="text-sm p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
+                <pre class="text-message p-4"><code id="code-viewer" class={"language-#{language_class(@file_type)}"} phx-hook="Highlight"><%= @file_content %></code></pre>
               <% end %>
             </div>
           </div>
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
               <%= for file <- @files do %>
                 <.link
                   patch={~p"/projects/#{@project.id}/config?mode=list&path=#{file.path}"}
-                  class="flex items-center gap-3 rounded-lg border border-base-content/10 bg-base-100 px-3 py-2"
+                  class="flex items-center gap-3 rounded-box border border-base-content/10 bg-base-100 px-3 py-2"
                 >
                   <%= if file.is_dir do %>
                     <.icon name="hero-folder-solid" class="size-4 text-primary shrink-0" />
@@ -211,8 +211,8 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                     <.icon name="hero-document" class="size-4 shrink-0" />
                   <% end %>
                   <div class="min-w-0 flex-1">
-                    <p class="truncate text-sm">{file.name}</p>
-                    <p class="text-xs text-base-content/55">
+                    <p class="truncate text-message">{file.name}</p>
+                    <p class="text-mini text-base-content/55">
                       {if file.is_dir, do: "Directory", else: format_size(file.size)}
                     </p>
                   </div>
@@ -260,7 +260,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                   class="w-16 h-16 mx-auto text-base-content/20 mb-4"
                 />
                 <h3 class="text-lg font-semibold text-base-content/60 mb-2">Empty directory</h3>
-                <p class="text-sm text-base-content/40">No files in this directory</p>
+                <p class="text-message text-base-content/40">No files in this directory</p>
               </div>
             </div>
           <% end %>

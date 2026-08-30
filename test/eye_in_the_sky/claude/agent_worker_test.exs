@@ -1,7 +1,6 @@
 # credo:disable-for-this-file Credo.Check.Warning.UnsafeToAtom
 defmodule EyeInTheSky.Claude.AgentWorkerTest do
   use EyeInTheSky.DataCase, async: false
-  require Logger
 
   @moduletag :capture_log
 
@@ -194,6 +193,48 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
   test "AgentManager returns error for invalid message payload" do
     assert {:error, :invalid_message} =
              AgentManager.send_message(123_456, nil)
+  end
+
+  test "AgentWorker health reports running worker and SDK process state", %{track: track} do
+    {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
+
+    Phoenix.PubSub.subscribe(PubSub, "agent:working")
+    session_id = session.id
+
+    assert {:ok, :started} = AgentManager.send_message(session.id, "health check")
+    assert_receive {:agent_working, %{id: ^session_id}}, 5_000
+
+    mock_port = wait_for_mock_port(session.id)
+    assert is_pid(mock_port)
+
+    health = AgentWorker.health(session.id)
+
+    assert health.alive == true
+    assert health.provider == "claude"
+    assert health.status == "running"
+    assert health.processing == true
+    assert health.handler_alive == true
+    assert health.sdk_active == true
+    assert health.port_alive == true
+    assert health.port_type == "pid"
+    assert health.current_job_active == true
+    assert is_nil(health.current_job_id) or is_integer(health.current_job_id)
+    assert health.queue_depth == 0
+    assert is_nil(health.os_pid)
+
+    send(mock_port, {:exit, 0})
+  end
+
+  test "AgentWorker health reports stopped state for missing worker" do
+    health = AgentWorker.health(999_999_999)
+
+    assert health.alive == false
+    assert health.processing == false
+    assert health.handler_alive == false
+    assert health.sdk_active == false
+    assert health.port_alive == false
+    assert health.current_job_active == false
+    assert health.queue_depth == 0
   end
 
   test "Messages tracks inbound history per provider" do

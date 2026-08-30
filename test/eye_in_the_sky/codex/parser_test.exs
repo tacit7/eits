@@ -386,6 +386,24 @@ defmodule EyeInTheSky.Codex.ParserTest do
       line = Jason.encode!(%{"error" => %{"message" => "Bad request"}})
       assert {:error, {:codex_error, "Bad request"}} = Parser.parse_stream_line(line)
     end
+
+    test "typed nested Codex error object returns the inner message" do
+      line =
+        Jason.encode!(%{
+          "type" => "error",
+          "status" => 400,
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" =>
+              "The 'gpt-5.2' model is not supported when using Codex with a ChatGPT account."
+          }
+        })
+
+      assert {:error,
+              {:codex_error,
+               "The 'gpt-5.2' model is not supported when using Codex with a ChatGPT account."}} =
+               Parser.parse_stream_line(line)
+    end
   end
 
   # ---------------------------------------------------------------------------

@@ -321,6 +321,26 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
     end
   end
 
+  describe "GET /api/v1/sessions/:id/worker" do
+    test "returns AgentWorker health fields when no worker is registered", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn = get(conn, ~p"/api/v1/sessions/#{session.id}/worker")
+      resp = json_response(conn, 200)
+
+      assert resp["alive"] == false
+      assert resp["processing"] == false
+      assert resp["handler_alive"] == false
+      assert resp["sdk_active"] == false
+      assert resp["port_alive"] == false
+      assert resp["current_job_active"] == false
+      assert resp["queue_depth"] == 0
+      assert Map.has_key?(resp, "last_activity_at")
+      assert resp["hung"] == false
+    end
+  end
+
   # ---- PATCH /api/v1/sessions/:uuid ----
 
   describe "PATCH /api/v1/sessions/:uuid" do
@@ -368,6 +388,21 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
 
       {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
       assert updated.entrypoint == "cli"
+      assert updated.managed_by_app == false
+    end
+
+    test "allows entrypoint cli update to stay app-managed explicitly", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{
+        "entrypoint" => "cli",
+        "managed_by_app" => true
+      })
+
+      {:ok, updated} = Sessions.get_session_by_uuid(session.uuid)
+      assert updated.entrypoint == "cli"
+      assert updated.managed_by_app == true
     end
 
     test "clear_entrypoint true sets entrypoint to nil", %{conn: conn} do
@@ -469,6 +504,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
 
       {:ok, session} = Sessions.get_session_by_uuid(uuid)
       assert session.entrypoint == "cli"
+      assert session.managed_by_app == false
     end
 
     test "entrypoint defaults to nil when not provided", %{conn: conn} do
@@ -481,6 +517,7 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
 
       {:ok, session} = Sessions.get_session_by_uuid(uuid)
       assert session.entrypoint == nil
+      assert session.managed_by_app == true
     end
   end
 

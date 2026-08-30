@@ -13,12 +13,12 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     assigns = assign(assigns, :tabs, @filter_tabs)
 
     ~H"""
-    <div class="flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+    <div class="flex items-center gap-1 bg-base-200/40 rounded-box p-0.5">
       <button
         :for={{value, label, active_color} <- @tabs}
         phx-click="filter_session"
         phx-value-filter={value}
-        class={"px-3 py-2 rounded-md text-xs font-medium transition-all duration-150 min-h-[44px] flex items-center " <>
+        class={"focus-ring px-3 py-2 rounded-box text-mini font-medium transition-all duration-150 min-h-[44px] flex items-center " <>
           if(@current == value,
             do: "bg-base-100 #{active_color} shadow-sm",
             else: "text-base-content/40 hover:text-base-content/60"
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
         </span>
         <button
           phx-click="confirm_delete_selected"
-          class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
+          class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-error/70 transition-colors hover:bg-error/10 hover:text-error"
         >
           <.icon name="hero-trash-mini" class="size-3.5" /> Delete
         </button>
@@ -81,7 +81,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       <% end %>
       <button
         phx-click="exit_select_mode"
-        class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+        class="focus-ring ml-auto inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
         aria-label="Exit select mode"
       >
         <.icon name="hero-x-mark" class="size-4" />
@@ -108,12 +108,12 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       class="md:opacity-0 md:group-hover/row:opacity-100 open:opacity-100 relative dropdown dropdown-end"
     >
       <summary
-        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
+        class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
         aria-label="More options"
       >
         <.icon name="hero-ellipsis-horizontal-mini" class="size-4" />
       </summary>
-      <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-lg shadow-lg w-48 p-1">
+      <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-box shadow-lg w-48 p-1">
         <%= if @agent.id do %>
           <li>
             <a href={~p"/dm/#{@agent.id}"} target="_blank" class="flex items-center gap-2">
@@ -203,16 +203,22 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     >
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Delete sessions</h3>
-        <p class="py-4 text-sm text-base-content/70">
+        <p class="py-4 text-message text-base-content/70">
           Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(
                                                                                 @selected_ids
                                                                               ) != 1, do: "s"}? This cannot be undone.
         </p>
         <div class="modal-action">
-          <button phx-click="cancel_delete_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+          <button
+            phx-click="cancel_delete_selected"
+            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+          >
             Cancel
           </button>
-          <button phx-click="delete_selected" class="btn btn-sm btn-error min-h-[44px]">
+          <button
+            phx-click="delete_selected"
+            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-error px-3 text-mini font-medium text-error-content transition-colors hover:bg-error/85"
+          >
             Delete
           </button>
         </div>
@@ -256,7 +262,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
               }
               class="flex items-center gap-2 text-secondary"
             >
-              + New canvas
+              <.icon name="hero-plus-mini" class="size-3.5" /> New canvas
             </button>
           </li>
           <li id={"new-canvas-form-#{@agent.id}"} style="display:none">
@@ -266,11 +272,14 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
                 id={"new-canvas-input-#{@agent.id}"}
                 type="text"
                 name="canvas_name"
-                class="input input-xs w-full text-base"
+                class="input input-xs w-full text-message"
                 placeholder="Canvas name..."
                 autocomplete="off"
               />
-              <button type="submit" class="btn btn-primary btn-xs w-full">
+              <button
+                type="submit"
+                class="focus-ring inline-flex min-h-[44px] w-full items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+              >
                 Create &amp; Add
               </button>
             </form>
@@ -292,17 +301,23 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     >
       <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive sessions</h3>
-        <p class="py-4 text-sm text-base-content/70">
+        <p class="py-4 text-message text-base-content/70">
           <% count = MapSet.size(@selected_ids) %> Archive {count} selected session{if count == 1,
             do: "",
             else: "s"}?
           Archived sessions can be unarchived later.
         </p>
         <div class="modal-action">
-          <button phx-click="cancel_archive_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+          <button
+            phx-click="cancel_archive_selected"
+            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+          >
             Cancel
           </button>
-          <button phx-click="archive_selected" class="btn btn-sm btn-warning min-h-[44px]">
+          <button
+            phx-click="archive_selected"
+            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-warning px-3 text-mini font-medium text-warning-content transition-colors hover:bg-warning/85"
+          >
             Archive
           </button>
         </div>

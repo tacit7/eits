@@ -91,7 +91,7 @@ config :eye_in_the_sky, :vite_host, "http://127.0.0.1:#{System.get_env("VITE_POR
 config :eye_in_the_sky, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
-config :logger, level: :warning
+config :logger, level: :debug
 config :logger, :default_formatter, format: "[$level] $message\n"
 
 # Set a higher stacktrace during development. Avoid configuring such

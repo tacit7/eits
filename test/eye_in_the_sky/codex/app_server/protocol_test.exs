@@ -53,6 +53,14 @@ defmodule EyeInTheSky.Codex.AppServer.ProtocolTest do
     assert turn["params"]["sandboxPolicy"]["type"] == "dangerFullAccess"
   end
 
+  test "builds hooks/list requests for one or more cwd values" do
+    request = Protocol.hooks_list_request("hooks-1", ["/tmp/project"])
+
+    assert request["id"] == "hooks-1"
+    assert request["method"] == "hooks/list"
+    assert request["params"] == %{"cwds" => ["/tmp/project"]}
+  end
+
   test "server request responses decline approvals and answer user input" do
     command =
       Protocol.server_request_response(%{

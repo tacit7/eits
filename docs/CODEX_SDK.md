@@ -107,12 +107,16 @@ EITS_CODEX_APP_SERVER_SMOKE=1 PHX_SERVER=false mix test --include integration te
 
 The smoke test starts a real `codex app-server --listen stdio://`, completes two
 turns through the same app-server owner, and requires Codex hooks to write EITS
-environment context to a temporary hook log.
+environment context to a temporary hook log. It also calls `hooks/list` on the
+same app-server process and captures `hook/started` / `hook/completed`
+notifications so hook failures report whether hooks were undiscovered, untrusted,
+or executed without the expected EITS environment.
 
 The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
 `started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
 `turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,
-`cancel_timeout`, `server_request_replied`, and `exit`.
+`cancel_timeout`, `hooks_list`, `hook_started`, `hook_completed`,
+`server_request_replied`, and `exit`.
 
 ## Session UUID Lifecycle
 

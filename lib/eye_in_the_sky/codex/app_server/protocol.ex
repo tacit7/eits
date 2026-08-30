@@ -93,6 +93,11 @@ defmodule EyeInTheSky.Codex.AppServer.Protocol do
     request(id, "turn/interrupt", %{"threadId" => thread_id, "turnId" => turn_id})
   end
 
+  @spec hooks_list_request(id(), [String.t()]) :: map()
+  def hooks_list_request(id, cwds) when is_list(cwds) do
+    request(id, "hooks/list", %{"cwds" => cwds})
+  end
+
   @spec server_request_response(map()) :: map()
   def server_request_response(%{"id" => id, "method" => method} = request) do
     params = request["params"] || %{}

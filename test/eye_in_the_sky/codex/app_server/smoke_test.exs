@@ -2,6 +2,7 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
   use ExUnit.Case, async: false
 
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Codex.AppServer
   alias EyeInTheSky.Codex.SDK
 
   @moduletag :integration
@@ -15,8 +16,9 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     eits_session_id = "smoke-session-#{System.unique_integer([:positive])}"
     project_path = smoke_project!()
     hook_log = Path.join(project_path, "hook-events.ndjson")
+    telemetry_ref = attach_hook_telemetry()
 
-    first_ref =
+    {first_ref, app_server_pid} =
       start_and_wait!(
         "Reply with exactly: EITS_APP_SERVER_SMOKE_ONE",
         eits_session_id,
@@ -31,7 +33,12 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     assert first_result =~ "EITS_APP_SERVER_SMOKE_ONE"
     assert_receive {:claude_complete, ^first_ref, ^thread_id}, 120_000
 
-    second_ref =
+    assert {:ok, hook_list} =
+             AppServer.list_hooks(app_server_pid, [project_path],
+               app_server_call_timeout_ms: 120_000
+             )
+
+    {second_ref, ^app_server_pid} =
       start_and_wait!(
         "Reply with exactly: EITS_APP_SERVER_SMOKE_TWO",
         eits_session_id,
@@ -43,7 +50,7 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     assert second_result =~ "EITS_APP_SERVER_SMOKE_TWO"
     assert_receive {:claude_complete, ^second_ref, ^thread_id}, 120_000
 
-    assert_hook_context!(hook_log)
+    assert_hook_context!(hook_log, hook_list, collect_hook_notifications(telemetry_ref))
   end
 
   defp start_and_wait!(prompt, eits_session_id, project_path, hook_log, extra_opts \\ []) do
@@ -68,7 +75,7 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
 
     assert {:ok, ref, pid} = SDK.start(prompt, opts)
     assert is_pid(pid)
-    ref
+    {ref, pid}
   end
 
   defp wait_for_result!(ref) do
@@ -118,7 +125,7 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
 
   defp hook_command(command), do: %{"type" => "command", "command" => command, "timeout" => 5}
 
-  defp assert_hook_context!(hook_log) do
+  defp assert_hook_context!(hook_log, hook_list, hook_notifications) do
     if File.exists?(hook_log) do
       events =
         hook_log
@@ -130,7 +137,44 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
       assert Enum.any?(events, &(&1["agent"] == "smoke-agent-uuid"))
       assert Enum.any?(events, &(&1["project"] == "smoke-project-id"))
     else
-      flunk("Codex app-server did not write hook log; hook parity is not proven")
+      flunk("""
+      Codex app-server did not write hook log; hook parity is not proven.
+
+      hooks/list response: #{inspect(hook_list)}
+      hook notifications: #{inspect(hook_notifications)}
+      """)
+    end
+  end
+
+  defp attach_hook_telemetry do
+    test_pid = self()
+    ref = make_ref()
+    handler_id = {__MODULE__, ref}
+
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        [
+          [:eits, :codex, :app_server, :hook_started],
+          [:eits, :codex, :app_server, :hook_completed]
+        ],
+        fn event, measurements, metadata, _config ->
+          suffix = Enum.drop(event, 3)
+          send(test_pid, {:app_server_hook_telemetry, ref, suffix, measurements, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    ref
+  end
+
+  defp collect_hook_notifications(ref, acc \\ []) do
+    receive do
+      {:app_server_hook_telemetry, ^ref, event, _measurements, metadata} ->
+        collect_hook_notifications(ref, [{event, metadata} | acc])
+    after
+      100 -> Enum.reverse(acc)
     end
   end
 end

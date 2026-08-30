@@ -92,6 +92,11 @@ defmodule EyeInTheSky.Codex.AppServer do
     GenServer.call(pid, {:start_turn, sdk_ref, caller_pid, prompt, opts}, timeout)
   end
 
+  def list_hooks(pid, cwds, opts \\ []) when is_list(cwds) do
+    timeout = Keyword.get(opts, :app_server_call_timeout_ms, 60_000)
+    GenServer.call(pid, {:list_hooks, cwds}, timeout)
+  end
+
   def interrupt(pid) do
     GenServer.call(pid, :interrupt, @interrupt_timeout_ms)
   catch
@@ -170,6 +175,27 @@ defmodule EyeInTheSky.Codex.AppServer do
   end
 
   @impl true
+  def handle_call({:list_hooks, cwds}, from, %__MODULE__{initialized?: true} = state) do
+    {:noreply, request_hooks_list(state, cwds, from)}
+  end
+
+  @impl true
+  def handle_call({:list_hooks, cwds}, from, %__MODULE__{active_turn: nil} = state) do
+    {:noreply,
+     send_request(
+       state,
+       "initialize",
+       Protocol.initialize_request(next_id(state), @client_version),
+       {:initialize_then_hooks_list, cwds, from}
+     )}
+  end
+
+  @impl true
+  def handle_call({:list_hooks, _cwds}, _from, state) do
+    {:reply, {:error, :turn_already_active}, state}
+  end
+
+  @impl true
   def handle_call(:interrupt, _from, %__MODULE__{active_turn: nil} = state) do
     {:reply, {:error, :no_active_turn}, state}
   end
@@ -210,7 +236,7 @@ defmodule EyeInTheSky.Codex.AppServer do
       {%{kind: kind}, pending} ->
         state = %{state | pending: pending}
         emit_telemetry(:request_timeout, %{}, telemetry_meta(state, %{kind: kind}))
-        {:noreply, fail_active_turn(state, {:codex_app_server_timeout, kind})}
+        {:noreply, fail_request(kind, state, {:codex_app_server_timeout, kind})}
     end
   end
 
@@ -294,9 +320,9 @@ defmodule EyeInTheSky.Codex.AppServer do
     reason = {:codex_app_server_error, error["message"] || "Codex app-server request failed"}
 
     case pop_pending(state, id) do
-      {%{timer: timer}, state} ->
+      {%{timer: timer, kind: kind}, state} ->
         Process.cancel_timer(timer)
-        fail_active_turn(state, reason)
+        fail_request(kind, state, reason)
 
       {nil, state} ->
         Logger.debug("Ignoring orphan Codex app-server error id=#{inspect(id)}")
@@ -313,6 +339,12 @@ defmodule EyeInTheSky.Codex.AppServer do
     write_message(state, Protocol.initialized_notification())
     state = %{state | initialized?: true}
     ensure_thread(state)
+  end
+
+  defp handle_request_result({:initialize_then_hooks_list, cwds, from}, _result, state) do
+    write_message(state, Protocol.initialized_notification())
+    state = %{state | initialized?: true}
+    request_hooks_list(state, cwds, from)
   end
 
   defp handle_request_result(:thread_start, result, state) do
@@ -348,6 +380,12 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   defp handle_request_result(:interrupt, _result, state), do: state
 
+  defp handle_request_result({:hooks_list, from}, result, state) do
+    GenServer.reply(from, {:ok, result})
+    emit_telemetry(:hooks_list, %{}, telemetry_meta(state, %{hook_count: hook_count(result)}))
+    state
+  end
+
   defp ensure_thread(%__MODULE__{thread_id: thread_id} = state)
        when is_binary(thread_id) and thread_id != "" do
     start_active_turn(state)
@@ -380,9 +418,23 @@ defmodule EyeInTheSky.Codex.AppServer do
     send_request(state, "turn/start", request, :turn_start)
   end
 
+  defp request_hooks_list(state, cwds, from) do
+    id = next_id(state)
+    request = Protocol.hooks_list_request(id, Enum.map(cwds, &Path.expand/1))
+    send_request(state, "hooks/list", request, {:hooks_list, from})
+  end
+
   defp handle_notification(%{"method" => method, "params" => params}, state)
        when is_map(params) do
     cond do
+      method == "hook/started" ->
+        emit_hook_telemetry(:hook_started, params, state)
+        state
+
+      method == "hook/completed" ->
+        emit_hook_telemetry(:hook_completed, params, state)
+        state
+
       stale_notification?(state, params) ->
         state
 
@@ -416,7 +468,7 @@ defmodule EyeInTheSky.Codex.AppServer do
       failed when failed in ["failed", "error"] ->
         fail_active_turn(state, {:codex_turn_failed, error["message"] || "Codex turn failed"})
 
-      canceled when canceled in ["cancelled", "canceled"] ->
+      canceled when canceled in ["cancelled", "canceled", "interrupted"] ->
         fail_active_turn(state, :canceled)
 
       _ ->
@@ -463,6 +515,36 @@ defmodule EyeInTheSky.Codex.AppServer do
     state
   end
 
+  defp fail_request({:hooks_list, from}, state, reason) do
+    GenServer.reply(from, {:error, reason})
+    state
+  end
+
+  defp fail_request({:initialize_then_hooks_list, _cwds, from}, state, reason) do
+    GenServer.reply(from, {:error, reason})
+    state
+  end
+
+  defp fail_request(_kind, state, reason), do: fail_active_turn(state, reason)
+
+  defp emit_hook_telemetry(event, params, state) do
+    run = params["run"] || %{}
+
+    metadata =
+      telemetry_meta(state, %{
+        hook_event_name:
+          params["hookEventName"] || params["hook_event_name"] || run["eventName"] ||
+            run["event_name"],
+        hook_name: params["hookName"] || params["hook_name"] || run["name"] || run["hookName"],
+        item_id: params["itemId"] || params["item_id"],
+        exit_code:
+          params["exitCode"] || params["exit_code"] || run["exitCode"] || run["exit_code"],
+        trust_status: run["trustStatus"] || run["trust_status"]
+      })
+
+    emit_telemetry(event, %{}, metadata)
+  end
+
   defp stale_notification?(%__MODULE__{active_turn: nil}, _params), do: true
 
   defp stale_notification?(%__MODULE__{thread_id: thread_id, active_turn: turn}, params) do
@@ -479,6 +561,17 @@ defmodule EyeInTheSky.Codex.AppServer do
   defp usage_from_params(params) do
     params["usage"] || params["tokenUsage"] || get_in(params, ["turn", "usage"]) || %{}
   end
+
+  defp hook_count(result) when is_map(result) do
+    cond do
+      is_list(result["hooks"]) -> length(result["hooks"])
+      is_map(result["hooks"]) -> map_size(result["hooks"])
+      is_list(result["data"]) -> result["data"] |> Enum.map(&hook_count/1) |> Enum.sum()
+      true -> 0
+    end
+  end
+
+  defp hook_count(_result), do: 0
 
   defp fail_active_turn(%__MODULE__{active_turn: nil} = state, _reason), do: state
 

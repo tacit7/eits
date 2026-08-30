@@ -111,12 +111,69 @@ defmodule EyeInTheSky.Codex.AppServerTest do
     assert_receive {:fake_request, "turn/interrupt", _interrupt_id}
   end
 
+  test "lists hooks through the initialized app-server", %{pid: pid} do
+    task = Task.async(fn -> AppServer.list_hooks(pid, ["/tmp"]) end)
+
+    assert_receive {:fake_request, "initialize", init_id}
+    send_response(pid, init_id, %{})
+    assert_receive {:fake_notification, "initialized"}
+
+    assert_receive {:fake_request, "hooks/list", hooks_id}
+    send_response(pid, hooks_id, %{"hooks" => [%{"name" => "SessionStart"}]})
+
+    assert {:ok, %{"hooks" => [%{"name" => "SessionStart"}]}} = Task.await(task)
+  end
+
+  test "emits hook notification telemetry without an active turn", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+
+    send_notification(pid, "hook/started", %{
+      "hookEventName" => "SessionStart",
+      "hookName" => "startup"
+    })
+
+    send_notification(pid, "hook/completed", %{
+      "hookEventName" => "SessionStart",
+      "hookName" => "startup",
+      "exitCode" => 0
+    })
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:hook_started], _measurements,
+                    %{hook_event_name: "SessionStart", hook_name: "startup"}}
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:hook_completed], _measurements,
+                    %{hook_event_name: "SessionStart", hook_name: "startup", exit_code: 0}}
+  end
+
+  test "extracts hook telemetry from nested app-server run payloads", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+
+    send_notification(pid, "hook/completed", %{
+      "threadId" => "thread-hooks",
+      "run" => %{
+        "eventName" => "userPromptSubmit",
+        "hookName" => "prompt",
+        "exitCode" => 0,
+        "trustStatus" => "trusted"
+      }
+    })
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:hook_completed], _measurements,
+                    %{
+                      hook_event_name: "userPromptSubmit",
+                      hook_name: "prompt",
+                      exit_code: 0,
+                      trust_status: "trusted"
+                    }}
+  end
+
   test "emits one terminal telemetry event for successful turns", %{pid: pid} do
     telemetry_ref = attach_app_server_telemetry()
     ref = make_ref()
+    caller = self()
 
     task =
-      Task.async(fn -> AppServer.start_turn(pid, ref, self(), "hello", project_path: "/tmp") end)
+      Task.async(fn -> AppServer.start_turn(pid, ref, caller, "hello", project_path: "/tmp") end)
 
     assert_receive {:fake_request, "initialize", init_id}
     send_response(pid, init_id, %{})
@@ -178,6 +235,36 @@ defmodule EyeInTheSky.Codex.AppServerTest do
                     %{thread_id: "thread-cancel", turn_id: "turn-cancel"}}
   end
 
+  test "treats documented interrupted turn status as canceled", %{pid: pid} do
+    telemetry_ref = attach_app_server_telemetry()
+    ref = make_ref()
+    caller = self()
+
+    task =
+      Task.async(fn -> AppServer.start_turn(pid, ref, caller, "hello", project_path: "/tmp") end)
+
+    assert_receive {:fake_request, "initialize", init_id}
+    send_response(pid, init_id, %{})
+    assert_receive {:fake_notification, "initialized"}
+
+    assert_receive {:fake_request, "thread/start", thread_id}
+    send_response(pid, thread_id, %{"thread" => %{"id" => "thread-interrupted"}})
+
+    assert_receive {:fake_request, "turn/start", turn_id}
+    send_response(pid, turn_id, %{"turn" => %{"id" => "turn-interrupted"}})
+    assert {:ok, ^ref, ^pid} = Task.await(task)
+
+    send_notification(pid, "turn/completed", %{
+      "threadId" => "thread-interrupted",
+      "turn" => %{"id" => "turn-interrupted", "status" => "interrupted"}
+    })
+
+    assert_receive {:claude_error, ^ref, :canceled}
+
+    assert_receive {:app_server_telemetry, ^telemetry_ref, [:turn_canceled], _measurements,
+                    %{thread_id: "thread-interrupted", turn_id: "turn-interrupted"}}
+  end
+
   defp send_response(pid, id, result) do
     send(
       pid,
@@ -202,6 +289,9 @@ defmodule EyeInTheSky.Codex.AppServerTest do
     events =
       for event <- [
             :interrupt,
+            :hook_started,
+            :hook_completed,
+            :hooks_list,
             :turn_accepted,
             :turn_completed,
             :turn_failed,

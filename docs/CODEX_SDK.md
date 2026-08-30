@@ -7,7 +7,7 @@ How EITS creates, runs, streams, and resumes sessions across multiple providers:
 | Provider | Binary | SDK | Stream Handler | Assembler | Status on Completion |
 |----------|--------|-----|-----------------|-----------|----------------------|
 | Claude | `claude` | `Claude.SDK` | Direct SSE | `StreamAssembler` | `idle` |
-| Codex | `codex` | `Codex.SDK` | JSONL via `MessageHandler` | `CodexStreamAssembler` | `idle` |
+| Codex | `codex` | `Codex.SDK` | JSONL via `MessageHandler`, or feature-flagged JSON-RPC app-server | `CodexStreamAssembler` | `idle` |
 | Gemini | `gemini` | `gemini_cli_sdk` | ETS-based `StreamHandler` | `StreamAssembler` (default) | `idle` |
 
 This document focuses on Codex and Gemini integration patterns. For Claude-specific details, see `AGENT_WORKER_QUEUE.md`.
@@ -73,9 +73,22 @@ UI (new agent form, agent_type="codex")
           -> AgentWorker.init/1  (stream = CodexStreamAssembler.new())
             -> start_codex_sdk/2
               -> Codex.SDK.start/2
-                -> Codex.CLI.spawn_new_session/2
+                -> default: Codex.CLI.spawn_new_session/2
                   -> Port.open (codex exec --json ...)
+                -> opt-in: Codex.AppServer.lookup_or_start/2
+                  -> Port.open (codex app-server --listen stdio://)
+                  -> JSON-RPC initialize/thread/start/turn/start
 ```
+
+The app-server bridge is gated by `codex_app_server_enabled` and remains off by
+default. When enabled, `EyeInTheSky.Codex.AppServer` is a supervised long-lived
+GenServer registered per EITS AgentWorker/session. It owns the Codex
+`app-server` Port, JSON-RPC request IDs, pending call timeouts, thread and
+active-turn IDs, server-request replies, cancellation via `turn/interrupt`, and
+text/reasoning buffers. AgentWorker remains the queue and persistence owner and
+continues to receive the same per-turn tuple protocol:
+`claude_message`, `codex_session_id`, `claude_complete`, and `claude_error`
+keyed by a fresh `sdk_ref`.
 
 ## Session UUID Lifecycle
 
@@ -613,7 +626,10 @@ The adapter never forwards Claude-only allow/fail-open fields, preventing Codex 
 | Module | File | Role |
 |--------|------|------|
 | `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup; defaults `bypass_sandbox` to `true` |
+| `Codex.AppServer` | `lib/eye_in_the_sky/codex/app_server.ex` | Default-off JSON-RPC app-server owner; one supervised process per AgentWorker/session |
 | `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter; init prompt with EITS CLI reference |
+| `Codex.AppServer.Protocol` | `lib/eye_in_the_sky/codex/app_server/protocol.ex` | JSON-RPC request/response/server-request helpers for app-server |
+| `Codex.AppServer.TurnBuffer` | `lib/eye_in_the_sky/codex/app_server/turn_buffer.ex` | Buffers app-server text and reasoning by item ID and emits final result text |
 | `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Normalize Codex tool calls to canonical format (command_execution→Bash, web_search→WebSearch, etc.) |
 | `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
 | `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
@@ -644,12 +660,12 @@ Codex session status transitions are driven by JSONL events emitted by `codex ex
 | Codex Event | Handler | Status Set |
 |-------------|---------|------------|
 | `thread.started` | `on_codex_thread_started/1` | `"working"` |
-| `turn.completed` | `on_sdk_completed/3` (provider="codex") | `"waiting"` |
+| `turn.completed` | `on_sdk_completed/3` (provider="codex") | `"idle"` |
 | SDK error | `on_sdk_errored/2` | `"idle"` |
 
 **`thread.started`**: Fires when Codex creates a new thread. The worker calls `on_codex_thread_started/1` immediately (not waiting for turn end) to promote the session to `"working"` and sync the real `thread_id` to `sessions.uuid`. Also sends a `"working"` status notification.
 
-**`turn.completed`**: Codex sessions transition to `"waiting"` on completion, not `"idle"`. This allows the session to be resumed with `codex exec resume <thread_id>`. A resumable status notification is sent. Unlike Claude sessions which go to `"idle"`, Codex sessions remain resumable.
+**`turn.completed`**: Codex sessions transition to `"idle"` on completion. The persisted Codex thread id still allows future turns to resume the provider conversation.
 
 **SDK error**: Failed turns transition to `"idle"` so the UI can display the failure and allow retry.
 

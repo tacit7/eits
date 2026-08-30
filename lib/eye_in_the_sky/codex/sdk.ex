@@ -21,8 +21,9 @@ defmodule EyeInTheSky.Codex.SDK do
 
   alias EyeInTheSky.Claude.{Message, Utils}
   alias EyeInTheSky.Claude.SDK.Registry
-  alias EyeInTheSky.Codex.{Parser, ToolMapper}
+  alias EyeInTheSky.Codex.{AppServer, Parser, ToolMapper}
   alias EyeInTheSky.SDK.MessageHandler
+  alias EyeInTheSky.Settings
 
   require Logger
 
@@ -94,7 +95,11 @@ defmodule EyeInTheSky.Codex.SDK do
       "[telemetry] codex.sdk.start session_id=#{opts[:session_id]} model=#{opts[:model]}"
     )
 
-    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+    if app_server_enabled?(opts) do
+      run_app_server_turn(sdk_ref, prompt, Keyword.delete(opts, :resume_thread_id))
+    else
+      run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+    end
   end
 
   @doc """
@@ -107,9 +112,13 @@ defmodule EyeInTheSky.Codex.SDK do
     sdk_ref = make_ref()
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
 
-    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
-      cli.resume_session(session_id, p, o)
-    end)
+    if app_server_enabled?(opts) do
+      run_app_server_turn(sdk_ref, prompt, Keyword.put(opts, :resume_thread_id, session_id))
+    else
+      run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
+        cli.resume_session(session_id, p, o)
+      end)
+    end
   end
 
   @doc """
@@ -128,8 +137,14 @@ defmodule EyeInTheSky.Codex.SDK do
         :ok
 
       pid when is_pid(pid) ->
-        send(pid, :cancel)
-        :ok
+        case AppServer.interrupt(pid) do
+          :ok ->
+            :ok
+
+          {:error, _reason} ->
+            send(pid, :cancel)
+            :ok
+        end
     end
   end
 
@@ -182,6 +197,48 @@ defmodule EyeInTheSky.Codex.SDK do
 
         {:error, {:handler_start_failed, reason}}
     end
+  end
+
+  defp run_app_server_turn(sdk_ref, prompt, opts) do
+    to = Keyword.fetch!(opts, :to)
+    owner_key = app_server_owner_key(opts, to)
+
+    meta = %{session_id: opts[:session_id], model: opts[:model], owner_key: owner_key}
+
+    :telemetry.execute(
+      [:eits, :codex, :app_server, :start],
+      %{system_time: System.system_time()},
+      meta
+    )
+
+    case AppServer.lookup_or_start(owner_key, opts) do
+      {:ok, pid} ->
+        Registry.register(sdk_ref, pid)
+
+        case AppServer.start_turn(pid, sdk_ref, to, prompt, opts) do
+          {:ok, ^sdk_ref, ^pid} ->
+            {:ok, sdk_ref, pid}
+
+          {:error, reason} ->
+            Registry.unregister(sdk_ref)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp app_server_enabled?(opts) do
+    Keyword.get(opts, :codex_app_server, false) ||
+      Application.get_env(:eye_in_the_sky, :codex_app_server_enabled, false) ||
+      Settings.get_boolean("codex_app_server_enabled")
+  rescue
+    _ -> false
+  end
+
+  defp app_server_owner_key(opts, to) do
+    opts[:eits_session_id] || opts[:session_id] || {:caller, to}
   end
 
   # ---------------------------------------------------------------------------

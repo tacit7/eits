@@ -586,11 +586,18 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def terminate(reason, %__MODULE__{} = state) do
     SdkLifecycle.cancel_active_sdk(state)
+    stop_owned_codex_app_server(state)
     Reconciliation.maybe_mark_session_failed(reason, state)
     :ok
   end
 
   # --- Private ---
+
+  defp stop_owned_codex_app_server(%__MODULE__{provider: "codex", session_id: session_id}) do
+    EyeInTheSky.Codex.AppServer.stop_owner(session_id)
+  end
+
+  defp stop_owned_codex_app_server(_state), do: :ok
 
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()

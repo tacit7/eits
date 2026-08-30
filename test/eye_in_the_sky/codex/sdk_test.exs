@@ -92,6 +92,62 @@ defmodule EyeInTheSky.Codex.SDKTest do
     end
   end
 
+  describe "app-server backend" do
+    test "is opt-in and preserves the public SDK tuple/event contract" do
+      owner_key = System.unique_integer([:positive])
+      test_pid = self()
+      fake = start_supervised!({SDKTestFakeCodexAppServer, test_pid})
+
+      task =
+        Task.async(fn ->
+          SDK.start("hello",
+            to: test_pid,
+            project_path: "/tmp",
+            codex_app_server: true,
+            eits_session_id: owner_key,
+            transport_pid: fake
+          )
+        end)
+
+      assert_receive {:sdk_fake_request, "initialize", init_id}
+      send_response(owner_key, init_id, %{})
+      assert_receive {:sdk_fake_notification, "initialized"}
+
+      assert_receive {:sdk_fake_request, "thread/start", thread_id}
+      send_response(owner_key, thread_id, %{"thread" => %{"id" => "thread-sdk"}})
+
+      assert_receive {:sdk_fake_request, "turn/start", turn_id}
+      send_response(owner_key, turn_id, %{"turn" => %{"id" => "turn-sdk"}})
+
+      assert {:ok, ref, app_server_pid} = Task.await(task)
+      assert is_reference(ref)
+      assert Registry.lookup(ref) == app_server_pid
+      assert_receive {:codex_session_id, ^ref, "thread-sdk"}
+
+      send_notification(owner_key, "item/agentMessage/delta", %{
+        "threadId" => "thread-sdk",
+        "turnId" => "turn-sdk",
+        "itemId" => "msg-1",
+        "delta" => "hi"
+      })
+
+      send_notification(owner_key, "turn/completed", %{
+        "threadId" => "thread-sdk",
+        "turn" => %{"id" => "turn-sdk", "status" => "completed"}
+      })
+
+      assert_receive {:claude_message, ^ref, %Message{type: :result, content: "hi"}}
+      assert_receive {:claude_complete, ^ref, "thread-sdk"}
+      assert Registry.lookup(ref) == nil
+    end
+
+    test "default backend still uses codex exec registry shape" do
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
+      assert is_pid(Registry.lookup(ref))
+      assert :ok = SDK.cancel(ref)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Message flow: agent_message -> turn.completed -> result + complete
   # ---------------------------------------------------------------------------
@@ -445,5 +501,52 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
       SDK.cancel(ref)
     end
+  end
+
+  defp send_response(owner_key, id, result) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "result" => result})}
+    )
+  end
+
+  defp send_notification(owner_key, method, params) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
+    )
+  end
+end
+
+defmodule SDKTestFakeCodexAppServer do
+  use GenServer
+
+  def start_link(test_pid), do: GenServer.start_link(__MODULE__, test_pid)
+
+  @impl true
+  def init(test_pid), do: {:ok, test_pid}
+
+  @impl true
+  def handle_info({:codex_app_server_write, _from, json}, test_pid) do
+    message = Jason.decode!(json)
+
+    cond do
+      Map.has_key?(message, "result") ->
+        send(test_pid, {:sdk_fake_response, message["id"], message["result"]})
+
+      Map.has_key?(message, "id") ->
+        send(test_pid, {:sdk_fake_request, message["method"], message["id"]})
+
+      true ->
+        send(test_pid, {:sdk_fake_notification, message["method"]})
+    end
+
+    {:noreply, test_pid}
   end
 end

@@ -50,6 +50,10 @@ defmodule EyeInTheSky.Application do
           {Registry, keys: :unique, name: EyeInTheSky.Claude.ChatRegistry},
           # SDK registry for tracking running Claude CLI processes
           EyeInTheSky.Claude.SDK.Registry,
+          # Codex app-server ownership: one long-lived JSON-RPC server per AgentWorker/session.
+          {Registry, keys: :unique, name: EyeInTheSky.Codex.AppServerRegistry},
+          {DynamicSupervisor,
+           name: EyeInTheSky.Codex.AppServerSupervisor, strategy: :one_for_one},
           # DynamicSupervisor for persistent agent workers.
           # max_children caps concurrent live AgentWorkers; tune via
           # AGENT_SUPERVISOR_MAX_CHILDREN (see config/runtime.exs). Default 50.

@@ -104,11 +104,21 @@ defmodule EyeInTheSky.Codex.AppServer do
   end
 
   def stop_owner(owner_key) do
-    case Registry.lookup(@registry, owner_key) do
-      [{pid, _}] -> DynamicSupervisor.terminate_child(@supervisor, pid)
-      [] -> :ok
+    if named_process?(@registry) and named_process?(@supervisor) do
+      case Registry.lookup(@registry, owner_key) do
+        [{pid, _}] -> DynamicSupervisor.terminate_child(@supervisor, pid)
+        [] -> :ok
+      end
+    else
+      :ok
     end
+  rescue
+    ArgumentError -> :ok
+  catch
+    :exit, _ -> :ok
   end
+
+  defp named_process?(name), do: is_pid(Process.whereis(name))
 
   @impl true
   def init(opts) do

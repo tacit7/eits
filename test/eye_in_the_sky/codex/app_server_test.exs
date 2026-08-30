@@ -152,6 +152,23 @@ defmodule EyeInTheSky.Codex.AppServerTest do
                     %{request_id: "approval-1", thread_id: "thread-1", turn_id: "turn-1"}}
   end
 
+  test "stop_owner tolerates a missing registry during cleanup" do
+    registry_name = EyeInTheSky.Codex.AppServerRegistry
+    registry_pid = Process.whereis(registry_name)
+
+    assert is_pid(registry_pid)
+
+    on_exit(fn ->
+      if Process.whereis(registry_name) == nil and Process.alive?(registry_pid) do
+        Process.register(registry_pid, registry_name)
+      end
+    end)
+
+    Process.unregister(registry_name)
+
+    assert :ok = AppServer.stop_owner(:missing_registry_owner)
+  end
+
   test "JSON-RPC errors without ids fail the active turn once", %{pid: pid} do
     ref = make_ref()
 

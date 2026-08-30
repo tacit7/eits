@@ -46,6 +46,22 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <div class="flex items-center justify-between px-5 py-4">
             <div>
+              <p class="text-message font-medium text-base-content">Codex App Server Bridge</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
+                Use the feature-flagged Codex JSON-RPC app-server backend for Codex turns
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              checked={@settings["codex_app_server_enabled"] == "true"}
+              phx-click="toggle_setting"
+              phx-value-key="codex_app_server_enabled"
+            />
+          </div>
+
+          <div class="flex items-center justify-between px-5 py-4">
+            <div>
               <p class="text-message font-medium text-base-content">Per-session Rate-Limit Bucket</p>
               <p class="text-mini text-base-content/50 mt-0.5">
                 Per-session rate-limit bucket (Phase 2). Requires eits CLI with x-eits-session header support. Leaving off keeps the current IP-keyed bucket.

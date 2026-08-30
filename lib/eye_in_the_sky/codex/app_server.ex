@@ -57,6 +57,7 @@ defmodule EyeInTheSky.Codex.AppServer do
   def lookup_or_start(owner_key, opts) do
     case Registry.lookup(@registry, owner_key) do
       [{pid, _}] when is_pid(pid) ->
+        emit_telemetry(:lookup, %{reused: true}, %{owner_key: owner_key})
         {:ok, pid}
 
       [] ->
@@ -65,9 +66,17 @@ defmodule EyeInTheSky.Codex.AppServer do
           |> Keyword.put(:owner_key, owner_key)
 
         case DynamicSupervisor.start_child(@supervisor, {__MODULE__, child_opts}) do
-          {:ok, pid} -> {:ok, pid}
-          {:error, {:already_started, pid}} -> {:ok, pid}
-          {:error, reason} -> {:error, reason}
+          {:ok, pid} ->
+            emit_telemetry(:started, %{}, %{owner_key: owner_key})
+            {:ok, pid}
+
+          {:error, {:already_started, pid}} ->
+            emit_telemetry(:lookup, %{reused: true}, %{owner_key: owner_key})
+            {:ok, pid}
+
+          {:error, reason} ->
+            emit_telemetry(:start_failed, %{}, %{owner_key: owner_key, reason: reason})
+            {:error, reason}
         end
     end
   end
@@ -179,6 +188,7 @@ defmodule EyeInTheSky.Codex.AppServer do
   def handle_call(:interrupt, _from, state) do
     id = next_id(state)
     request = Protocol.turn_interrupt_request(id, state.thread_id, state.active_turn.turn_id)
+    emit_telemetry(:interrupt, %{}, telemetry_meta(state))
     state = send_request(state, "turn/interrupt", request, :interrupt)
 
     timer =
@@ -199,6 +209,7 @@ defmodule EyeInTheSky.Codex.AppServer do
 
       {%{kind: kind}, pending} ->
         state = %{state | pending: pending}
+        emit_telemetry(:request_timeout, %{}, telemetry_meta(state, %{kind: kind}))
         {:noreply, fail_active_turn(state, {:codex_app_server_timeout, kind})}
     end
   end
@@ -208,6 +219,7 @@ defmodule EyeInTheSky.Codex.AppServer do
         {:interrupt_terminal_timeout, sdk_ref},
         %__MODULE__{active_turn: %{sdk_ref: sdk_ref}} = state
       ) do
+    emit_telemetry(:cancel_timeout, %{}, telemetry_meta(state))
     {:noreply, fail_active_turn(state, :canceled)}
   end
 
@@ -230,6 +242,7 @@ defmodule EyeInTheSky.Codex.AppServer do
   @impl true
   def handle_info({port, {:exit_status, status}}, %__MODULE__{port: port} = state) do
     reason = {:codex_app_server_exit, status}
+    emit_telemetry(:exit, %{exit_status: status}, telemetry_meta(state, %{reason: reason}))
     {:stop, reason, fail_active_turn(fail_pending(state, reason), reason)}
   end
 
@@ -325,6 +338,7 @@ defmodule EyeInTheSky.Codex.AppServer do
     case get_in(result, ["turn", "id"]) do
       turn_id when is_binary(turn_id) and turn_id != "" ->
         GenServer.reply(state.active_turn.from, {:ok, state.active_turn.sdk_ref, self()})
+        emit_telemetry(:turn_accepted, %{}, telemetry_meta(state, %{turn_id: turn_id}))
         put_in(state.active_turn.turn_id, turn_id)
 
       _ ->
@@ -418,6 +432,12 @@ defmodule EyeInTheSky.Codex.AppServer do
 
         send_message(state, Message.result(text || "", metadata))
 
+        emit_telemetry(
+          :turn_completed,
+          %{text_length: String.length(text || "")},
+          telemetry_meta(state, %{status: status})
+        )
+
         EyeInTheSky.Claude.SDK.Registry.unregister(state.active_turn.sdk_ref)
         cancel_turn_timer(state.active_turn.cancel_timer)
 
@@ -433,6 +453,13 @@ defmodule EyeInTheSky.Codex.AppServer do
   defp handle_server_request(request, state) do
     response = Protocol.server_request_response(request)
     write_message(state, response)
+
+    emit_telemetry(
+      :server_request_replied,
+      %{},
+      telemetry_meta(state, %{method: request["method"]})
+    )
+
     state
   end
 
@@ -459,6 +486,7 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   defp fail_active_turn(state, reason) do
     turn = state.active_turn
+    emit_terminal_failure_telemetry(state, reason)
     EyeInTheSky.Claude.SDK.Registry.unregister(turn.sdk_ref)
     cancel_turn_timer(turn.cancel_timer)
     maybe_reply_start(turn, {:error, reason})
@@ -495,6 +523,38 @@ defmodule EyeInTheSky.Codex.AppServer do
     pending = Map.put(state.pending, id, %{method: method, kind: kind, timer: timer})
 
     %{state | pending: pending, next_id: id + 1}
+  end
+
+  defp emit_telemetry(event, measurements, metadata) do
+    :telemetry.execute(
+      [:eits, :codex, :app_server, event],
+      Map.put_new(measurements, :system_time, System.system_time()),
+      metadata
+    )
+  end
+
+  defp emit_terminal_failure_telemetry(state, :canceled) do
+    emit_telemetry(:turn_canceled, %{}, telemetry_meta(state, %{reason: :canceled}))
+  end
+
+  defp emit_terminal_failure_telemetry(state, {:codex_turn_failed, _message} = reason) do
+    emit_telemetry(:turn_failed, %{}, telemetry_meta(state, %{reason: reason}))
+  end
+
+  defp emit_terminal_failure_telemetry(state, reason) do
+    emit_telemetry(:turn_error, %{}, telemetry_meta(state, %{reason: reason}))
+  end
+
+  defp telemetry_meta(state, extra \\ %{}) do
+    turn = state.active_turn || %{}
+
+    %{
+      owner_key: state.owner_key,
+      thread_id: state.thread_id,
+      turn_id: turn[:turn_id],
+      sdk_ref: turn[:sdk_ref]
+    }
+    |> Map.merge(extra)
   end
 
   defp write_message(%__MODULE__{transport_pid: pid}, message) when is_pid(pid) do
@@ -574,6 +634,10 @@ defmodule EyeInTheSky.Codex.AppServer do
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_PROJECT_ID", opts[:eits_project_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
     |> EyeInTheSky.CLI.Port.maybe_add_env("ENTRYPOINT", opts[:entrypoint] || "cli")
+    |> EyeInTheSky.CLI.Port.maybe_add_env(
+      "EITS_CODEX_APP_SERVER_HOOK_LOG",
+      opts[:smoke_hook_log]
+    )
     |> EyeInTheSky.CLI.Port.maybe_add_env(
       "EITS_URL",
       opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")

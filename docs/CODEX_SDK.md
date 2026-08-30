@@ -90,6 +90,30 @@ continues to receive the same per-turn tuple protocol:
 `claude_message`, `codex_session_id`, `claude_complete`, and `claude_error`
 keyed by a fresh `sdk_ref`.
 
+### Codex App-Server Rollout
+
+The bridge is intentionally canary-first:
+
+- Global switch: `codex_app_server_enabled` in Settings, exposed on the Settings
+  -> System tab.
+- Per-call switch: pass `codex_app_server: true` to `EyeInTheSky.Codex.SDK`.
+- Normal CI: the real app-server smoke test is excluded by the `:integration`
+  tag.
+- Manual smoke test:
+
+```bash
+EITS_CODEX_APP_SERVER_SMOKE=1 PHX_SERVER=false mix test --include integration test/eye_in_the_sky/codex/app_server/smoke_test.exs
+```
+
+The smoke test starts a real `codex app-server --listen stdio://`, completes two
+turns through the same app-server owner, and requires Codex hooks to write EITS
+environment context to a temporary hook log.
+
+The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
+`started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
+`turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,
+`cancel_timeout`, `server_request_replied`, and `exit`.
+
 ## Session UUID Lifecycle
 
 ### Creation (uuid starts nil)

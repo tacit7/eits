@@ -109,12 +109,14 @@ defmodule EyeInTheSky.Codex.AppServer.SmokeTest do
     %{
       "description" => "Codex app-server smoke hooks for EITS tests.",
       "hooks" => %{
-        "SessionStart" => [%{"type" => "command", "command" => command}],
-        "UserPromptSubmit" => [%{"type" => "command", "command" => command}],
-        "Stop" => [%{"type" => "command", "command" => command}]
+        "SessionStart" => [%{"hooks" => [hook_command(command)]}],
+        "UserPromptSubmit" => [%{"hooks" => [hook_command(command)]}],
+        "Stop" => [%{"hooks" => [hook_command(command)]}]
       }
     }
   end
+
+  defp hook_command(command), do: %{"type" => "command", "command" => command, "timeout" => 5}
 
   defp assert_hook_context!(hook_log) do
     if File.exists?(hook_log) do

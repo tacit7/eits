@@ -37,6 +37,9 @@ defmodule EyeInTheSky.Codex.SDK do
     log_raw_prefix: "codex.raw",
     forward_raw_lines: true
   ]
+  @app_server_min_version Version.parse!("0.149.1")
+  @app_server_gate_cache_key {__MODULE__, :app_server_gate_cache}
+  @app_server_gate_ttl_ms 60_000
 
   @eits_cli_reference """
     eits tasks begin --title "<title>"
@@ -96,7 +99,16 @@ defmodule EyeInTheSky.Codex.SDK do
     )
 
     if app_server_enabled?(opts) do
-      run_app_server_turn(sdk_ref, prompt, Keyword.delete(opts, :resume_thread_id))
+      run_app_server_or_fallback(
+        sdk_ref,
+        prompt,
+        Keyword.delete(opts, :resume_thread_id),
+        fn ref, p, o ->
+          run_codex_session(ref, p, o, fn cli, prompt, cli_opts ->
+            cli.spawn_new_session(prompt, cli_opts)
+          end)
+        end
+      )
     else
       run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
     end
@@ -113,7 +125,16 @@ defmodule EyeInTheSky.Codex.SDK do
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
 
     if app_server_enabled?(opts) do
-      run_app_server_turn(sdk_ref, prompt, Keyword.put(opts, :resume_thread_id, session_id))
+      run_app_server_or_fallback(
+        sdk_ref,
+        prompt,
+        Keyword.put(opts, :resume_thread_id, session_id),
+        fn ref, p, o ->
+          run_codex_session(ref, p, o, fn cli, prompt, cli_opts ->
+            cli.resume_session(session_id, prompt, cli_opts)
+          end)
+        end
+      )
     else
       run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
         cli.resume_session(session_id, p, o)
@@ -199,6 +220,29 @@ defmodule EyeInTheSky.Codex.SDK do
     end
   end
 
+  defp run_app_server_or_fallback(sdk_ref, prompt, opts, fallback_fun) do
+    case app_server_gate(opts) do
+      {:ok, gate_meta} ->
+        emit_app_server_gate(:gate_passed, opts, gate_meta)
+
+        case run_app_server_turn(sdk_ref, prompt, opts) do
+          {:ok, ^sdk_ref, _pid} = result ->
+            result
+
+          {:error, {:app_server_lookup_failed, reason}} ->
+            emit_app_server_gate(:fallback, opts, %{reason: reason, phase: :lookup})
+            fallback_fun.(sdk_ref, prompt, opts)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, {:app_server_gate_failed, reason}} ->
+        emit_app_server_gate(:gate_failed, opts, %{reason: reason})
+        fallback_fun.(sdk_ref, prompt, opts)
+    end
+  end
+
   defp run_app_server_turn(sdk_ref, prompt, opts) do
     to = Keyword.fetch!(opts, :to)
     owner_key = app_server_owner_key(opts, to)
@@ -225,7 +269,7 @@ defmodule EyeInTheSky.Codex.SDK do
         end
 
       {:error, reason} ->
-        {:error, reason}
+        {:error, {:app_server_lookup_failed, reason}}
     end
   end
 
@@ -239,6 +283,107 @@ defmodule EyeInTheSky.Codex.SDK do
 
   defp app_server_owner_key(opts, to) do
     opts[:eits_session_id] || opts[:session_id] || {:caller, to}
+  end
+
+  defp app_server_gate(opts) do
+    cond do
+      Keyword.get(opts, :transport_pid) ->
+        {:ok, %{source: :injected_transport}}
+
+      executable = codex_executable(opts) ->
+        cached_app_server_gate(executable, opts)
+
+      true ->
+        {:error, {:app_server_gate_failed, :codex_executable_not_found}}
+    end
+  end
+
+  defp cached_app_server_gate(executable, opts) do
+    now = System.monotonic_time(:millisecond)
+    cache_key = {executable, @app_server_min_version}
+    cache = :persistent_term.get(@app_server_gate_cache_key, %{})
+
+    case Map.get(cache, cache_key) do
+      {deadline, result} when deadline > now ->
+        result
+
+      _ ->
+        result = probe_app_server_gate(executable, opts)
+
+        :persistent_term.put(
+          @app_server_gate_cache_key,
+          Map.put(cache, cache_key, {now + @app_server_gate_ttl_ms, result})
+        )
+
+        result
+    end
+  end
+
+  defp probe_app_server_gate(executable, opts) do
+    runner = Keyword.get(opts, :app_server_command_runner, &System.cmd/3)
+
+    case runner.(executable, ["--version"], stderr_to_stdout: true) do
+      {output, 0} ->
+        case parse_codex_version(output) do
+          {:ok, version} ->
+            if Version.compare(version, @app_server_min_version) == :lt do
+              {:error,
+               {:app_server_gate_failed, {:codex_version_too_old, Version.to_string(version)}}}
+            else
+              {:ok,
+               %{
+                 source: :version_probe,
+                 executable: executable,
+                 version: Version.to_string(version)
+               }}
+            end
+
+          {:error, reason} ->
+            {:error, {:app_server_gate_failed, reason}}
+        end
+
+      {output, status} ->
+        {:error, {:app_server_gate_failed, {:codex_version_failed, status, String.trim(output)}}}
+    end
+  rescue
+    error ->
+      {:error, {:app_server_gate_failed, {:codex_version_probe_error, error}}}
+  end
+
+  defp codex_executable(opts) do
+    cond do
+      opts[:codex_executable] ->
+        opts[:codex_executable]
+
+      path = System.find_executable("codex") ->
+        path
+
+      true ->
+        [
+          "/usr/local/bin/codex",
+          "/opt/homebrew/bin/codex",
+          Path.expand("~/.local/bin/codex"),
+          Path.expand("~/.cargo/bin/codex")
+        ]
+        |> Enum.find(&File.exists?/1)
+    end
+  end
+
+  defp parse_codex_version(output) when is_binary(output) do
+    case Regex.run(~r/(\d+\.\d+\.\d+(?:[-+][^\s]+)?)/, output) do
+      [_, version] -> Version.parse(version)
+      _ -> {:error, {:codex_version_unparseable, String.trim(output)}}
+    end
+  end
+
+  defp emit_app_server_gate(event, opts, metadata) do
+    :telemetry.execute(
+      [:eits, :codex, :app_server, event],
+      %{system_time: System.system_time()},
+      Map.merge(%{session_id: opts[:session_id], model: opts[:model]}, metadata)
+    )
+
+    :ok
   end
 
   # ---------------------------------------------------------------------------

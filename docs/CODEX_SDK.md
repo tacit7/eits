@@ -97,6 +97,13 @@ The bridge is intentionally canary-first:
 - Global switch: `codex_app_server_enabled` in Settings, exposed on the Settings
   -> System tab.
 - Per-call switch: pass `codex_app_server: true` to `EyeInTheSky.Codex.SDK`.
+- Capability gate: non-test app-server starts require a discoverable Codex
+  binary with version `0.149.1` or newer. The version probe is cached briefly so
+  repeated turns do not shell out every time.
+- Safe fallback: gate failures and app-server lookup/startup failures fall back
+  to the existing `codex exec` backend before any turn is accepted. Failures
+  after `turn/start` is in flight stay on the app-server path to avoid duplicate
+  execution.
 - AgentWorker path: Codex workers use the same `Codex.SDK` flag gate. The
   app-server owner key is the EITS session id, so one supervised
   `Codex.AppServer` process is reused across turns for that AgentWorker and is
@@ -126,7 +133,8 @@ The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
 `started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
 `turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,
 `cancel_timeout`, `hooks_list`, `hook_started`, `hook_completed`,
-`server_request_replied`, `server_request_resolved`, and `exit`.
+`server_request_replied`, `server_request_resolved`, `gate_passed`,
+`gate_failed`, `fallback`, and `exit`.
 
 Server-initiated app-server requests are always answered so the long-lived
 bridge cannot hang waiting for host UI that EITS does not yet expose. Command

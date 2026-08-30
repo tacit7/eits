@@ -696,7 +696,7 @@ defmodule EyeInTheSky.Codex.AppServer do
         {:ok, %{port: nil, transport_pid: pid}}
 
       true ->
-        with {:ok, path} <- find_codex_binary() do
+        with {:ok, path} <- find_codex_binary(opts) do
           port =
             Port.open({:spawn_executable, path}, [
               :binary,
@@ -713,18 +713,26 @@ defmodule EyeInTheSky.Codex.AppServer do
     end
   end
 
-  defp find_codex_binary do
-    case System.find_executable("codex") do
-      nil ->
-        ["/usr/local/bin/codex", "/opt/homebrew/bin/codex", Path.expand("~/.local/bin/codex")]
+  defp find_codex_binary(opts) do
+    cond do
+      opts[:codex_executable] ->
+        {:ok, opts[:codex_executable]}
+
+      path = System.find_executable("codex") ->
+        {:ok, path}
+
+      true ->
+        [
+          "/usr/local/bin/codex",
+          "/opt/homebrew/bin/codex",
+          Path.expand("~/.local/bin/codex"),
+          Path.expand("~/.cargo/bin/codex")
+        ]
         |> Enum.find(&File.exists?/1)
         |> case do
           nil -> {:error, :codex_binary_not_found}
           path -> {:ok, path}
         end
-
-      path ->
-        {:ok, path}
     end
   end
 

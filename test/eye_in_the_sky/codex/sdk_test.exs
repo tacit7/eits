@@ -146,6 +146,67 @@ defmodule EyeInTheSky.Codex.SDKTest do
       assert is_pid(Registry.lookup(ref))
       assert :ok = SDK.cancel(ref)
     end
+
+    test "falls back to codex exec when app-server capability gate fails before startup" do
+      telemetry_ref = attach_app_server_gate_telemetry()
+      executable = "/tmp/eits-codex-old-#{System.unique_integer([:positive])}"
+
+      runner = fn ^executable, ["--version"], [stderr_to_stdout: true] ->
+        {"codex-cli 0.148.0", 0}
+      end
+
+      {:ok, ref, _handler} =
+        SDK.start("test",
+          to: self(),
+          project_path: "/tmp",
+          codex_app_server: true,
+          codex_executable: executable,
+          app_server_command_runner: runner
+        )
+
+      assert is_pid(Registry.lookup(ref))
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:gate_failed], _measurements,
+                      %{reason: {:codex_version_too_old, "0.148.0"}}}
+
+      assert :ok = SDK.cancel(ref)
+    end
+
+    test "caches app-server capability probe and falls back on startup lookup failure" do
+      telemetry_ref = attach_app_server_gate_telemetry()
+      executable = "/tmp/eits-codex-new-#{System.unique_integer([:positive])}"
+      missing_project = "/tmp/eits-codex-missing-#{System.unique_integer([:positive])}"
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      runner = fn ^executable, ["--version"], [stderr_to_stdout: true] ->
+        Agent.update(counter, &(&1 + 1))
+        {"codex-cli 0.149.1", 0}
+      end
+
+      start_opts = [
+        to: self(),
+        project_path: missing_project,
+        codex_app_server: true,
+        codex_executable: executable,
+        app_server_command_runner: runner
+      ]
+
+      {:ok, first_ref, _handler} = SDK.start("first", start_opts)
+      {:ok, second_ref, _handler} = SDK.start("second", start_opts)
+
+      assert Agent.get(counter, & &1) == 1
+      assert is_pid(Registry.lookup(first_ref))
+      assert is_pid(Registry.lookup(second_ref))
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:gate_passed], _measurements,
+                      %{version: "0.149.1"}}
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:fallback], _measurements,
+                      %{phase: :lookup, reason: {:invalid_project_path, ^missing_project}}}
+
+      assert :ok = SDK.cancel(first_ref)
+      assert :ok = SDK.cancel(second_ref)
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -521,6 +582,31 @@ defmodule EyeInTheSky.Codex.SDKTest do
       {:codex_app_server_output,
        Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
     )
+  end
+
+  defp attach_app_server_gate_telemetry do
+    test_pid = self()
+    ref = make_ref()
+    handler_id = {__MODULE__, ref}
+
+    events =
+      for event <- [:gate_passed, :gate_failed, :fallback] do
+        [:eits, :codex, :app_server, event]
+      end
+
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        fn event, measurements, metadata, _config ->
+          suffix = Enum.drop(event, 3)
+          send(test_pid, {:app_server_gate_telemetry, ref, suffix, measurements, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    ref
   end
 end
 

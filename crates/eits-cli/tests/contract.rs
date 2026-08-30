@@ -62,7 +62,9 @@ fn help_output_matches_goldens() {
         (&["commits", "--help"], "help_commits.txt"),
         (&["notes", "--help"], "help_notes.txt"),
         (&["whoami", "--help"], "help_whoami.txt"),
+        (&["doctor", "--help"], "help_doctor.txt"),
         (&["work", "--help"], "help_work.txt"),
+        (&["workflow", "--help"], "help_workflow.txt"),
     ];
     for (args, golden) in cases {
         let out = Command::cargo_bin("eits")
@@ -538,6 +540,77 @@ fn commits_create_resolves_agent_from_session_and_sends_session_id() {
     assert_eq!(body["agent_id"], "agent-uuid-1");
     assert_eq!(body["session_id"], "s-1");
     assert_eq!(body["commit_hashes"][0], "abc123");
+}
+
+#[test]
+fn commits_create_sends_task_ids_when_requested() {
+    let srv = common::serve(vec![(
+        201,
+        r#"{"commits":[{"id":9,"commit_hash":"abc123","commit_message":null}],"duplicates":[],"errors":[],"link_errors":[]}"#,
+    )]);
+    Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .env("EITS_AGENT_UUID", "agent-1")
+        .args([
+            "commits",
+            "create",
+            "--hash",
+            "abc123",
+            "--task-id",
+            "42",
+            "--task-id",
+            "task-uuid",
+        ])
+        .assert()
+        .success();
+
+    let reqs = srv.finish();
+    assert_eq!(reqs[0].method, "POST");
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["session_id"], "s-1");
+    assert_eq!(body["agent_id"], "agent-1");
+    assert_eq!(body["commit_hashes"][0], "abc123");
+    assert_eq!(body["task_ids"][0], "42");
+    assert_eq!(body["task_ids"][1], "task-uuid");
+}
+
+#[test]
+fn tasks_complete_commit_uses_batch_commit_payload_with_task_link() {
+    let srv = common::serve(vec![
+        (200, r#"{"task":{"id":42,"state_id":2}}"#),
+        (200, r#"{"success":true,"task_id":42}"#),
+        (
+            201,
+            r#"{"commits":[{"id":9,"commit_hash":"abc123"}],"duplicates":[],"errors":[],"link_errors":[]}"#,
+        ),
+    ]);
+    Command::cargo_bin("eits")
+        .unwrap()
+        .env("EITS_URL", &srv.url)
+        .env("EITS_SESSION_UUID", "s-1")
+        .env("EITS_AGENT_UUID", "agent-1")
+        .args([
+            "tasks",
+            "complete",
+            "42",
+            "--message",
+            "done",
+            "--commit",
+            "abc123",
+        ])
+        .assert()
+        .success();
+
+    let reqs = srv.finish();
+    assert_eq!(reqs[2].method, "POST");
+    assert!(reqs[2].path.ends_with("/api/v1/commits"));
+    let body: serde_json::Value = serde_json::from_str(&reqs[2].body).unwrap();
+    assert_eq!(body["session_id"], "s-1");
+    assert_eq!(body["agent_id"], "agent-1");
+    assert_eq!(body["commit_hashes"][0], "abc123");
+    assert_eq!(body["task_ids"][0], "42");
 }
 
 #[test]

@@ -2,7 +2,10 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.Commits
+  alias EyeInTheSky.{Commits, Tasks}
+  alias EyeInTheSky.Repo
+
+  import Ecto.Query
 
   import EyeInTheSky.Factory
 
@@ -170,6 +173,37 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
       assert commit["agent_id"] == agent.id
     end
 
+    test "links created commits to task_ids", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      {:ok, task} =
+        Tasks.create_task(%{
+          title: "Commit-linked task",
+          session_id: session.id,
+          state_id: 2
+        })
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.uuid,
+          "commit_hashes" => ["task-linked-hash"],
+          "task_ids" => [to_string(task.id)]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert resp["link_errors"] == []
+
+      linked? =
+        Repo.exists?(
+          from ct in "commit_tasks",
+            where: ct.commit_id == ^commit["id"] and ct.task_id == ^task.id
+        )
+
+      assert linked?
+    end
+
     test "returns 400 when commit_hashes is not a list", %{conn: conn} do
       agent = create_agent()
       _session = create_session(agent)
@@ -181,6 +215,20 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
         })
 
       assert json_response(conn, 400)["error"] == "commit_hashes must be a list"
+    end
+
+    test "returns 400 when task_ids is not a list", %{conn: conn} do
+      agent = create_agent()
+      _session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "agent_id" => agent.uuid,
+          "commit_hashes" => ["abc123"],
+          "task_ids" => "not-a-list"
+        })
+
+      assert json_response(conn, 400)["error"] == "task_ids must be a list"
     end
 
     test "returns 400 when agent_id is missing", %{conn: conn} do

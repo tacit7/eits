@@ -9,7 +9,9 @@ Commands:
   sessions  Session queries and mutations
   dm        Send or read direct messages (root form: `eits dm --to <id> --message <text>`)
   whoami    Resolve and print session/agent identity (mirrors bash `eits whoami`)
+  doctor    Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
   work      Report current work/session checkpoint status
+  workflow  Current session workflow status and suggested next command
   help      Print this message or the help of the given subcommand(s)
 
 Options:

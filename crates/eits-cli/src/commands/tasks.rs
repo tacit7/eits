@@ -477,7 +477,14 @@ pub fn run(
             )?;
 
             for hash in &commits {
-                if let Err(e) = client.post("/commits", json!({ "hash": hash })) {
+                let mut payload = json!({ "commit_hashes": [hash], "task_ids": [id] });
+                if !identity.is_empty() {
+                    payload["session_id"] = json!(identity);
+                }
+                if let Some(agent_uuid) = cfg.agent_uuid.as_deref() {
+                    payload["agent_id"] = json!(agent_uuid);
+                }
+                if let Err(e) = client.post("/commits", payload) {
                     eprintln!(
                         "warning: task closed but commit {hash} could not be tracked: {}",
                         e.message

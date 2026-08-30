@@ -12,7 +12,9 @@ The `eits` command is the Rust CLI. It provides better performance, JSON-native 
 - `commits` — commit tracking (list, create)
 - `notes` — note queries and mutations (list, get, create, update, add)
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
+- `doctor` — read-only CLI diagnostics for config, identity, server, git, hooks, and capabilities
 - `work` — current work checkpoint, task/team/inbox/git health, and commit tracking status
+- `workflow` — agent-facing status alias with suggested next command
 
 Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
@@ -299,7 +301,8 @@ eits tasks done <id>           # DEPRECATED: use complete instead
 eits tasks complete <id> <message>
 eits tasks complete <id> --message <text>
 eits tasks complete <id> --message <text> --commit <sha> [--commit <sha>] ...
-# --commit: track commits atomically with task close (repeatable; eliminates separate eits commits create round-trips)
+# --commit: track commits and link them to the task after a successful close
+#           (repeatable; eliminates separate eits commits create round-trips)
 # --notify <session_uuid_or_id>: DM a session after successful close (logs "Task <id> completed")
 
 # Delete
@@ -575,10 +578,11 @@ eits commits list [--session <uuid>] [--agent <uuid>] [--mine] [--all] \
 # --all: override to list across all sessions
 # --since <hash>: return only commits newer than the given hash (sprint reconciliation)
 
-eits commits create [--agent <uuid>] --hash <h1> [--hash <h2>] [--message <m>] ...
+eits commits create [--agent <uuid>] [--hash <h1>] [--hash <h2>] \
+  [--message <m>] [--task-id <task_id_or_uuid>] ...
 # --agent: defaults to $EITS_AGENT_UUID; falls back to agent_uuid lookup from $EITS_SESSION_UUID when unset
 # If no --hash provided, uses current HEAD (git rev-parse HEAD)
-# If no --message provided, uses git log -1 --format=%s
+# --task-id links every submitted commit hash to the given task; repeat for multiple tasks
 # Response includes top-level boolean: already_tracked=true when ALL submitted hashes were duplicates
 # (easier to check than inspecting array lengths)
 ```
@@ -835,16 +839,34 @@ Prints current session UUID, session ID, agent UUID, agent ID (integer), project
 
 ---
 
-## work
+## doctor
+
+**Available in:** eits (Rust, JSON output)
+
+```bash
+eits doctor
+```
+
+Runs read-only diagnostics for the local CLI environment. The JSON output includes:
+- config resolution and value source (`process_env`, Codex env file, desktop config, config env file, or default)
+- session and agent identity presence
+- server reachability
+- current git repository, branch, HEAD, and project mapping hint
+- hook script and registration status
+- whether the current identity can support task, note, commit, and DM operations
+- warnings and a suggested next command
+
+## work / workflow
 
 **Available in:** eits (Rust, JSON output)
 
 ```bash
 eits work status
 eits work checkpoint   # alias for status
+eits workflow status   # agent-facing alias for status
 ```
 
-Reports the current checkpoint for the active session. The JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, worktree and git health, and commit-tracking status where feasible.
+Reports the current checkpoint for the active session. The JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, worktree and git health, commit-tracking status where feasible, and a suggested next command.
 
 **Output includes:**
 - **Identity block**: Session UUID, Session ID, Agent UUID, Agent ID, Project ID, creation timestamp, worktree path

@@ -15,6 +15,7 @@ use commands::notes::NotesCmd;
 use commands::sessions::SessionsCmd;
 use commands::tasks::TasksCmd;
 use commands::work::WorkCmd;
+use commands::workflow::WorkflowCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
 
@@ -74,10 +75,17 @@ enum Cmd {
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
+    /// Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
+    Doctor,
     /// Report current work/session checkpoint status
     Work {
         #[command(subcommand)]
         cmd: WorkCmd,
+    },
+    /// Current session workflow status and suggested next command
+    Workflow {
+        #[command(subcommand)]
+        cmd: WorkflowCmd,
     },
     /// Anything not Rust-owned falls through to the legacy extras script
     #[command(external_subcommand)]
@@ -185,6 +193,9 @@ fn main() {
                 error::exit_with(err, pretty);
             }
         }
+        Cmd::Doctor => {
+            commands::doctor::run(pretty);
+        }
         Cmd::Work { cmd } => {
             let cfg = match config::Config::resolve() {
                 Ok(cfg) => cfg,
@@ -192,6 +203,16 @@ fn main() {
             };
             let client = http::Client::new(cfg.clone());
             if let Err(err) = commands::work::run(&client, &cfg, cmd, pretty) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Workflow { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::workflow::run(&client, &cfg, cmd, pretty) {
                 error::exit_with(err, pretty);
             }
         }

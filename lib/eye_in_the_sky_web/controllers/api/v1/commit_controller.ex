@@ -5,7 +5,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
   import EyeInTheSkyWeb.ControllerHelpers
 
-  alias EyeInTheSky.{Agents, Commits, Sessions}
+  alias EyeInTheSky.{Agents, Commits, Sessions, Tasks}
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
             end
 
           params["agent_id"] ->
-            case Agents.get_agent_by_uuid(params["agent_id"]) do
+            case resolve_agent(params["agent_id"]) do
               {:ok, agent} -> Commits.list_commits_for_agent(agent.id, limit: limit)
               _ -> []
             end
@@ -97,15 +97,16 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   POST /api/v1/commits - Track one or more git commits.
 
   Accepts session_id (UUID or integer), agent_id (UUID), commit_hashes (list),
-  commit_messages (optional list). When session_id is present, it is used as
-  the authoritative commit target; otherwise the latest session for agent_id is
-  used for compatibility.
+  commit_messages (optional list), and task_ids (optional list). When session_id
+  is present, it is used as the authoritative commit target; otherwise the latest
+  session for agent_id is used for compatibility.
   """
   def create(conn, params) do
     session_identity = params["session_id"]
     agent_uuid = params["agent_id"]
     hashes = params["commit_hashes"] || []
     messages = params["commit_messages"] || []
+    task_ids = params["task_ids"] || []
 
     cond do
       blank?(session_identity) and blank?(agent_uuid) ->
@@ -114,15 +115,18 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       not is_list(hashes) ->
         {:error, :bad_request, "commit_hashes must be a list"}
 
+      not is_list(task_ids) ->
+        {:error, :bad_request, "task_ids must be a list"}
+
       hashes == [] ->
         {:error, :bad_request, "commit_hashes is required"}
 
       true ->
-        do_create_commits(conn, session_identity, agent_uuid, hashes, messages)
+        do_create_commits(conn, session_identity, agent_uuid, hashes, messages, task_ids)
     end
   end
 
-  defp do_create_commits(conn, session_identity, agent_uuid, hashes, messages) do
+  defp do_create_commits(conn, session_identity, agent_uuid, hashes, messages, task_ids) do
     with {:ok, session, agent_id} <- resolve_commit_target(session_identity, agent_uuid) do
       results =
         hashes
@@ -153,7 +157,9 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
       errors =
         for {:error, changeset} <- results, do: translate_errors(changeset)
 
-      http_status = if errors == [], do: :created, else: :multi_status
+      link_errors = link_commits_to_tasks(session.id, hashes, task_ids)
+
+      http_status = if errors == [] and link_errors == [], do: :created, else: :multi_status
 
       conn
       |> put_status(http_status)
@@ -161,6 +167,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
         commits: created,
         duplicates: duplicates,
         errors: errors,
+        link_errors: link_errors,
         already_tracked: duplicates != [] and created == [] and errors == []
       })
     else
@@ -172,6 +179,48 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
 
       [] ->
         {:error, :not_found, "No session found for agent"}
+    end
+  end
+
+  defp link_commits_to_tasks(_session_id, _hashes, []), do: []
+
+  defp link_commits_to_tasks(session_id, hashes, task_ids) do
+    case resolve_task_ids(task_ids) do
+      {:ok, resolved_task_ids} ->
+        hashes
+        |> Enum.flat_map(fn hash ->
+          case Commits.get_commit_by_session_and_hash(session_id, hash) do
+            %{id: commit_id} ->
+              Enum.each(resolved_task_ids, &Commits.link_commit_to_task(commit_id, &1))
+              []
+
+            _ ->
+              [%{commit_hash: hash, error: "commit not found for task linkage"}]
+          end
+        end)
+
+      {:error, errors} ->
+        errors
+    end
+  end
+
+  defp resolve_task_ids(task_ids) do
+    {ids, errors} =
+      task_ids
+      |> Enum.reduce({[], []}, fn task_id, {ids, errors} ->
+        case Tasks.get_task_ids(task_id) do
+          {:ok, {id, _uuid}} ->
+            {[id | ids], errors}
+
+          {:error, _reason} ->
+            {ids, [%{task_id: task_id, error: "task not found"} | errors]}
+        end
+      end)
+
+    if errors == [] do
+      {:ok, Enum.reverse(ids)}
+    else
+      {:error, Enum.reverse(errors)}
     end
   end
 
@@ -191,11 +240,20 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitController do
   end
 
   defp resolve_commit_target(_session_identity, agent_uuid) do
-    with {:ok, agent} <- Agents.get_agent_by_uuid(agent_uuid),
+    with {:ok, agent} <- resolve_agent(agent_uuid),
          [session | _] <- Sessions.list_sessions_for_agent(agent.id, limit: 1) do
       {:ok, session, agent.id}
     end
   end
+
+  defp resolve_agent(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {id, ""} -> Agents.get_agent(id)
+      _ -> Agents.get_agent_by_uuid(value)
+    end
+  end
+
+  defp resolve_agent(id) when is_integer(id), do: Agents.get_agent(id)
 
   defp blank?(value), do: is_nil(value) or value == ""
 end

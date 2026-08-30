@@ -18,220 +18,247 @@ pub enum WorkCmd {
 pub fn run(client: &Client, cfg: &Config, cmd: WorkCmd, pretty: bool) -> Result<(), EitsError> {
     match cmd {
         WorkCmd::Status => {
-            let mut warnings: Vec<String> = Vec::new();
-            let mut report = serde_json::Map::new();
-
-            let mut identity = json!({
-                "session_uuid": cfg.session_uuid.clone(),
-                "session_id": cfg.session_id.clone(),
-                "agent_uuid": cfg.agent_uuid.clone(),
-                "agent_id": Value::Null,
-                "project_id": cfg.project_id.clone(),
-                "created_at": Value::Null,
-                "worktree_path": Value::Null,
-                "resolved": false,
-            });
-
-            let session_snapshot = match cfg.session_identity() {
-                Some(_) => match whoami::resolve(client, cfg) {
-                    Ok(snapshot) => Some(snapshot),
-                    Err(err) => {
-                        warnings.push(format!("session lookup unavailable: {}", err.message));
-                        None
-                    }
-                },
-                None => None,
-            };
-
-            if let Some(snapshot) = &session_snapshot {
-                identity["session_uuid"] = snapshot.session_uuid.clone();
-                identity["session_id"] = snapshot.session_id.clone();
-                identity["agent_uuid"] = json!(snapshot.agent_uuid.clone());
-                identity["agent_id"] = snapshot.agent_id.clone();
-                identity["project_id"] = snapshot.project_id.clone();
-                identity["created_at"] = snapshot
-                    .session
-                    .get("created_at")
-                    .cloned()
-                    .unwrap_or(Value::Null);
-                identity["worktree_path"] = snapshot
-                    .session
-                    .get("worktree_path")
-                    .cloned()
-                    .unwrap_or(Value::Null);
-                identity["status"] = snapshot
-                    .session
-                    .get("status")
-                    .cloned()
-                    .unwrap_or(Value::Null);
-                identity["resolved"] = json!(true);
-            }
-
-            report.insert("current_session".into(), identity);
-            report.insert(
-                "health".into(),
-                json!({
-                    "session_identity": cfg.session_identity().is_some(),
-                    "agent_uuid": cfg.agent_uuid.is_some(),
-                    "project_id": cfg.project_id.is_some(),
-                    "session_resolved": session_snapshot.is_some(),
-                }),
-            );
-
-            let mut task_items: Vec<Value> = Vec::new();
-            let mut active_tasks: Vec<Value> = Vec::new();
-            let mut tasks_ok = false;
-            if let Some(identity) = cfg.session_identity() {
-                let mut qs = format!("session_id={identity}&limit=200");
-                if let Some(pid) = cfg.project_id.as_deref() {
-                    qs.push_str(&format!("&project_id={pid}"));
-                }
-                match client.get(&format!("/tasks?{qs}")) {
-                    Ok(resp) => {
-                        task_items = collection_items(&resp, &["tasks", "results"]);
-                        active_tasks = task_items
-                            .iter()
-                            .filter(|task| matches!(task_state_id(task), Some(2 | 4)))
-                            .cloned()
-                            .collect();
-                        tasks_ok = true;
-                    }
-                    Err(err) => warnings.push(format!("task lookup unavailable: {}", err.message)),
-                }
-            }
-            report.insert(
-                "tasks".into(),
-                json!({
-                    "count": task_items.len(),
-                    "active_count": active_tasks.len(),
-                    "items": task_items,
-                    "active_items": active_tasks,
-                }),
-            );
-            update_health(&mut report, "tasks", tasks_ok);
-
-            let mut team_items: Vec<Value> = Vec::new();
-            let mut teams_ok = false;
-            let agent_uuid = session_snapshot
-                .as_ref()
-                .map(|snapshot| snapshot.agent_uuid.clone())
-                .or_else(|| cfg.agent_uuid.clone());
-            if let Some(agent_uuid) = agent_uuid {
-                match client.get(&format!(
-                    "/teams?member_agent_uuid={}",
-                    super::uri_encode(&agent_uuid)
-                )) {
-                    Ok(resp) => {
-                        team_items = collection_items(&resp, &["teams"]);
-                        teams_ok = true;
-                    }
-                    Err(err) => warnings.push(format!("team lookup unavailable: {}", err.message)),
-                }
-            }
-            report.insert(
-                "team_memberships".into(),
-                json!({
-                    "count": team_items.len(),
-                    "items": team_items,
-                }),
-            );
-            update_health(&mut report, "teams", teams_ok);
-
-            let mut inbox_items: Vec<Value> = Vec::new();
-            let mut inbox_ok = false;
-            if let Some(identity) = cfg.session_identity() {
-                let mut qs: Vec<(String, String)> = vec![
-                    ("session".into(), identity.to_string()),
-                    ("limit".into(), "20".into()),
-                ];
-                if let Some(created_at) = session_snapshot
-                    .as_ref()
-                    .and_then(|snapshot| snapshot.session.get("created_at"))
-                    .and_then(Value::as_str)
-                {
-                    qs.push(("since".into(), super::uri_encode(created_at)));
-                }
-                let query_string = qs
-                    .iter()
-                    .map(|(k, v)| format!("{k}={v}"))
-                    .collect::<Vec<_>>()
-                    .join("&");
-                match client.get(&format!("/dm?{query_string}")) {
-                    Ok(resp) => {
-                        inbox_items = collection_items(&resp, &["messages"]);
-                        inbox_ok = true;
-                    }
-                    Err(err) => warnings.push(format!("dm lookup unavailable: {}", err.message)),
-                }
-            }
-            report.insert(
-                "inbox".into(),
-                json!({
-                    "count": inbox_items.len(),
-                    "items": inbox_items,
-                }),
-            );
-            update_health(&mut report, "inbox", inbox_ok);
-
-            let git = git_report();
-            let git_root = git.get("root").and_then(Value::as_str).map(str::to_string);
-            report.insert("git".into(), git);
-            update_health(&mut report, "git_repo", git_root.is_some());
-
-            let head = git_head();
-            let mut commit_tracking = json!({
-                "state": "unavailable",
-                "tracked_head": false,
-                "head": Value::Null,
-                "tracked_count": Value::Null,
-                "unlogged_commits": [],
-            });
-            let mut commits_ok = false;
-            if let (Some(identity), Some(head)) = (cfg.session_identity(), head.clone()) {
-                match client.get(&format!("/commits?session_id={identity}&limit=200")) {
-                    Ok(resp) => {
-                        let tracked: HashSet<String> =
-                            collection_items(&resp, &["commits", "results"])
-                                .iter()
-                                .filter_map(|item| item.get("commit_hash").and_then(Value::as_str))
-                                .map(str::to_string)
-                                .collect();
-                        let recent = git_recent_commits(20);
-                        let mut unlogged = Vec::new();
-                        for hash in recent {
-                            if tracked.contains(&hash) {
-                                break;
-                            }
-                            unlogged.push(Value::String(hash));
-                        }
-                        commit_tracking = json!({
-                            "state": "checked",
-                            "tracked_head": tracked.contains(&head),
-                            "head": head,
-                            "tracked_count": tracked.len(),
-                            "unlogged_commits": unlogged,
-                        });
-                        commits_ok = true;
-                    }
-                    Err(err) => {
-                        warnings.push(format!("commit tracking unavailable: {}", err.message))
-                    }
-                }
-            } else if cfg.session_identity().is_none() {
-                warnings.push("commit tracking unavailable: missing session identity".into());
-            } else if head.is_none() {
-                warnings.push("commit tracking unavailable: not inside a git repository".into());
-            }
-            report.insert("commit_tracking".into(), commit_tracking);
-            update_health(&mut report, "commit_tracking", commits_ok);
-
-            if !warnings.is_empty() {
-                report.insert("warnings".into(), json!(warnings));
-            }
-
-            output::print_json(&Value::Object(report), pretty);
+            output::print_json(&status_report(client, cfg), pretty);
             Ok(())
         }
+    }
+}
+
+pub fn status_report(client: &Client, cfg: &Config) -> Value {
+    let mut warnings: Vec<String> = Vec::new();
+    let mut report = serde_json::Map::new();
+
+    let mut identity = json!({
+        "session_uuid": cfg.session_uuid.clone(),
+        "session_id": cfg.session_id.clone(),
+        "agent_uuid": cfg.agent_uuid.clone(),
+        "agent_id": Value::Null,
+        "project_id": cfg.project_id.clone(),
+        "created_at": Value::Null,
+        "worktree_path": Value::Null,
+        "resolved": false,
+    });
+
+    let session_snapshot = match cfg.session_identity() {
+        Some(_) => match whoami::resolve(client, cfg) {
+            Ok(snapshot) => Some(snapshot),
+            Err(err) => {
+                warnings.push(format!("session lookup unavailable: {}", err.message));
+                None
+            }
+        },
+        None => None,
+    };
+
+    if let Some(snapshot) = &session_snapshot {
+        identity["session_uuid"] = snapshot.session_uuid.clone();
+        identity["session_id"] = snapshot.session_id.clone();
+        identity["agent_uuid"] = json!(snapshot.agent_uuid.clone());
+        identity["agent_id"] = snapshot.agent_id.clone();
+        identity["project_id"] = snapshot.project_id.clone();
+        identity["created_at"] = snapshot
+            .session
+            .get("created_at")
+            .cloned()
+            .unwrap_or(Value::Null);
+        identity["worktree_path"] = snapshot
+            .session
+            .get("worktree_path")
+            .cloned()
+            .unwrap_or(Value::Null);
+        identity["status"] = snapshot
+            .session
+            .get("status")
+            .cloned()
+            .unwrap_or(Value::Null);
+        identity["resolved"] = json!(true);
+    }
+
+    report.insert("current_session".into(), identity);
+    report.insert(
+        "health".into(),
+        json!({
+            "session_identity": cfg.session_identity().is_some(),
+            "agent_uuid": cfg.agent_uuid.is_some(),
+            "project_id": cfg.project_id.is_some(),
+            "session_resolved": session_snapshot.is_some(),
+        }),
+    );
+
+    let mut task_items: Vec<Value> = Vec::new();
+    let mut active_tasks: Vec<Value> = Vec::new();
+    let mut tasks_ok = false;
+    if let Some(identity) = cfg.session_identity() {
+        let mut qs = format!("session_id={identity}&limit=200");
+        if let Some(pid) = cfg.project_id.as_deref() {
+            qs.push_str(&format!("&project_id={pid}"));
+        }
+        match client.get(&format!("/tasks?{qs}")) {
+            Ok(resp) => {
+                task_items = collection_items(&resp, &["tasks", "results"]);
+                active_tasks = task_items
+                    .iter()
+                    .filter(|task| matches!(task_state_id(task), Some(2 | 4)))
+                    .cloned()
+                    .collect();
+                tasks_ok = true;
+            }
+            Err(err) => warnings.push(format!("task lookup unavailable: {}", err.message)),
+        }
+    }
+    report.insert(
+        "tasks".into(),
+        json!({
+            "count": task_items.len(),
+            "active_count": active_tasks.len(),
+            "items": task_items,
+            "active_items": active_tasks,
+        }),
+    );
+    update_health(&mut report, "tasks", tasks_ok);
+
+    let mut team_items: Vec<Value> = Vec::new();
+    let mut teams_ok = false;
+    let agent_uuid = session_snapshot
+        .as_ref()
+        .map(|snapshot| snapshot.agent_uuid.clone())
+        .or_else(|| cfg.agent_uuid.clone());
+    if let Some(agent_uuid) = agent_uuid {
+        match client.get(&format!(
+            "/teams?member_agent_uuid={}",
+            super::uri_encode(&agent_uuid)
+        )) {
+            Ok(resp) => {
+                team_items = collection_items(&resp, &["teams"]);
+                teams_ok = true;
+            }
+            Err(err) => warnings.push(format!("team lookup unavailable: {}", err.message)),
+        }
+    }
+    report.insert(
+        "team_memberships".into(),
+        json!({
+            "count": team_items.len(),
+            "items": team_items,
+        }),
+    );
+    update_health(&mut report, "teams", teams_ok);
+
+    let mut inbox_items: Vec<Value> = Vec::new();
+    let mut inbox_ok = false;
+    if let Some(identity) = cfg.session_identity() {
+        let mut qs: Vec<(String, String)> = vec![
+            ("session".into(), identity.to_string()),
+            ("limit".into(), "20".into()),
+        ];
+        if let Some(created_at) = session_snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.session.get("created_at"))
+            .and_then(Value::as_str)
+        {
+            qs.push(("since".into(), super::uri_encode(created_at)));
+        }
+        let query_string = qs
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        match client.get(&format!("/dm?{query_string}")) {
+            Ok(resp) => {
+                inbox_items = collection_items(&resp, &["messages"]);
+                inbox_ok = true;
+            }
+            Err(err) => warnings.push(format!("dm lookup unavailable: {}", err.message)),
+        }
+    }
+    report.insert(
+        "inbox".into(),
+        json!({
+            "count": inbox_items.len(),
+            "items": inbox_items,
+        }),
+    );
+    update_health(&mut report, "inbox", inbox_ok);
+
+    let git = git_report();
+    let git_root = git.get("root").and_then(Value::as_str).map(str::to_string);
+    report.insert("git".into(), git);
+    update_health(&mut report, "git_repo", git_root.is_some());
+
+    let head = git_head();
+    let mut commit_tracking = json!({
+        "state": "unavailable",
+        "tracked_head": false,
+        "head": Value::Null,
+        "tracked_count": Value::Null,
+        "unlogged_commits": [],
+    });
+    let mut commits_ok = false;
+    if let (Some(identity), Some(head)) = (cfg.session_identity(), head.clone()) {
+        match client.get(&format!("/commits?session_id={identity}&limit=200")) {
+            Ok(resp) => {
+                let tracked: HashSet<String> = collection_items(&resp, &["commits", "results"])
+                    .iter()
+                    .filter_map(|item| item.get("commit_hash").and_then(Value::as_str))
+                    .map(str::to_string)
+                    .collect();
+                let recent = git_recent_commits(20);
+                let mut unlogged = Vec::new();
+                for hash in recent {
+                    if tracked.contains(&hash) {
+                        break;
+                    }
+                    unlogged.push(Value::String(hash));
+                }
+                commit_tracking = json!({
+                    "state": "checked",
+                    "tracked_head": tracked.contains(&head),
+                    "head": head,
+                    "tracked_count": tracked.len(),
+                    "unlogged_commits": unlogged,
+                });
+                commits_ok = true;
+            }
+            Err(err) => warnings.push(format!("commit tracking unavailable: {}", err.message)),
+        }
+    } else if cfg.session_identity().is_none() {
+        warnings.push("commit tracking unavailable: missing session identity".into());
+    } else if head.is_none() {
+        warnings.push("commit tracking unavailable: not inside a git repository".into());
+    }
+    report.insert("commit_tracking".into(), commit_tracking);
+    update_health(&mut report, "commit_tracking", commits_ok);
+
+    report.insert(
+        "suggested_next_command".into(),
+        json!(suggest_next(&report)),
+    );
+
+    if !warnings.is_empty() {
+        report.insert("warnings".into(), json!(warnings));
+    }
+
+    Value::Object(report)
+}
+
+fn suggest_next(report: &serde_json::Map<String, Value>) -> String {
+    if report
+        .get("commit_tracking")
+        .and_then(|v| v.get("unlogged_commits"))
+        .and_then(Value::as_array)
+        .is_some_and(|items| !items.is_empty())
+    {
+        "eits commits create".into()
+    } else if report
+        .get("tasks")
+        .and_then(|v| v.get("active_count"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        > 0
+    {
+        "eits tasks complete <task_id> --message \"...\"".into()
+    } else {
+        "eits tasks begin --title \"...\"".into()
     }
 }
 

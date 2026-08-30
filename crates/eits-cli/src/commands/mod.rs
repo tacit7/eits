@@ -1,10 +1,12 @@
 pub mod commits;
 pub mod dm;
+pub mod doctor;
 pub mod notes;
 pub mod sessions;
 pub mod tasks;
 pub mod whoami;
 pub mod work;
+pub mod workflow;
 
 use serde_json::{json, Value};
 

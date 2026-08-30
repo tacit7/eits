@@ -1,0 +1,8 @@
+Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
+
+Usage: eits doctor [OPTIONS]
+
+Options:
+      --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet   Print only the created/affected ID on success (mutations)
+  -h, --help    Print help

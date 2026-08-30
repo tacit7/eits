@@ -5,6 +5,7 @@ use crate::error::{Code, EitsError};
 use crate::http::Client;
 use crate::output;
 use serde_json::{json, Value};
+use std::process::Command as StdCommand;
 
 #[derive(clap::Subcommand)]
 pub enum CommitsCmd {
@@ -36,6 +37,9 @@ pub enum CommitsCmd {
         /// Commit message, positionally paired with --hash (repeatable)
         #[arg(short = 'm', long = "message")]
         messages: Vec<String>,
+        /// Task id/uuid to link the tracked commit(s) to (repeatable)
+        #[arg(long = "task-id")]
+        task_ids: Vec<String>,
     },
 }
 
@@ -169,11 +173,15 @@ pub fn run(
 
         CommitsCmd::Create {
             agent,
-            hashes,
+            mut hashes,
             messages,
+            task_ids,
         } => {
             if hashes.is_empty() {
-                return Err(EitsError::usage("commits create: --hash is required"));
+                let head = git_head().ok_or_else(|| {
+                    EitsError::usage("commits create: --hash is required outside a git repository")
+                })?;
+                hashes.push(head);
             }
             let agent_id = resolve_agent_id(client, cfg, agent)?;
             let mut payload = json!({
@@ -185,6 +193,9 @@ pub fn run(
             }
             if !messages.is_empty() {
                 payload["commit_messages"] = json!(messages);
+            }
+            if !task_ids.is_empty() {
+                payload["task_ids"] = json!(task_ids);
             }
             let resp = client.post("/commits", payload).map_err(|err| {
                 if err.message.contains("server returned HTML") {
@@ -211,17 +222,28 @@ pub fn run(
                 .and_then(Value::as_array)
                 .cloned()
                 .unwrap_or_default();
+            let link_errors = resp
+                .get("link_errors")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
 
             let has_commits = !commits.is_empty();
             let has_duplicates = !duplicates.is_empty();
             let has_errors = !errors.is_empty();
+            let has_link_errors = !link_errors.is_empty();
 
             // Pure failure: the batch produced errors and nothing was created
             // or already tracked — nothing was persisted, so this is the only
             // case that's a hard error (exit 1, validation envelope).
-            if has_errors && !has_commits && !has_duplicates {
+            if (has_errors || has_link_errors) && !has_commits && !has_duplicates {
+                let error = if has_errors {
+                    &errors[0]
+                } else {
+                    &link_errors[0]
+                };
                 return Err(EitsError::api(
-                    first_error_message(&errors[0]),
+                    first_error_message(error),
                     Code::Validation,
                     None,
                 ));
@@ -230,7 +252,7 @@ pub fn run(
             // Any other combination means at least one hash was persisted
             // (created or already-tracked) — surface everything the batch
             // did rather than silently dropping data, exit 0.
-            let status = if has_errors || (has_commits && has_duplicates) {
+            let status = if has_errors || has_link_errors || (has_commits && has_duplicates) {
                 "partial"
             } else if has_commits {
                 "created"
@@ -269,8 +291,27 @@ pub fn run(
             if has_errors {
                 out["errors"] = json!(errors);
             }
+            if has_link_errors {
+                out["link_errors"] = json!(link_errors);
+            }
             output::print_json(&out, pretty);
             Ok(())
         }
+    }
+}
+
+fn git_head() -> Option<String> {
+    let output = StdCommand::new("git")
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let hash = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if hash.is_empty() {
+        None
+    } else {
+        Some(hash)
     }
 }

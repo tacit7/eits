@@ -97,6 +97,10 @@ The bridge is intentionally canary-first:
 - Global switch: `codex_app_server_enabled` in Settings, exposed on the Settings
   -> System tab.
 - Per-call switch: pass `codex_app_server: true` to `EyeInTheSky.Codex.SDK`.
+- AgentWorker path: Codex workers use the same `Codex.SDK` flag gate. The
+  app-server owner key is the EITS session id, so one supervised
+  `Codex.AppServer` process is reused across turns for that AgentWorker and is
+  stopped when the worker terminates.
 - Normal CI: the real app-server smoke test is excluded by the `:integration`
   tag.
 - Manual smoke test:

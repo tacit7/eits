@@ -960,6 +960,150 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     assert new_state.current_job == nil
   end
 
+  # --- Codex app-server integration ---
+
+  test "Codex AgentWorker uses one app-server across two turns when flag is enabled", %{
+    track: track
+  } do
+    Application.delete_env(:eye_in_the_sky, :codex_app_server_enabled)
+    EyeInTheSky.Settings.put("codex_app_server_enabled", "true")
+
+    {_agent, session} =
+      create_test_agent_and_session(
+        %{provider: "codex", session_uuid: Ecto.UUID.generate()},
+        %{track: track}
+      )
+
+    on_exit(fn ->
+      EyeInTheSky.Settings.put("codex_app_server_enabled", "false")
+      EyeInTheSky.Codex.AppServer.stop_owner(session.id)
+    end)
+
+    test_pid = self()
+    fake = start_supervised!({AgentWorkerAppServerFake, test_pid})
+    Phoenix.PubSub.subscribe(PubSub, "agent:working")
+    Phoenix.PubSub.subscribe(PubSub, "agent:stopped")
+    Phoenix.PubSub.subscribe(PubSub, "session:#{session.id}")
+
+    first_task =
+      Task.async(fn ->
+        AgentManager.send_message(session.id, "first",
+          model: "gpt-5.2",
+          eits_workflow: "0",
+          transport_pid: fake
+        )
+      end)
+
+    assert_receive {:agent_app_server_request, "initialize", init_id}, 5_000
+    send_app_server_response(session.id, init_id, %{})
+    assert_receive {:agent_app_server_notification, "initialized"}, 5_000
+
+    assert_receive {:agent_app_server_request, "thread/start", thread_id}, 5_000
+    send_app_server_response(session.id, thread_id, %{"thread" => %{"id" => "thread-agent"}})
+
+    assert_receive {:agent_app_server_request, "turn/start", first_turn_id}, 5_000
+    send_app_server_response(session.id, first_turn_id, %{"turn" => %{"id" => "turn-1"}})
+
+    assert {:ok, :started} = Task.await(first_task)
+    assert_receive {:agent_working, %{id: first_working_id}}, 5_000
+    assert first_working_id == session.id
+
+    [{app_server_pid, _}] =
+      Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, session.id)
+
+    send_app_server_notification(session.id, "item/agentMessage/delta", %{
+      "threadId" => "thread-agent",
+      "turnId" => "turn-1",
+      "itemId" => "msg-1",
+      "delta" => "first reply"
+    })
+
+    send_app_server_notification(session.id, "turn/completed", %{
+      "threadId" => "thread-agent",
+      "turn" => %{"id" => "turn-1", "status" => "completed"}
+    })
+
+    assert_receive {:new_message, %{body: "first reply"}}, 5_000
+    assert_receive {:agent_stopped, %{id: first_stopped_id}}, 5_000
+    assert first_stopped_id == session.id
+
+    [{worker_pid, _}] = Registry.lookup(AgentRegistry, {:session, session.id})
+    first_state = :sys.get_state(worker_pid)
+    assert first_state.provider_conversation_id == "thread-agent"
+
+    second_task =
+      Task.async(fn ->
+        AgentManager.send_message(session.id, "second",
+          model: "gpt-5.2",
+          eits_workflow: "0",
+          transport_pid: fake
+        )
+      end)
+
+    assert_receive {:agent_app_server_request, "turn/start", second_turn_id}, 5_000
+    send_app_server_response(session.id, second_turn_id, %{"turn" => %{"id" => "turn-2"}})
+
+    assert {:ok, :started} = Task.await(second_task)
+    assert_receive {:agent_working, %{id: second_working_id}}, 5_000
+    assert second_working_id == session.id
+
+    assert [{^app_server_pid, _}] =
+             Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, session.id)
+
+    second_state = :sys.get_state(worker_pid)
+    assert second_state.handler_pid == app_server_pid
+
+    send_app_server_notification(session.id, "item/agentMessage/delta", %{
+      "threadId" => "thread-agent",
+      "turnId" => "turn-2",
+      "itemId" => "msg-2",
+      "delta" => "second reply"
+    })
+
+    send_app_server_notification(session.id, "turn/completed", %{
+      "threadId" => "thread-agent",
+      "turn" => %{"id" => "turn-2", "status" => "completed"}
+    })
+
+    assert_receive {:new_message, %{body: "second reply"}}, 5_000
+    assert_receive {:agent_stopped, %{id: second_stopped_id}}, 5_000
+    assert second_stopped_id == session.id
+  end
+
+  test "Codex AgentWorker keeps exec backend when app-server flag is off", %{track: track} do
+    Application.put_env(:eye_in_the_sky, :codex_app_server_enabled, false)
+    EyeInTheSky.Settings.put("codex_app_server_enabled", "false")
+
+    {_agent, session} =
+      create_test_agent_and_session(
+        %{provider: "codex", session_uuid: Ecto.UUID.generate()},
+        %{track: track}
+      )
+
+    on_exit(fn ->
+      Application.delete_env(:eye_in_the_sky, :codex_app_server_enabled)
+      EyeInTheSky.Codex.AppServer.stop_owner(session.id)
+    end)
+
+    fake = start_supervised!({AgentWorkerAppServerFake, self()})
+
+    assert {:ok, :started} =
+             AgentManager.send_message(session.id, "uses exec",
+               model: "gpt-5.2",
+               eits_workflow: "0",
+               codex_app_server: false,
+               transport_pid: fake
+             )
+
+    assert [] == Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, session.id)
+
+    mock_port = wait_for_mock_port(session.id)
+    assert is_pid(mock_port)
+    assert mock_port != fake
+
+    send(mock_port, {:exit, 0})
+  end
+
   # --- Registry Invariant Tests ---
   # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
 
@@ -1173,6 +1317,26 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     if sdk_ref, do: SDK.Registry.lookup(sdk_ref), else: nil
   catch
     :exit, _ -> nil
+  end
+
+  defp send_app_server_response(owner_key, id, result) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "result" => result})}
+    )
+  end
+
+  defp send_app_server_notification(owner_key, method, params) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
+    )
   end
 
   # Helper: start a worker with one active job and one queued job, return
@@ -1604,5 +1768,32 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       # Wait for mock port to be ready
       _mock_port = wait_for_mock_port(session.id)
     end
+  end
+end
+
+defmodule AgentWorkerAppServerFake do
+  use GenServer
+
+  def start_link(test_pid), do: GenServer.start_link(__MODULE__, test_pid)
+
+  @impl true
+  def init(test_pid), do: {:ok, test_pid}
+
+  @impl true
+  def handle_info({:codex_app_server_write, _from, json}, test_pid) do
+    message = Jason.decode!(json)
+
+    cond do
+      Map.has_key?(message, "result") ->
+        send(test_pid, {:agent_app_server_response, message["id"], message["result"]})
+
+      Map.has_key?(message, "id") ->
+        send(test_pid, {:agent_app_server_request, message["method"], message["id"]})
+
+      true ->
+        send(test_pid, {:agent_app_server_notification, message["method"]})
+    end
+
+    {:noreply, test_pid}
   end
 end

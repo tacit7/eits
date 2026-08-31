@@ -52,6 +52,86 @@ defmodule EyeInTheSky.Codex.AppServerTest do
     refute_receive {:claude_error, ^ref, _}, 50
   end
 
+  test "ignores duplicate terminal notifications after successful completion", %{pid: pid} do
+    ref = make_ref()
+    caller = self()
+
+    task =
+      Task.async(fn -> AppServer.start_turn(pid, ref, caller, "hello", project_path: "/tmp") end)
+
+    assert_receive {:fake_request, "initialize", init_id}
+    send_response(pid, init_id, %{})
+    assert_receive {:fake_notification, "initialized"}
+
+    assert_receive {:fake_request, "thread/start", thread_id}
+    send_response(pid, thread_id, %{"thread" => %{"id" => "thread-once"}})
+    assert_receive {:codex_session_id, ^ref, "thread-once"}
+
+    assert_receive {:fake_request, "turn/start", turn_id}
+    send_response(pid, turn_id, %{"turn" => %{"id" => "turn-once"}})
+    assert {:ok, ^ref, ^pid} = Task.await(task)
+
+    send_notification(pid, "item/agentMessage/delta", %{
+      "threadId" => "thread-once",
+      "turnId" => "turn-once",
+      "itemId" => "msg-once",
+      "delta" => "done"
+    })
+
+    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "done", delta: true}}
+
+    send_notification(pid, "turn/completed", %{
+      "threadId" => "thread-once",
+      "turn" => %{"id" => "turn-once", "status" => "completed"}
+    })
+
+    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "done", delta: false}}
+    assert_receive {:claude_message, ^ref, %Message{type: :result, content: "done"}}
+    assert_receive {:claude_complete, ^ref, "thread-once"}
+
+    send_notification(pid, "turn/completed", %{
+      "threadId" => "thread-once",
+      "turn" => %{"id" => "turn-once", "status" => "failed", "error" => %{"message" => "late"}}
+    })
+
+    send(pid, {:interrupt_terminal_timeout, ref})
+
+    refute_receive {:claude_message, ^ref, %Message{type: :result}}, 50
+    refute_receive {:claude_complete, ^ref, _}, 50
+    refute_receive {:claude_error, ^ref, _}, 50
+  end
+
+  test "ignores late startup responses after terminal JSON-RPC errors", %{pid: pid} do
+    ref = make_ref()
+    caller = self()
+
+    task =
+      Task.async(fn -> AppServer.start_turn(pid, ref, caller, "hello", project_path: "/tmp") end)
+
+    assert_receive {:fake_request, "initialize", init_id}
+    send_response(pid, init_id, %{})
+    assert_receive {:fake_notification, "initialized"}
+
+    assert_receive {:fake_request, "thread/start", thread_id}
+    send_response(pid, thread_id, %{"thread" => %{"id" => "thread-late-startup"}})
+    assert_receive {:codex_session_id, ^ref, "thread-late-startup"}
+
+    assert_receive {:fake_request, "turn/start", turn_id}
+
+    send_rpc_error(pid, nil, "transport closed")
+
+    assert {:error, {:codex_app_server_error, "transport closed"}} = Task.await(task)
+    assert_receive {:claude_error, ^ref, {:codex_app_server_error, "transport closed"}}
+
+    monitor_ref = Process.monitor(pid)
+    send_response(pid, turn_id, %{"turn" => %{"id" => "turn-late-startup"}})
+
+    assert Process.alive?(pid)
+    refute_receive {:DOWN, ^monitor_ref, :process, ^pid, _}, 50
+    refute_receive {:claude_complete, ^ref, _}, 50
+    refute_receive {:claude_message, ^ref, %Message{type: :result}}, 50
+  end
+
   test "auto-responds to server requests so Codex cannot hang", %{pid: pid} do
     telemetry_ref = attach_app_server_telemetry()
 
@@ -381,6 +461,19 @@ defmodule EyeInTheSky.Codex.AppServerTest do
       {:codex_app_server_output,
        Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
     )
+  end
+
+  defp send_rpc_error(pid, id, message) do
+    error = %{"message" => message}
+
+    payload =
+      if is_nil(id) do
+        %{"jsonrpc" => "2.0", "error" => error}
+      else
+        %{"jsonrpc" => "2.0", "id" => id, "error" => error}
+      end
+
+    send(pid, {:codex_app_server_output, Jason.encode!(payload)})
   end
 
   defp attach_app_server_telemetry do

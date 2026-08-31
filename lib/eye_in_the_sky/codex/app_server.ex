@@ -103,6 +103,17 @@ defmodule EyeInTheSky.Codex.AppServer do
     :exit, _ -> {:error, :not_found}
   end
 
+  def app_server_pid?(pid) when is_pid(pid) do
+    named_process?(@registry) and
+      Registry.select(@registry, [
+        {{:"$1", :"$2", :"$3"}, [{:==, :"$2", pid}], [true]}
+      ]) != []
+  rescue
+    ArgumentError -> false
+  catch
+    :exit, _ -> false
+  end
+
   def stop_owner(owner_key) do
     if named_process?(@registry) and named_process?(@supervisor) do
       case Registry.lookup(@registry, owner_key) do
@@ -357,6 +368,12 @@ defmodule EyeInTheSky.Codex.AppServer do
     request_hooks_list(state, cwds, from)
   end
 
+  defp handle_request_result(kind, _result, %__MODULE__{active_turn: nil} = state)
+       when kind in [:thread_start, :turn_start] do
+    Logger.debug("Ignoring stale Codex app-server #{kind} response with no active turn")
+    state
+  end
+
   defp handle_request_result(:thread_start, result, state) do
     case get_in(result, ["thread", "id"]) do
       thread_id when is_binary(thread_id) and thread_id != "" ->
@@ -606,6 +623,8 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   defp fail_active_turn(state, reason) do
     turn = state.active_turn
+    state = fail_pending(state, reason)
+
     emit_terminal_failure_telemetry(state, reason)
     EyeInTheSky.Claude.SDK.Registry.unregister(turn.sdk_ref)
     cancel_turn_timer(turn.cancel_timer)

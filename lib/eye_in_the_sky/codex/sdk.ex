@@ -158,14 +158,23 @@ defmodule EyeInTheSky.Codex.SDK do
         :ok
 
       pid when is_pid(pid) ->
-        case AppServer.interrupt(pid) do
-          :ok ->
-            :ok
+        cancel_pid(pid, cli)
+    end
+  end
 
-          {:error, _reason} ->
-            send(pid, :cancel)
-            :ok
-        end
+  defp cancel_pid(pid, cli) do
+    if AppServer.app_server_pid?(pid) do
+      case AppServer.interrupt(pid) do
+        :ok ->
+          :ok
+
+        {:error, _reason} ->
+          send(pid, :cancel)
+          :ok
+      end
+    else
+      cli.cancel(pid)
+      :ok
     end
   end
 

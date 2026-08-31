@@ -90,6 +90,36 @@ continues to receive the same per-turn tuple protocol:
 `claude_message`, `codex_session_id`, `claude_complete`, and `claude_error`
 keyed by a fresh `sdk_ref`.
 
+### Supervision Tree
+
+`AppServerRegistry` (`:unique` Registry) and `AppServerSupervisor`
+(`DynamicSupervisor`) are unconditionally added to the `EyeInTheSky.Application`
+supervision tree at startup. Individual `AppServer` processes are started on
+demand inside the supervisor when the feature flag is on and the capability gate
+passes; stopping the owning AgentWorker terminates the corresponding
+`AppServer` child via `stop_owner/1`.
+
+`stop_owner/1` guards against test or early-shutdown scenarios where the registry
+or supervisor may not yet be running: it uses `named_process?/1` to verify both
+OTP names are live before touching the registry, and catches any
+`ArgumentError` or `:exit` to return `:ok` without raising.
+
+### Terminal Race Hardening
+
+Two race conditions are hardened:
+
+- **Stale responses**: `thread/start` and `turn/start` JSON-RPC responses that
+  arrive after the active turn has already been cleared (e.g., timeout followed
+  by a late reply) are discarded. `handle_request_result/3` pattern-matches
+  `active_turn: nil` for both request kinds and logs a debug message instead of
+  applying the result.
+
+- **Cancel routing**: When `Codex.SDK.cancel/2` is called, it must not call
+  `cli.cancel/1` on a pid that belongs to the app-server (doing so would send a
+  raw OS signal to a long-lived process). `AppServer.app_server_pid?/1` probes
+  the registry to distinguish app-server pids from plain CLI pids; CLI cancel
+  is only invoked for the non-app-server case.
+
 ### Codex App-Server Rollout
 
 The bridge is intentionally canary-first:

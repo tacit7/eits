@@ -742,7 +742,7 @@ List commits for a session or agent with optional filtering.
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `session_id` | string | no | Session UUID to list commits for |
-| `agent_id` | string | no | Agent UUID to list commits for |
+| `agent_id` | string | no | Agent integer ID or UUID to list commits for |
 | `limit` | integer | no | Max results (default 20, max 100) |
 | `since_hash` | string | no | Return only commits newer than this hash; includes `since_hash_found` in response |
 
@@ -786,13 +786,17 @@ Track one or more git commits. When `session_id` is present it is used as the au
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `session_id` | string \| integer | no | Session UUID or integer ID — authoritative target when present |
-| `agent_id` | string | no* | Agent UUID — required when `session_id` is absent |
+| `agent_id` | string \| integer | no* | Agent integer ID or UUID — required when `session_id` is absent |
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
+| `task_ids` | (string\|integer)[] | no | Task integer IDs or UUIDs to link each commit to via the `commit_tasks` join table. Must be a list if provided. |
 
 \* At least one of `session_id` or `agent_id` must be provided. If both are omitted the request fails with `400 "session_id or agent_id is required"`.
 
-**Response:** `201 Created` (or `207 Multi-Status` if some duplicates)
+**Response:** `201 Created` or `207 Multi-Status`
+
+- `201 Created` — all commits were inserted successfully **and** `link_errors` is empty.
+- `207 Multi-Status` — at least one commit hash was a duplicate/error **or** at least one task-link failed.
 
 Distinguishes created commits from duplicates. Duplicate hashes (detected via `on_conflict: :nothing`) are returned separately with `status: "duplicate"`.
 
@@ -805,9 +809,14 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
     {"commit_hash": "existing123", "status": "duplicate"}
   ],
   "errors": [],
+  "link_errors": [],
   "already_tracked": false
 }
 ```
+
+`link_errors` contains one entry per failed task link. Each entry is either:
+- `{"commit_hash": "<hash>", "error": "commit not found for task linkage"}` — the commit hash could not be found after insertion
+- `{"task_id": "<id>", "error": "task not found"}` — the provided task ID did not resolve to a known task
 
 `already_tracked` is `true` when all submitted hashes were duplicates (i.e. `duplicates` is non-empty and both `commits` and `errors` are empty). Lets callers detect the already-tracked case without inspecting array lengths.
 
@@ -816,6 +825,7 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
   "commits": [],
   "duplicates": [{"commit_hash": "abc123", "status": "duplicate"}],
   "errors": [],
+  "link_errors": [],
   "already_tracked": true
 }
 ```
@@ -825,6 +835,7 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
 | Status | Condition |
 |--------|-----------|
 | `400` | Neither `session_id` nor `agent_id` provided |
+| `400` | `task_ids` is not a list |
 | `404` | `session_id` provided but resolves to no session |
 | `404` | `agent_id` provided but agent not found or has no session |
 
@@ -842,6 +853,14 @@ curl -X POST localhost:5001/api/v1/commits \
 curl -X POST localhost:5001/api/v1/commits \
   -H 'Content-Type: application/json' \
   -d '{"session_id":"d475b275-d827-40de-9748-5f2335c38be2","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
+```
+
+**Example — with task linkage:**
+
+```bash
+curl -X POST localhost:5001/api/v1/commits \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"d475b275-d827-40de-9748-5f2335c38be2","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"],"task_ids":[42,99]}'
 ```
 
 ---

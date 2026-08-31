@@ -209,14 +209,14 @@ export const ModelSelectorPopup = {
     return Array.from(this._list.querySelectorAll("li[data-slug]"))
   },
 
-  _setActive(idx) {
+  _setActive(idx, { scroll = false } = {}) {
     // Bug fix: the previous version reset non-active rows to "their own
     // current value" (a no-op), so once a row was hovered/keyboard-active
     // its highlight never cleared. Every row not at idx must go to "false".
     const items = this._visibleItems()
     items.forEach((li, i) => li.setAttribute("aria-selected", i === idx ? "true" : "false"))
     this._activeIndex = idx
-    if (items[idx]) items[idx].scrollIntoView({ block: "nearest" })
+    if (scroll && items[idx]) items[idx].scrollIntoView({ block: "nearest" })
   },
 
   _handleKeydown(e) {
@@ -226,10 +226,10 @@ export const ModelSelectorPopup = {
 
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      if (count) this._setActive((this._activeIndex + 1) % count)
+      if (count) this._setActive((this._activeIndex + 1) % count, { scroll: true })
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      if (count) this._setActive((this._activeIndex - 1 + count) % count)
+      if (count) this._setActive((this._activeIndex - 1 + count) % count, { scroll: true })
     } else if (e.key === "Enter") {
       e.preventDefault()
       const active = items[this._activeIndex]

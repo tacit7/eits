@@ -4,7 +4,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links"
 import { WebglAddon } from "@xterm/addon-webgl"
 import "@xterm/xterm/css/xterm.css"
 
-// xterm.js color themes — keyed by DaisyUI data-theme value.
+// xterm.js color themes — keyed by the document data-theme value.
 // Dracula: official dracula/visual-studio-code theme terminal colors
 // Tokyo Night: official enkia/tokyo-night-vscode-theme terminal colors
 // Dark/Light/Autumn: VSCode default Dark+/Light+ ANSI palette
@@ -201,7 +201,7 @@ export const PtyHook = {
       term.write(Uint8Array.from(atob(data), c => c.charCodeAt(0)))
     })
 
-    // Watch for DaisyUI theme changes and re-apply xterm theme.
+    // Watch for theme changes and re-apply xterm theme.
     // Do NOT write escape sequences here — injecting \x1b[H\x1b[2J into the
     // PTY input stream corrupts vim's cursor tracking and redraw state.
     // xterm.js re-renders the buffer with new colors on its own.

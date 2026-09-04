@@ -24,7 +24,7 @@ function getOrCreateHelp() {
   el.style.cssText = "position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center"
 
   const backdrop = document.createElement("div")
-  backdrop.style.cssText = "position:absolute;inset:0;background:oklch(var(--b3)/0.6)"
+  backdrop.style.cssText = "position:absolute;inset:0;background:color-mix(in oklch, var(--color-base-300) 60%, transparent)"
   backdrop.addEventListener("click", closeHelp)
 
   const card = document.createElement("div")

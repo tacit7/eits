@@ -2,11 +2,8 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
   @moduledoc """
   New Task modal dialog component.
 
-  Renders conditionally (not via native dialog element) to avoid DaisyUI 5's
-  top-layer exit transition bug: showModal/close keeps the dialog in the
-  browser top layer for ~300ms, during which the native ::backdrop blocks
-  all pointer events on the page. Using a conditional div removes the element
-  from the DOM entirely when closed.
+  Renders conditionally rather than through a native dialog element, so closing
+  removes the overlay from the DOM immediately.
   """
 
   use EyeInTheSkyWeb, :html

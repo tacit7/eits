@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
             Priority
           </h3>
           <div class="space-y-1.5">
-            <%= for {label, value, color} <- [{"High", 3, "hsl(var(--er))"}, {"Med", 2, "hsl(var(--wa))"}, {"Low", 1, "hsl(var(--in))"}] do %>
+            <%= for {label, value, color} <- [{"High", 3, "var(--color-error)"}, {"Med", 2, "var(--color-warning)"}, {"Low", 1, "var(--color-info)"}] do %>
               <label class="group flex cursor-pointer items-center gap-3 py-0.5">
                 <input
                   type="checkbox"
@@ -175,7 +175,7 @@ defmodule EyeInTheSkyWeb.Components.KanbanFilterDrawer do
                   />
                   <div
                     class="h-5 w-8 flex-shrink-0 rounded-box border border-base-content/8"
-                    style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
+                    style={"background-color: #{tag.color || "color-mix(in oklch, var(--color-base-content) 30%, transparent)"}"}
                   />
                   <span class="min-w-0 flex-1 truncate text-message font-medium text-base-content/70">
                     {tag.name}

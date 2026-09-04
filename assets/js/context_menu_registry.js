@@ -17,7 +17,7 @@
 //                           owned by Rail (its own live_render'd LiveView) —
 //                           bridged via a `tauri:rail-action` CustomEvent
 //   flash(msg)              info toast via phx:flash
-//   prompt(opts)            DaisyUI text-input dialog; resolves trimmed
+//   prompt(opts)            local text-input dialog; resolves trimmed
 //                           value or null on cancel
 //
 // Keep builders pure: read dataset, return items. No DOM work here.

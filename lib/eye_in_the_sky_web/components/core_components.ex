@@ -9,11 +9,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   them in any way you want, based on your application growth and needs.
 
   The foundation for styling is Tailwind CSS, a utility-first CSS framework,
-  augmented with daisyUI, a Tailwind CSS plugin that provides UI components
-  and themes. Here are useful references:
-
-    * [daisyUI](https://daisyui.com/docs/intro/) - a good place to get
-      started and see the available components.
+  extended with local EITS design tokens and component primitives. Here are
+  useful references:
 
     * [Tailwind CSS](https://tailwindcss.com) - the foundational framework
       we build on. You will use it for layout, sizing, flexbox, grid, and
@@ -988,7 +985,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a  spinner using the DaisyUI  class.
+  Renders a spinner using the local EITS spinner primitive.
 
   ## Examples
 
@@ -1087,7 +1084,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a keyboard key using the DaisyUI kbd component.
+  Renders a keyboard key using the local EITS keyboard primitive.
 
   ## Examples
 
@@ -1164,7 +1161,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a DaisyUI skeleton placeholder for  states.
+  Renders a local skeleton placeholder for loading states.
   Caller controls width/height via the class attribute.
 
   ## Examples

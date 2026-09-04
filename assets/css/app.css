@@ -11,18 +11,13 @@
    The heroicons installation itself is managed by your mix.exs */
 @plugin "../vendor/heroicons";
 
-/* daisyUI Tailwind Plugin - installed via npm */
-@plugin "daisyui" {
-  themes: all;
-}
-
-/* Catppuccin themes for daisyUI (inlined from @catppuccin/daisyui v2.1.1) */
+/* Catppuccin themes, owned locally. */
 :root:has(input.theme-controller[value=latte]:checked),[data-theme="latte"]{color-scheme:light;--radius-selector:0.25rem;--radius-field:0.5rem;--radius-box:0.5rem;--size-field:0.25rem;--size-selector:0.25rem;--border:1px;--depth:1;--noise:0;--color-primary:#7287fd;--color-primary-content:#e6e9ef;--color-secondary:#ccd0da;--color-secondary-content:#4c4f69;--color-accent:#dc8a78;--color-accent-content:#e6e9ef;--color-neutral:#8c8fa1;--color-neutral-content:#e6e9ef;--color-success:#40a02b;--color-success-content:#eff1f5;--color-warning:#df8e1d;--color-warning-content:#eff1f5;--color-error:#d20f39;--color-error-content:#eff1f5;--color-info:#04a5e5;--color-info-content:#e6e9ef;--color-base-100:#eff1f5;--color-base-200:#e6e9ef;--color-base-300:#dce0e8;--color-base-content:#4c4f69}
 :root:has(input.theme-controller[value=frappe]:checked),[data-theme="frappe"]{color-scheme:dark;--radius-selector:0.25rem;--radius-field:0.5rem;--radius-box:0.5rem;--size-field:0.25rem;--size-selector:0.25rem;--border:1px;--depth:1;--noise:0;--color-primary:#babbf1;--color-primary-content:#292c3c;--color-secondary:#414559;--color-secondary-content:#c6d0f5;--color-accent:#f2d5cf;--color-accent-content:#292c3c;--color-neutral:#838ba7;--color-neutral-content:#292c3c;--color-success:#a6d189;--color-success-content:#303446;--color-warning:#e5c890;--color-warning-content:#303446;--color-error:#e78284;--color-error-content:#303446;--color-info:#99d1db;--color-info-content:#292c3c;--color-base-100:#303446;--color-base-200:#292c3c;--color-base-300:#232634;--color-base-content:#c6d0f5}
 :root:has(input.theme-controller[value=macchiato]:checked),[data-theme="macchiato"]{color-scheme:dark;--radius-selector:0.25rem;--radius-field:0.5rem;--radius-box:0.5rem;--size-field:0.25rem;--size-selector:0.25rem;--border:1px;--depth:1;--noise:0;--color-primary:#b7bdf8;--color-primary-content:#1e2030;--color-secondary:#363a4f;--color-secondary-content:#cad3f5;--color-accent:#f4dbd6;--color-accent-content:#1e2030;--color-neutral:#8087a2;--color-neutral-content:#1e2030;--color-success:#a6da95;--color-success-content:#24273a;--color-warning:#eed49f;--color-warning-content:#24273a;--color-error:#ed8796;--color-error-content:#24273a;--color-info:#91d7e3;--color-info-content:#1e2030;--color-base-100:#24273a;--color-base-200:#1e2030;--color-base-300:#181926;--color-base-content:#cad3f5}
 :root:has(input.theme-controller[value=mocha]:checked),[data-theme="mocha"]{color-scheme:dark;--radius-selector:0.25rem;--radius-field:0.5rem;--radius-box:0.5rem;--size-field:0.25rem;--size-selector:0.25rem;--border:1px;--depth:1;--noise:0;--color-primary:#b4befe;--color-primary-content:#181825;--color-secondary:#313244;--color-secondary-content:#cdd6f4;--color-accent:#f5e0dc;--color-accent-content:#181825;--color-neutral:#7f849c;--color-neutral-content:#181825;--color-success:#a6e3a1;--color-success-content:#1e1e2e;--color-warning:#f9e2af;--color-warning-content:#1e1e2e;--color-error:#f38ba8;--color-error-content:#1e1e2e;--color-info:#89dceb;--color-info-content:#181825;--color-base-100:#1e1e2e;--color-base-200:#181825;--color-base-300:#11111b;--color-base-content:#cdd6f4}
 
-/* Tokyo Night theme for daisyUI */
+/* Tokyo Night theme */
 [data-theme="tokyonight"]{color-scheme:dark;--color-primary:#7aa2f7;--color-primary-content:#1a1b26;--color-secondary:#bb9af7;--color-secondary-content:#1a1b26;--color-accent:#7dcfff;--color-accent-content:#1a1b26;--color-neutral:#1a1b26;--color-neutral-content:#c0caf5;--color-base-100:#1a1b26;--color-base-200:#16161e;--color-base-300:#24283b;--color-base-content:#c0caf5;--color-info:#4fd6be;--color-info-content:#1a1b26;--color-success:#9ece6a;--color-success-content:#1a1b26;--color-warning:#e0af68;--color-warning-content:#1a1b26;--color-error:#f7768e;--color-error-content:#1a1b26}
 
 /* Named typography tokens for dense UI and DM transcript text.
@@ -32,6 +27,29 @@
    text-micro   = 10px    (mono compact tool output, code inline refs)
    text-nano    =  9px    (badge counts, kbd hints, section headers) */
 @theme {
+  --color-base-100: oklch(97.5% 0.004 85);
+  --color-base-200: oklch(94.5% 0.006 85);
+  --color-base-300: oklch(91% 0.012 90);
+  --color-base-content: oklch(12% 0.008 100);
+  --color-primary: oklch(61% 0.15 42);
+  --color-primary-content: oklch(98% 0 0);
+  --color-secondary: oklch(65% 0.15 300);
+  --color-secondary-content: oklch(98% 0 0);
+  --color-accent: oklch(63% 0.13 205);
+  --color-accent-content: oklch(98% 0 0);
+  --color-neutral: oklch(42% 0.01 90);
+  --color-neutral-content: oklch(98% 0 0);
+  --color-info: oklch(68% 0.13 240);
+  --color-info-content: oklch(12% 0.008 100);
+  --color-success: oklch(50% 0.2 155);
+  --color-success-content: oklch(98% 0 0);
+  --color-warning: oklch(58% 0.18 75);
+  --color-warning-content: oklch(12% 0.008 100);
+  --color-error: oklch(50% 0.22 25);
+  --color-error-content: oklch(98% 0 0);
+  --radius-selector: 0.25rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.5rem;
   --text-message: 0.8125rem;
   --text-prompt: 0.78125rem;
   --text-mini: 0.6875rem;
@@ -468,10 +486,375 @@
   .eits-disclosure__content {
     padding: 0 0.75rem 0.75rem;
   }
+
+  .input,
+  .select,
+  .textarea {
+    width: auto;
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 14%, transparent);
+    border-radius: var(--radius-field);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-size: var(--text-message);
+    line-height: 1.4;
+    transition-property: border-color, background-color, box-shadow;
+    transition-duration: 150ms;
+  }
+
+  .input,
+  .select {
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .textarea {
+    min-height: 5rem;
+    padding: 0.625rem 0.75rem;
+  }
+
+  .input-xs,
+  .select-xs {
+    min-height: 1.75rem;
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-mini);
+  }
+
+  .input-sm,
+  .select-sm {
+    min-height: 2rem;
+    padding: 0.375rem 0.625rem;
+    font-size: var(--text-mini);
+  }
+
+  .input-md,
+  .select-md {
+    min-height: 2.5rem;
+  }
+
+  .textarea-sm {
+    min-height: 4rem;
+    padding: 0.5rem 0.625rem;
+    font-size: var(--text-mini);
+  }
+
+  .input-bordered,
+  .select-bordered,
+  .textarea-bordered {
+    border-color: color-mix(in oklch, var(--color-base-content) 14%, transparent);
+  }
+
+  .input:focus,
+  .select:focus,
+  .textarea:focus {
+    border-color: color-mix(in oklch, var(--color-primary) 50%, transparent);
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 16%, transparent);
+  }
+
+  .input::placeholder,
+  .textarea::placeholder {
+    color: color-mix(in oklch, var(--color-base-content) 32%, transparent);
+  }
+
+  .select {
+    appearance: none;
+    padding-right: 2rem;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 0.9rem) 52%,
+      calc(100% - 0.65rem) 52%;
+    background-size: 0.25rem 0.25rem, 0.25rem 0.25rem;
+    background-repeat: no-repeat;
+  }
+
+  .label {
+    display: flex;
+    min-height: 1.75rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-block: 0.25rem;
+    color: color-mix(in oklch, var(--color-base-content) 76%, transparent);
+  }
+
+  .label-text {
+    color: color-mix(in oklch, var(--color-base-content) 78%, transparent);
+  }
+
+  .label-text-alt {
+    color: color-mix(in oklch, var(--color-base-content) 46%, transparent);
+    font-size: var(--text-mini);
+  }
+
+  .kbd {
+    display: inline-flex;
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-selector);
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 16%, transparent);
+    background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
+    padding: 0.125rem 0.375rem;
+    color: color-mix(in oklch, var(--color-base-content) 64%, transparent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: var(--text-mini);
+    line-height: 1;
+  }
+
+  .kbd-xs {
+    min-width: 1rem;
+    min-height: 1rem;
+    padding: 0.0625rem 0.25rem;
+    font-size: var(--text-nano);
+  }
+
+  .checkbox {
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+    appearance: none;
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 24%, transparent);
+    border-radius: 0.25rem;
+    background: var(--color-base-100);
+    color: var(--color-primary);
+    cursor: pointer;
+    transition-property: border-color, background-color, box-shadow;
+    transition-duration: 150ms;
+  }
+
+  .checkbox:checked {
+    border-color: currentColor;
+    background:
+      linear-gradient(45deg, transparent 54%, var(--color-primary-content) 54% 64%, transparent 64%) 28% 58% / 42% 42% no-repeat,
+      linear-gradient(135deg, transparent 44%, var(--color-primary-content) 44% 54%, transparent 54%) 64% 48% / 54% 54% no-repeat,
+      currentColor;
+  }
+
+  .checkbox:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--color-primary) 60%, transparent);
+    outline-offset: 2px;
+  }
+
+  .checkbox-xs {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .checkbox-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .checkbox-primary {
+    color: var(--color-primary);
+  }
+
+  .toggle {
+    width: 2.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+    appearance: none;
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 16%, transparent);
+    border-radius: 999px;
+    background:
+      radial-gradient(circle, var(--color-base-100) 46%, transparent 48%) 0.125rem 50% / 0.875rem 0.875rem no-repeat,
+      color-mix(in oklch, var(--color-base-content) 16%, transparent);
+    cursor: pointer;
+    transition-property: border-color, background-color, background-position, box-shadow;
+    transition-duration: 150ms;
+  }
+
+  .toggle:checked {
+    border-color: currentColor;
+    background:
+      radial-gradient(circle, var(--color-primary-content) 46%, transparent 48%) calc(100% - 0.125rem) 50% / 0.875rem 0.875rem no-repeat,
+      currentColor;
+  }
+
+  .toggle:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--color-primary) 60%, transparent);
+    outline-offset: 2px;
+  }
+
+  .toggle-sm {
+    width: 2rem;
+    height: 1.125rem;
+  }
+
+  .toggle-primary {
+    color: var(--color-primary);
+  }
+
+  .toggle-warning {
+    color: var(--color-warning);
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    color: var(--color-base-content);
+    font-size: var(--text-message);
+  }
+
+  .table :where(th, td) {
+    border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
+    padding: 0.75rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .table :where(th) {
+    color: color-mix(in oklch, var(--color-base-content) 56%, transparent);
+    font-size: var(--text-mini);
+    font-weight: 600;
+  }
+
+  .table-sm :where(th, td) {
+    padding: 0.5rem;
+  }
+
+  .stats {
+    display: grid;
+    grid-auto-flow: column;
+    overflow: hidden;
+    border-radius: var(--radius-box);
+  }
+
+  .stat {
+    display: inline-grid;
+    gap: 0.25rem;
+    padding: 1rem;
+  }
+
+  .tooltip {
+    position: relative;
+  }
+
+  .tooltip::before {
+    content: attr(data-tip);
+    position: absolute;
+    z-index: 80;
+    max-width: 14rem;
+    border-radius: var(--radius-selector);
+    background: color-mix(in oklch, var(--color-base-content) 92%, black);
+    color: var(--color-base-100);
+    padding: 0.25rem 0.5rem;
+    font-size: var(--text-mini);
+    line-height: 1.2;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(0.25rem);
+    transition: opacity 120ms ease, transform 120ms ease;
+    white-space: nowrap;
+  }
+
+  .tooltip:hover::before,
+  .tooltip:focus-within::before {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+  .tooltip-right::before {
+    top: 50%;
+    left: calc(100% + 0.5rem);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--color-base-content) 8%, transparent),
+      color-mix(in oklch, var(--color-base-content) 14%, transparent),
+      color-mix(in oklch, var(--color-base-content) 8%, transparent)
+    );
+    background-size: 200% 100%;
+    animation: eitsSkeleton 1.3s ease-in-out infinite;
+  }
+
+  .toast {
+    position: fixed;
+    z-index: 50;
+    display: grid;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .toast-top {
+    top: 0;
+  }
+
+  .toast-bottom {
+    bottom: 0;
+  }
+
+  .toast-end {
+    right: 0;
+  }
+
+  .alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    border-radius: var(--radius-box);
+    border: 1px solid color-mix(in oklch, var(--color-base-content) 10%, transparent);
+    background: var(--color-base-100);
+    padding: 0.75rem;
+    color: var(--color-base-content);
+    box-shadow: 0 10px 30px color-mix(in oklch, black 14%, transparent);
+  }
+
+  .alert--info {
+    border-color: color-mix(in oklch, var(--color-info) 30%, transparent);
+  }
+
+  .alert--error {
+    border-color: color-mix(in oklch, var(--color-error) 30%, transparent);
+  }
+
+  .drawer {
+    position: relative;
+  }
+
+  .drawer-toggle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .drawer-side {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    pointer-events: none;
+  }
+
+  .drawer-toggle:not(:checked) ~ .drawer-side {
+    display: none;
+  }
+
+  .drawer-toggle:checked ~ .drawer-side,
+  .drawer-toggle:checked ~ .drawer-side > * {
+    pointer-events: auto;
+  }
+
+  .drawer-overlay {
+    background: color-mix(in oklch, black 42%, transparent);
+  }
 }
 
 @keyframes eitsSpin {
   to { transform: rotate(360deg); }
+}
+
+@keyframes eitsSkeleton {
+  to { background-position-x: -200%; }
 }
 
 /* Make LiveView wrapper divs transparent for layout */
@@ -538,12 +921,12 @@ body .phx-change-loading { opacity: 1 !important; }
   bottom: 0;
   left: 3px;
   width: 2px;
-  background: oklch(var(--bc) / 0.25);
+  background: color-mix(in oklch, var(--color-base-content) 25%, transparent);
   transition: background 120ms ease;
 }
 [data-editor-mode="split"] #editor-splitter:hover::before,
 [data-editor-mode="split"] #editor-splitter:focus-visible::before {
-  background: oklch(var(--p));
+  background: var(--color-primary);
 }
 [data-editor-mode="split"] #editor-splitter:focus-visible {
   outline: none;
@@ -566,9 +949,7 @@ body .phx-change-loading { opacity: 1 !important; }
 }
 
 /* CM6 gutter — theme packages can leave .cm-gutters-before with a transparent
-   background, making line numbers invisible against the editor background.
-   NOTE: oklch(var(--b2)) / oklch(var(--bc)) do not resolve here (DaisyUI variable
-   format issue). Hardcoded dark-theme values until a theme-aware solution is found. */
+   background, making line numbers invisible against the editor background. */
 .cm-editor .cm-gutters.cm-gutters-before {
   background: rgb(40, 44, 52) !important;
   color: rgb(171, 178, 191) !important;
@@ -730,10 +1111,10 @@ form:focus-visible {
   --guide-line:     hsl(15 63.1% 59.6%);           /* orange primary */
 
   /* ===== Text contrast ===== */
-  --text-primary:   oklch(var(--bc) / 0.92);
-  --text-secondary: oklch(var(--bc) / 0.70);
-  --text-muted:     oklch(var(--bc) / 0.55);
-  --text-disabled:  oklch(var(--bc) / 0.35);
+  --text-primary:   color-mix(in oklch, var(--color-base-content) 92%, transparent);
+  --text-secondary: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+  --text-muted:     color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  --text-disabled:  color-mix(in oklch, var(--color-base-content) 35%, transparent);
 
   /* ===== Code tokens ===== */
   --code-bg:     rgba(145, 105, 210, 0.18);
@@ -748,7 +1129,7 @@ form:focus-visible {
   /* ===== Accent soft (selected fill — low-opacity periwinkle) ===== */
   --accent-primary: oklch(65% 0.18 260);
   --accent-soft:    rgba(100, 120, 230, 0.14);
-  /* daisyUI v5 variables */
+  /* Theme utility variables */
   --color-base-100: hsl(60 2.7% 14.5%);      /* --bg-100 page bg */
   --color-base-200: hsl(60 2.1% 18.4%);      /* --bg-000 surfaces */
   --color-base-300: hsl(30 3.3% 11.8%);      /* --bg-200 deep bg */
@@ -756,31 +1137,10 @@ form:focus-visible {
   --color-primary: hsl(15 63.1% 59.6%);      /* --brand-100 orange */
   --color-primary-content: hsl(0 0% 100%);   /* --oncolor-100 */
   --color-neutral: hsl(50 9% 73.7%);         /* --text-200 secondary */
-  /* daisyUI v4 fallbacks */
-  --b1: hsl(60 2.7% 14.5%);
-  --b2: hsl(60 2.1% 18.4%);
-  --b3: hsl(30 3.3% 11.8%);
-  --bc: hsl(48 33.3% 97.1%);
-  --p: hsl(15 63.1% 59.6%);
-  --pc: hsl(0 0% 100%);
-  --s: oklch(65% 0.15 300);
-  --sc: hsl(0 0% 100%);
-  --su: hsl(97 59.1% 46.1%);    /* --success-000 */
-  --wa: hsl(40 71% 50%);         /* --warning-000 */
-  --er: hsl(0 67% 59.6%);        /* --danger-100 */
-  --in: hsl(210 65.5% 67.1%);    /* --accent-000 blue */
 }
 
-[data-theme="dark"] .card,
-[data-theme="dark"] .modal-box,
-[data-theme="dark"] .tab-content,
 [data-theme="dark"] [role="tabpanel"] {
   background-color: hsl(60 2.1% 18.4%) !important; /* --bg-000 surfaces */
-}
-
-[data-theme="dark"] .navbar {
-  background-color: hsl(60 2.7% 14.5%) !important; /* --bg-100 page bg */
-  border-bottom: 1px solid hsl(30 3.3% 11.8%);     /* --bg-200 deep */
 }
 
 [data-theme="dark"] .table {
@@ -793,12 +1153,12 @@ form:focus-visible {
 /* Accent: #D97757 primary orange, #C15F3C brand rust */
 [data-theme="light"] {
   /* ===== Text contrast ===== */
-  --text-primary:   oklch(var(--bc) / 0.92);
-  --text-secondary: oklch(var(--bc) / 0.70);
-  --text-muted:     oklch(var(--bc) / 0.55);
-  --text-disabled:  oklch(var(--bc) / 0.35);
+  --text-primary:   color-mix(in oklch, var(--color-base-content) 92%, transparent);
+  --text-secondary: color-mix(in oklch, var(--color-base-content) 70%, transparent);
+  --text-muted:     color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  --text-disabled:  color-mix(in oklch, var(--color-base-content) 35%, transparent);
 
-  /* daisyUI v5 variables (--color-*) */
+  /* Theme utility variables */
   --color-base-100: oklch(97.5% 0.004 85);  /* page bg — #FAF9F6 */
   --color-base-200: oklch(94.5% 0.006 85);  /* sidebar/panels — #F0EFEA */
   --color-base-300: oklch(91% 0.012 90);    /* borders/dividers — #E8E6DC */
@@ -806,29 +1166,11 @@ form:focus-visible {
   --color-primary: oklch(61% 0.15 42);      /* D97757 accent orange */
   --color-primary-content: oklch(98% 0 0);
   --color-neutral: oklch(42% 0.01 90);      /* secondary text — #66655D */
-  /* daisyUI v4 fallbacks */
-  --b1: oklch(97.5% 0.004 85);
-  --b2: oklch(94.5% 0.006 85);
-  --b3: oklch(91% 0.012 90);
-  --bc: oklch(12% 0.008 100);
-  --p: oklch(61% 0.15 42);       /* primary - #D97757 */
-  --pc: oklch(98% 0 0);
-  --su: oklch(50% 0.2 155);      /* success - deeper green */
-  --wa: oklch(58% 0.18 75);      /* warning - richer amber */
-  --er: oklch(50% 0.22 25);      /* error - stronger red */
 }
 
-[data-theme="light"] .card,
-[data-theme="light"] .modal-box,
-[data-theme="light"] .tab-content,
 [data-theme="light"] [role="tabpanel"] {
   background-color: oklch(96% 0.006 85) !important; /* Pampas — #F4F3EE */
   box-shadow: 0 1px 3px oklch(0% 0 0 / 0.08);
-}
-
-[data-theme="light"] .navbar {
-  background-color: oklch(94.5% 0.006 85) !important; /* panels — #F0EFEA */
-  border-bottom: 1px solid oklch(91% 0.012 90);
 }
 
 [data-theme="light"] .table {
@@ -837,8 +1179,8 @@ form:focus-visible {
 
 
 /* ===== DM Semantic Token Aliases =====
-   Scoped to DM screen components. DaisyUI base tokens stay underneath.
-   :root provides DaisyUI-derived fallbacks that work for all themes.
+   Scoped to DM screen components. Theme utility tokens stay underneath.
+   :root provides local theme-token fallbacks that work for all themes.
    Dark / light blocks tune values that the formula can't nail automatically.
    Do not use these tokens outside DM components until a broader token audit runs.
 ======================================== */
@@ -1175,15 +1517,15 @@ code.hljs { padding: 3px 5px; }
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.15s, color 0.15s, background-color 0.15s;
-  background-color: oklch(var(--b3) / 0.8);
-  color: oklch(var(--bc) / 0.5);
+  background-color: color-mix(in oklch, var(--color-base-300) 80%, transparent);
+  color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
 }
 
 .dm-markdown pre:hover .code-copy-btn,
 pre:hover .code-copy-btn { opacity: 1; }
 
-.code-copy-btn:hover { color: oklch(var(--bc) / 0.9); background-color: oklch(var(--b3)); }
-.code-copy-btn--copied { opacity: 1 !important; color: oklch(var(--su)); }
+.code-copy-btn:hover { color: color-mix(in oklch, var(--color-base-content) 90%, transparent); background-color: var(--color-base-300); }
+.code-copy-btn--copied { opacity: 1 !important; color: var(--color-success); }
 
 /* Copy button in tool call / output <details> summary rows */
 .tool-copy-btn {
@@ -1197,13 +1539,13 @@ pre:hover .code-copy-btn { opacity: 1; }
   opacity: 0;
   transition: opacity 0.15s, color 0.15s;
   background: transparent;
-  color: oklch(var(--bc) / 0.3);
+  color: color-mix(in oklch, var(--color-base-content) 30%, transparent);
 }
 
 details:hover .tool-copy-btn,
 details[open] .tool-copy-btn { opacity: 1; }
-.tool-copy-btn:hover { color: oklch(var(--bc) / 0.7); }
-.tool-copy-btn[data-copied] { color: oklch(var(--su)); opacity: 1; }
+.tool-copy-btn:hover { color: color-mix(in oklch, var(--color-base-content) 70%, transparent); }
+.tool-copy-btn[data-copied] { color: var(--color-success); opacity: 1; }
 
 .dm-markdown code {
   background: color-mix(in oklch, var(--color-base-content) 8%, transparent);

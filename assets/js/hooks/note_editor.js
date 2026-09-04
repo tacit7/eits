@@ -54,7 +54,7 @@ export const NoteEditorHook = {
     if (this._destroyed) return
     mountCMView(this, { EditorState, EditorView, doc: body, extensions, watch, tabWatch, watchFont, watchVim })
 
-    // Force the DaisyUI accordion open. LiveView does not re-set checked on
+    // Force the editor disclosure open. LiveView does not re-set checked on
     // existing inputs after initial render, so we must do it imperatively.
     const collapseInput = this.el.closest(".disclosure")?.querySelector("input[type=checkbox]")
     if (collapseInput) collapseInput.checked = true

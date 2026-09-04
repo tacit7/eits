@@ -115,7 +115,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
         <%= for tag <- Enum.take(@task.tags, 3) do %>
           <span
             class="text-mini px-1.5 py-0.5 rounded-box font-medium leading-none"
-            style={"background-color: #{tag.color || "hsl(var(--bc) / 0.3)"}26; color: #{tag.color || "hsl(var(--bc) / 0.3)"}"}
+            style={"background-color: color-mix(in oklch, #{tag.color || "var(--color-base-content)"} 15%, transparent); color: #{tag.color || "color-mix(in oklch, var(--color-base-content) 65%, transparent)"}"}
           >
             {tag.name}
           </span>
@@ -209,7 +209,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
                   >
                     <span
                       class="w-2 h-2 rounded-full flex-shrink-0"
-                      style={"background-color: #{state.color || "hsl(var(--bc) / 0.3)"}"}
+                      style={"background-color: #{state.color || "color-mix(in oklch, var(--color-base-content) 30%, transparent)"}"}
                     />
                     {state.name}
                   </button>
@@ -346,9 +346,9 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
 
   defp priority_bar_color(priority) do
     cond do
-      priority >= 3 -> "hsl(var(--er))"
-      priority == 2 -> "hsl(var(--wa))"
-      priority == 1 -> "hsl(var(--in))"
+      priority >= 3 -> "var(--color-error)"
+      priority == 2 -> "var(--color-warning)"
+      priority == 1 -> "var(--color-info)"
       true -> "transparent"
     end
   end

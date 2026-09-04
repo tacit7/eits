@@ -1,5 +1,5 @@
 // assets/js/hooks/diff_collapse.js
-// Intercepts the DaisyUI disclosure checkbox for commit diffs.
+// Intercepts the disclosure checkbox for commit diffs.
 //
 // First click (diff not yet cached):
 //   - Prevents the disclosure from opening immediately

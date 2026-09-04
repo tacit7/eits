@@ -445,7 +445,7 @@
        phx-hooks are silently ignored); the hook itself renders into body. --%>
   <div id="ctx-menu-root" phx-hook="CtxMenu" phx-update="ignore" style="display:none"></div>
 
-  <%!-- Rename dialog driven by the CtxMenu hook's ctx.prompt(). DaisyUI modal,
+  <%!-- Rename dialog driven by the CtxMenu hook's ctx.prompt(). Local modal,
        same pattern as #command-palette. Native <dialog> so Esc/backdrop close
        for free; the hook fills title/value and resolves on the `close` event. --%>
   <dialog id="ctx-rename-dialog" phx-update="ignore" class="eits-modal  ">

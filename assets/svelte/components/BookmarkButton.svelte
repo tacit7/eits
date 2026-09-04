@@ -1,18 +1,24 @@
 <script>
-  export let bookmarkType;  // 'file' | 'note' | 'agent' | 'session' | 'task'
-  export let bookmarkId = null;
-  export let filePath = null;
-  export let lineNumber = null;
-  export let title = null;
-  export let category = null;
-  export let projectId = null;
-  export let agentId = null;
-  export let isBookmarked = false;
-  export let size = 'sm';  // 'xs' | 'sm' | 'md' | 'lg'
-  export let showLabel = false;
+  let {
+    bookmarkType,
+    bookmarkId = null,
+    filePath = null,
+    lineNumber = null,
+    title = null,
+    category = null,
+    projectId = null,
+    agentId = null,
+    isBookmarked = false,
+    size = 'sm',
+    showLabel = false
+  } = $props();
 
-  let loading = false;
-  let currentBookmarkId = bookmarkId;
+  let loading = $state(false);
+  let currentBookmarkId = $state(initialBookmarkId());
+
+  function initialBookmarkId() {
+    return bookmarkId;
+  }
 
   async function toggleBookmark() {
     loading = true;
@@ -77,7 +83,7 @@
 </script>
 
 <button
-  on:click={toggleBookmark}
+  onclick={toggleBookmark}
   disabled={loading}
   class="eits-action eits-action--ghost {buttonSizeClasses[size]} {showLabel ? 'gap-2' : 'eits-action--icon'} hover:bg-base-200 transition-colors"
   title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}

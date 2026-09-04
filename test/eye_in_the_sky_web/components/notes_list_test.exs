@@ -62,7 +62,8 @@ defmodule EyeInTheSkyWeb.Components.NotesListTest do
       )
 
     assert html =~ "eits-disclosure--row"
-    assert html =~ "hero-document-text"
+    assert html =~ ~s(<rect width="16" height="12" x="4" y="8" rx="2")
+    refute html =~ "hero-document-text size-3.5"
     assert html =~ "pl-5"
   end
 

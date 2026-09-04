@@ -119,6 +119,25 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
       assert html =~ ~s(aria-label="Open task Sample task")
     end
 
+    test "list DM link uses the shared robot icon" do
+      task =
+        sample_task(%{
+          sessions: [%{id: 1, uuid: "session-uuid"}]
+        })
+
+      html =
+        render_component(&TaskCard.task_card/1,
+          task: task,
+          variant: "list",
+          on_click: "open_task",
+          on_delete: nil
+        )
+
+      assert html =~ ~s(aria-label="Open agent direct message")
+      assert html =~ ~s(<rect width="16" height="12" x="4" y="8" rx="2")
+      refute html =~ "hero-chat-bubble-left-ellipsis"
+    end
+
     test "list delete button has aria-label" do
       task = sample_task()
 

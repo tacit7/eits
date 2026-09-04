@@ -222,7 +222,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
               aria-label="Open agent direct message"
               onclick="event.stopPropagation();"
             >
-              <.icon name="hero-chat-bubble-left-ellipsis" class="size-3.5" />
+              <.custom_icon name="lucide-robot" class="size-3.5" />
             </.link>
           <% end %>
 

@@ -105,8 +105,8 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
               >
                 <%!-- Title — clicking expands the inline note body --%>
                 <div class="flex items-center gap-2 pr-6">
-                  <.icon
-                    name="hero-document-text"
+                  <.custom_icon
+                    name="lucide-robot"
                     class="size-3.5 flex-shrink-0 text-base-content/35"
                   />
                   <span class="text-message font-medium text-base-content/85 truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box">
@@ -122,7 +122,11 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-box text-mini font-medium",
                     parent_type_class(note.parent_type)
                   ]}>
-                    <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
+                    <%= if String.starts_with?(parent_type_icon(note.parent_type), "lucide-") do %>
+                      <.custom_icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
+                    <% else %>
+                      <.icon name={parent_type_icon(note.parent_type)} class="w-2.5 h-2.5" />
+                    <% end %>
                     {parent_type_label(note.parent_type)}
                   </span>
                   <%= if ref = format_parent_ref(note.parent_id) do %>
@@ -280,7 +284,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
   defp parent_type_icon(type) do
     case normalize_parent_type(type) do
       "session" -> "hero-clock-mini"
-      "agent" -> "hero-cpu-chip-mini"
+      "agent" -> "lucide-robot"
       "project" -> "hero-folder-mini"
       "task" -> "hero-clipboard-document-list-mini"
       _ -> "hero-document-text-mini"

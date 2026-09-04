@@ -10,8 +10,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           API Keys
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             <%!-- Anthropic API Key --%>
             <div class="px-5 py-4">
               <div class="flex items-center justify-between">
@@ -69,7 +69,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.AuthTab do
                 <% end %>
               </div>
               <%= if @generated_api_key do %>
-                <div class="alert alert-warning mt-2 p-3 text-mini">
+                <div class="eits-alert eits-alert--warning mt-2 p-3 text-mini">
                   <p class="font-semibold mb-1">Copy this key now - it will not be shown again.</p>
                   <p class="mb-2">
                     Add to .env: <code class="font-mono">EITS_API_KEY=&lt;value&gt;</code>

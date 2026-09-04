@@ -12,9 +12,9 @@
     phx-hook="CommandPalette"
     phx-update="ignore"
     data-projects={Jason.encode!(@palette_projects)}
-    class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+    class="eits-modal   p-0 bg-transparent"
   >
-    <div class="modal-box max-w-2xl p-0 overflow-hidden bg-base-200 pb-[env(safe-area-inset-bottom)]">
+    <div class="eits-dialog max-w-2xl p-0 overflow-hidden bg-base-200 pb-[env(safe-area-inset-bottom)]">
       <div class="border-b border-base-content/10 p-3">
         <div
           data-palette-breadcrumb
@@ -41,7 +41,7 @@
         ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
       </div>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="eits-modal-backdrop">
       <button>close</button>
     </form>
   </dialog>

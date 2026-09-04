@@ -22,7 +22,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   @impl true
   def mount(socket) do
-    # Warm the Pi discovery cache on mount - Task 9's collapse of
+    # Warm the Pi discovery cache on mount - Task 9's disclosure of
     # provider_changed/model_changed into one handler dropped the
     # refresh_async() call the old "pi" branch used to make, leaving the
     # cross-provider entry list (allow_provider_switch?: true) permanently
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
     # Load projects fresh from the DB instead of trusting the host's assign -
     # hosts load projects once at mount, so a project created after mount
-    # (e.g. via the rail's folder picker) never appears in the dropdown
+    # (e.g. via the rail's folder picker) never appears in the relative
     # until the page reloads. Scope by workspace_id when provided so that
     # workspace-scoped hosts don't leak other workspaces' projects.
     projects =
@@ -154,12 +154,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     <div>
       <div
         :if={@show}
-        class="modal modal-open modal-bottom sm:modal-middle"
+        class="eits-modal eits-modal-open  "
         phx-window-keydown={@toggle_event}
         phx-key="Escape"
         phx-target={assigns[:target]}
       >
-        <div class="modal-box w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
+        <div class="eits-dialog w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
           <.modal_header
             title={assigns[:title] || "New Agent"}
             toggle_event={@toggle_event}
@@ -223,7 +223,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
           </form>
         </div>
         <div
-          class="modal-backdrop bg-black/50 cursor-pointer"
+          class="eits-modal-backdrop bg-black/50 cursor-pointer"
           phx-click={@toggle_event}
           phx-target={assigns[:target]}
         >
@@ -497,12 +497,12 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
 
   defp cli_flags_section(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-box">
+    <div class="eits-disclosure  bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
+      <div class="eits-disclosure__summary min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
       </div>
-      <div class="collapse-content px-3 pb-3 space-y-3">
+      <div class="eits-disclosure__content px-3 pb-3 space-y-3">
         <%= if @selected_provider == "codex" do %>
           <.codex_cli_flags />
         <% else %>

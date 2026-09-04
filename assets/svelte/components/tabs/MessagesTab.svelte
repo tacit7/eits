@@ -99,13 +99,13 @@
   <!-- Input area -->
   <div class="border-t border-base-300 p-4">
     <form on:submit|preventDefault={handleSubmit} class="flex items-center gap-2">
-      <!-- Provider selector dropdown -->
-      <div class="dropdown dropdown-top">
+      <!-- Provider selector relative -->
+      <div class="relative ">
         <button type="button" tabindex="0" class="eits-action eits-action--ghost gap-2" title="Select AI Provider">
           <span class="w-4 h-4">{@html ComputerDesktopSvg}</span>
           <span class="eits-chip eits-chip--primary">{selectedProvider}</span>
         </button>
-        <ul class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 mb-2">
+        <ul class="eits-menu absolute eits-menu-list p-2 shadow bg-base-100 rounded-box w-40 mb-2">
           <li>
             <button type="button" on:click={() => selectProvider('claude')}
               class="flex items-center justify-between">

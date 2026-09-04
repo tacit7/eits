@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
   # Owns the <details> wrapper, <summary> wrapper, optional copy button, and
   # trailing chevron. Three modes:
   #   compact = true            → strip-row styling inside a <details>
-  #   compact = false           → bordered card styling inside a <details>
+  #   compact = false           → bordered panel styling inside a <details>
   #   flat = true (compact req) → no <details>, body always visible (cluster use)
   # ---------------------------------------------------------------------------
 
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         if @compact,
           do: "group my-px",
           else:
-            "group rounded-box border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
+            "group rounded-box border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden"
       }>
         <summary class={
           if @compact,
@@ -211,7 +211,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
             {@detail}
           </span>
         <% else %>
-          <%!-- Expanded card: keep icon + uppercase label --%>
+          <%!-- Expanded panel: keep icon + uppercase label --%>
           <.icon name={@icon} class="size-3.5 flex-shrink-0 text-base-content/35" />
           <span class="text-mini font-mono font-semibold text-base-content/45 uppercase tracking-normal flex-shrink-0">
             {@label}

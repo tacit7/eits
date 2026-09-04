@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
       class="w-48"
     />
     <%!-- ... menu --%>
-    <div class="dropdown dropdown-end">
+    <div class="relative ">
       <button
         tabindex="0"
         class="focus-ring flex h-7 w-7 items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
@@ -94,9 +94,9 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <.icon name="hero-ellipsis-horizontal" class="size-4" />
       </button>
       <ul
-        id="dm-topbar-dropdown-menu"
+        id="dm-topbar-relative-menu"
         tabindex="0"
-        class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
+        class="eits-menu absolute eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @session_uuid do %>
           <li id="dm-topbar-li-uuid">

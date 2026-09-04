@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
 
   def action_menu(assigns) do
     ~H"""
-    <div class="dropdown dropdown-end" id={@wrapper_id}>
+    <div class="relative " id={@wrapper_id}>
       <button
         tabindex="0"
         class={@button_class}
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
       </button>
       <ul
         tabindex="0"
-        class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
+        class="eits-menu absolute eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @show_tabs do %>
           <%= for {tab, icon, label} <- @tabs do %>

@@ -87,7 +87,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
         </div>
         <ul data-selector-list role="listbox" class="max-h-96 overflow-y-auto p-1.5">
           <li :for={{group, group_entries} <- @sections} data-selector-group={group}>
-            <div class="menu-title text-mini px-3 pt-2 pb-0.5 text-base-content/40 flex items-center gap-1.5">
+            <div class="eits-menu__label text-mini px-3 pt-2 pb-0.5 text-base-content/40 flex items-center gap-1.5">
               {group}
               <span
                 :if={pi_group?(group_entries)}

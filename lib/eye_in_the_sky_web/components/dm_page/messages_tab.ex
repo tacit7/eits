@@ -134,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
                 <%= if @has_more_messages do %>
                   <button
                     phx-click="load_more_messages"
-                    phx-click-loading-class="opacity-50 pointer-events-none"
+                    phx-click--class="opacity-50 pointer-events-none"
                     class="text-mini text-base-content/35 hover:text-primary transition-colors"
                     id="load-more-messages"
                     onclick="document.getElementById('messages-container').dispatchEvent(new CustomEvent('load-more-intent'))"
@@ -367,7 +367,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div class="group">
                 <%!-- Header row --%>
                 <div :if={@show_header} class="flex items-center gap-2 mb-1.5">
-                  <div class="size-5 rounded-full bg-[var(--surface-card)] border border-[var(--border-subtle)] flex items-center justify-center text-nano font-bold text-base-content/40 flex-shrink-0 select-none">
+                  <div class="size-5 rounded-full bg-[var(--surface-panel)] border border-[var(--border-subtle)] flex items-center justify-center text-nano font-bold text-base-content/40 flex-shrink-0 select-none">
                     U
                   </div>
                   <span class="text-mini font-semibold text-base-content/40">you</span>
@@ -399,7 +399,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessagesTab do
               <div class={[
                 "group",
                 @tier == :primary &&
-                  "rounded-box border bg-[var(--surface-card,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
+                  "rounded-box border bg-[var(--surface-panel,theme(colors.base-200/40))] border-base-content/[0.08] px-3 py-2.5",
                 @tier == :secondary && "pl-[33px] py-1",
                 @tier not in [:primary, :secondary] &&
                   "rounded-box bg-[var(--agent-bg)] hover:bg-base-content/[0.03] px-3 py-2.5 transition-colors duration-100"

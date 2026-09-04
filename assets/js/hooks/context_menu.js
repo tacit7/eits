@@ -138,7 +138,7 @@ export const CtxMenu = {
           new CustomEvent('phx:flash', { detail: { kind: 'info', msg } })
         )
       },
-      // DaisyUI text prompt (replaces window.prompt). Closes the menu, opens
+      // EITS text prompt (replaces window.prompt). Closes the menu, opens
       // #ctx-rename-dialog, resolves the trimmed value on Save or null on
       // Cancel/backdrop/Esc. Falls back to window.prompt if <dialog> is
       // unsupported (older webviews).
@@ -149,7 +149,7 @@ export const CtxMenu = {
     }
   },
 
-  // --- DaisyUI text prompt ----------------------------------------------------
+  // --- EITS text prompt -------------------------------------------------------
   _promptDialog({ title = 'Rename', value = '', placeholder = '' } = {}) {
     return new Promise((resolve) => {
       const dlg = document.getElementById('ctx-rename-dialog')

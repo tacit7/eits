@@ -136,8 +136,8 @@
 
 <div class="min-h-screen bg-base-200">
   <div class="mx-auto max-w-6xl px-6 py-6">
-    <div class="card bg-base-100 shadow-sm">
-      <div class="card-body">
+    <div class="eits-panel bg-base-100 shadow-sm">
+      <div class="eits-panel__body">
         <!-- Header -->
         <div class="bg-base-100/80 backdrop-blur sticky top-0 z-30 border-b border-base-300 -m-6 mb-0 p-6">
         <div class="flex items-start justify-between gap-4">
@@ -346,8 +346,8 @@
 </div>
 
 <!-- Add Note Modal -->
-<dialog bind:this={noteDialog} class="modal" aria-labelledby="note-modal-title">
-  <div class="modal-box">
+<dialog bind:this={noteDialog} class="eits-modal" aria-labelledby="note-modal-title">
+  <div class="eits-dialog">
     <form method="dialog">
       <button class="eits-action eits-action--ghost eits-action--icon absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
         <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -372,7 +372,7 @@
           required
         ></textarea>
       </div>
-      <div class="modal-action">
+      <div class="eits-panel__actions">
         <button type="button" class="eits-action eits-action--ghost" on:click={() => live.pushEvent('close_modal')}>
           Cancel
         </button>
@@ -382,14 +382,14 @@
       </div>
     </form>
   </div>
-  <form method="dialog" class="modal-backdrop">
+  <form method="dialog" class="eits-modal-backdrop">
     <button on:click={() => live.pushEvent('close_modal')}>close</button>
   </form>
 </dialog>
 
 <!-- Add Task Modal -->
-<dialog bind:this={taskDialog} class="modal" aria-labelledby="task-modal-title">
-  <div class="modal-box">
+<dialog bind:this={taskDialog} class="eits-modal" aria-labelledby="task-modal-title">
+  <div class="eits-dialog">
     <form method="dialog">
       <button class="eits-action eits-action--ghost eits-action--icon absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
         <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -429,7 +429,7 @@
           placeholder="Optional task description"
         ></textarea>
       </div>
-      <div class="modal-action">
+      <div class="eits-panel__actions">
         <button type="button" class="eits-action eits-action--ghost" on:click={() => live.pushEvent('close_modal')}>
           Cancel
         </button>
@@ -439,7 +439,7 @@
       </div>
     </form>
   </div>
-  <form method="dialog" class="modal-backdrop">
+  <form method="dialog" class="eits-modal-backdrop">
     <button on:click={() => live.pushEvent('close_modal')}>close</button>
   </form>
 </dialog>

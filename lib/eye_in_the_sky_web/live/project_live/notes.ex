@@ -402,11 +402,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
   defp quick_note_modal(assigns) do
     ~H"""
     <div
-      class="modal modal-open"
+      class="eits-modal eits-modal-open"
       phx-window-keydown="close_quick_note_modal"
       phx-key="Escape"
     >
-      <div class="modal-box max-w-md p-0 overflow-hidden">
+      <div class="eits-dialog max-w-md p-0 overflow-hidden">
         <div class="flex items-center justify-between px-4 py-3 border-b border-base-content/10">
           <h2 class="text-message font-semibold text-base-content">Quick Note</h2>
           <button
@@ -456,7 +456,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           </div>
         </form>
       </div>
-      <div class="modal-backdrop bg-black/50" phx-click="close_quick_note_modal"></div>
+      <div class="eits-modal-backdrop bg-black/50" phx-click="close_quick_note_modal"></div>
     </div>
     """
   end

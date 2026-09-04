@@ -141,8 +141,8 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   def days_since_update(_), do: nil
 
   @doc """
-  CSS classes for card aging indicator.
-  Returns {border_class, label} or nil if card is fresh.
+  CSS classes for panel aging indicator.
+  Returns {border_class, label} or nil if panel is fresh.
   """
   def card_aging_indicator(updated_at) do
     case days_since_update(updated_at) do

@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
   @moduledoc """
-  Grid-view task card component.
+  Grid-view task panel component.
   """
 
   use Phoenix.Component
@@ -15,8 +15,11 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.GridCard do
 
   def grid_card(assigns) do
     ~H"""
-    <div class="card bg-base-200 border border-base-300 hover:shadow-lg transition-all group" {@rest}>
-      <div class="card-body p-5">
+    <div
+      class="eits-panel bg-base-200 border border-base-300 hover:shadow-lg transition-all group"
+      {@rest}
+    >
+      <div class="eits-panel__body p-5">
         <%!-- Task header with priority --%>
         <div class="flex items-start justify-between gap-2 mb-3">
           <div class="flex-1 min-w-0">

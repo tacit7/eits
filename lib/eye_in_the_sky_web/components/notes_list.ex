@@ -87,9 +87,9 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
               />
             </div>
             <%!-- Collapse: chevron expands inline body --%>
-            <div class="collapse flex-1 overflow-visible">
+            <div class="eits-disclosure flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="collapse-title py-2.5 px-0 min-h-0 flex flex-col gap-1">
+              <div class="eits-disclosure__summary py-2.5 px-0 min-h-0 flex flex-col gap-1">
                 <%!-- Title — clicking navigates to full editor --%>
                 <div class="flex items-center gap-2 pr-6">
                   <%= if starred?(note) do %>
@@ -130,7 +130,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   </p>
                 <% end %>
               </div>
-              <div class="collapse-content px-0 pb-2">
+              <div class="eits-disclosure__content px-0 pb-2">
                 <%= if note.id == @editing_note_id do %>
                   <div
                     id={"note-editor-#{note.id}"}
@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   class="size-3.5"
                 />
               </button>
-              <div class="dropdown dropdown-end" id={"note-actions-#{note.id}"} phx-update="ignore">
+              <div class="relative " id={"note-actions-#{note.id}"} phx-update="ignore">
                 <button
                   tabindex="0"
                   role="button"
@@ -192,7 +192,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 </button>
                 <ul
                   tabindex="0"
-                  class="dropdown-content z-50 menu menu-xs p-1 shadow-lg bg-base-200 rounded-box w-48 border border-base-content/8"
+                  class="eits-menu absolute z-50 eits-menu-list  p-1 shadow-lg bg-base-200 rounded-box w-48 border border-base-content/8"
                 >
                   <li>
                     <button

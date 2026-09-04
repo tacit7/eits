@@ -100,19 +100,19 @@ defmodule EyeInTheSkyWeb.TopBar.Tasks do
       </div>
     <% end %>
     <div class="flex-1" />
-    <%!-- Sort dropdown --%>
+    <%!-- Sort relative --%>
     <details
-      id="tasks-sort-dropdown"
+      id="tasks-sort-relative"
       phx-update="ignore"
       phx-hook="SortDropdown"
       data-label={Helpers.sort_label(@sort_by, sort_options(), "Newest")}
-      class="dropdown"
+      class="relative"
     >
       <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options(), "Newest")}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 min-w-[120px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
+      <ul class="eits-menu absolute z-50 mt-1 min-w-[120px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- sort_options() do %>
           <li>
             <button

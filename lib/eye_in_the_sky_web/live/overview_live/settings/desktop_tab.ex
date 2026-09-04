@@ -10,8 +10,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
       <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         Desktop App
       </h2>
-      <div class="card bg-base-100 border border-base-300 shadow-sm">
-        <div class="card-body p-0 divide-y divide-base-300">
+      <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+        <div class="eits-panel__body p-0 divide-y divide-base-300">
           <div class="px-5 py-4">
             <div class="flex items-center justify-between gap-4">
               <div>

@@ -158,8 +158,8 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
         </div>
       </div>
 
-      <section class="card bg-base-200">
-        <div class="card-body p-4">
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-4">
           <form
             id="iam-policies-filter"
             phx-change="filter"
@@ -210,8 +210,8 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
         </div>
       </section>
 
-      <section class="card bg-base-200">
-        <div class="card-body p-0">
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-0">
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>

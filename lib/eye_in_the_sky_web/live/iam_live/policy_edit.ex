@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
       </div>
 
       <%= if @system? do %>
-        <div class="alert alert-warning">
+        <div class="eits-alert eits-alert--warning">
           <.icon name="hero-exclamation-triangle" class="size-5" />
           <div>
             <div class="font-semibold">This is a built-in system policy.</div>
@@ -248,8 +248,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
       >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
-        <section class="card bg-base-200">
-          <div class="card-body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <.input
               field={@form[:name]}
               type="text"
@@ -349,14 +349,14 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
       </.form>
 
       <%= if @matcher_source do %>
-        <details class="collapse collapse-arrow bg-base-200">
-          <summary class="collapse-title font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
+        <details class="eits-disclosure  bg-base-200">
+          <summary class="eits-disclosure__summary font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
             <.icon name="hero-code-bracket" class="size-4 text-primary" /> Matcher source
             <code class="font-mono text-mini text-base-content/60 ml-1">
               {@policy.builtin_matcher}.ex
             </code>
           </summary>
-          <div class="collapse-content px-0 pb-0">
+          <div class="eits-disclosure__content px-0 pb-0">
             <pre class="overflow-x-auto text-mini font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
           </div>
         </details>

@@ -362,7 +362,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       id="canvas-tablist"
       role="tablist"
       phx-hook="CanvasStatusHook"
-      class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0"
+      class="eits-tabs px-2 border-b border-base-300 bg-base-200/70 shrink-0"
     >
       <button
         onclick="history.length > 1 ? history.back() : window.location.href = '/'"
@@ -397,7 +397,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             id={"canvas-tab-#{canvas.id}"}
             data-canvas-id={canvas.id}
             phx-hook="CanvasTabHook"
-            class={["tab tab-sm group/tab", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+            class={["eits-tab group/tab", if(@active_canvas_id == canvas.id, do: "eits-tab--active")]}
             phx-click="switch_tab"
             phx-value-canvas-id={canvas.id}
           >
@@ -433,7 +433,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       <% else %>
         <a
           role="tab"
-          class="tab tab-sm gap-1 text-base-content/40"
+          class="eits-tab gap-1 text-base-content/40"
           phx-click="start_new_canvas"
         >
           <.icon name="hero-plus-mini" class="size-3.5" /> New
@@ -443,7 +443,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         id="canvas-ws-badge"
         class="eits-chip eits-chip--warning mx-2 hidden self-center px-2 py-1"
       >
-        <span class="loading loading-spinner loading-xs"></span> Reconnecting...
+        <span class=" spinner spinner--xs"></span> Reconnecting...
       </span>
       <button
         :if={not is_nil(@active_canvas_id)}
@@ -547,8 +547,8 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     ~H"""
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-base-300/60" phx-click="close_session_picker"></div>
-      <div class="relative z-10 card bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
-        <div class="card-body p-4 flex flex-col gap-3 min-h-0">
+      <div class="relative z-10 eits-panel bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
+        <div class="eits-panel__body p-4 flex flex-col gap-3 min-h-0">
           <div class="flex items-center justify-between shrink-0">
             <h3 class="font-semibold text-message">Add Session to Canvas</h3>
             <button

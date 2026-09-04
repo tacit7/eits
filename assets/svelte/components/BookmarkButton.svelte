@@ -85,7 +85,7 @@
   aria-pressed={isBookmarked}
 >
   {#if loading}
-    <span class="loading loading-spinner {sizeClasses[size]}"></span>
+    <span class="spinner {sizeClasses[size]}"></span>
   {:else if isBookmarked}
     <svg class="{sizeClasses[size]} text-warning" fill="currentColor" viewBox="0 0 20 20">
       <!-- Filled bookmark -->

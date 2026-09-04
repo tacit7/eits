@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
           </button>
         </div>
 
-        <div class="alert alert-info alert-soft mb-4 text-mini">
+        <div class="eits-alert eits-alert--info  mb-4 text-mini">
           <p>
             EITS Pi uses ~/.pi/agent/auth.json only. Environment credentials
             (including ANTHROPIC_API_KEY) are intentionally not passed into the harness.
@@ -32,8 +32,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
           {model_status_line(@pi_model_status)}
         </div>
 
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             {render_providers(assigns)}
           </div>
         </div>
@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.ProvidersTab do
     ~H|<span class="eits-chip eits-chip--neutral">not set</span>|
   end
 
-  defp model_status_line(:loading), do: "Model discovery: loading..."
+  defp model_status_line(:loading), do: "Model discovery: ..."
 
   defp model_status_line({count, :fresh}) when is_integer(count),
     do: "Model discovery: #{count} model(s) cached (fresh)"

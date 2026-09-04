@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
   Session creation action for the workspace sessions LiveView.
 
   The key difference from ProjectLive.Sessions.Actions: project_id comes from
-  form params (user selected it from the workspace project dropdown), not from
+  form params (user selected it from the workspace project relative), not from
   socket.assigns.project.
   """
 

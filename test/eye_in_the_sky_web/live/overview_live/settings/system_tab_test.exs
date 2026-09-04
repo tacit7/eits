@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
 
     test "renders card with divide-y layout" do
       html = render_tab()
-      assert html =~ "card"
+      assert html =~ "eits-panel"
       assert html =~ "divide-y"
     end
   end

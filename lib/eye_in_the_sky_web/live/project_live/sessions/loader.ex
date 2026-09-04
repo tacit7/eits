@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Loader do
   @moduledoc """
-  Handles all data-loading, filtering, sorting, pagination, and stream assignment
+  Handles all data-, filtering, sorting, pagination, and stream assignment
   for the project sessions LiveView.
   """
 

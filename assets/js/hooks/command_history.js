@@ -3,8 +3,8 @@
 // context (this.el, this.handleEvent, etc.) without needing a second phx-hook attribute.
 //
 // History persistence: per-session localStorage key `dm_history:<session_uuid>`.
-// Ctrl+R        → search dropdown filtered to current session's history.
-// Ctrl+Shift+R  → search dropdown merged across all dm_history:* keys (global).
+// Ctrl+R        → search relative filtered to current session's history.
+// Ctrl+Shift+R  → search relative merged across all dm_history:* keys (global).
 import {SlashCommandPopup} from "./slash_command_popup"
 import {escapeHtml, highlightMatch} from "./slash_renderer"
 
@@ -210,7 +210,7 @@ export const CommandHistory = {
     } catch {}
   },
 
-  // ── History search dropdown ───────────────────────────────────────────────────
+  // ── History search relative ───────────────────────────────────────────────────
   _openSearch(global) {
     if (this._searchEl) return
 

@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
           <%= for task <- @tasks do %>
             <% has_expandable = not is_nil(task.description) || Map.get(task, :notes, []) != [] %>
             <div class="flex items-start" id={"dm-task-#{task.id}"}>
-              <%!-- Edit button — outside collapse so checkbox overlay can't intercept --%>
+              <%!-- Edit button — outside disclosure so checkbox overlay can't intercept --%>
               <button
                 type="button"
                 phx-click="open_task_detail"
@@ -39,9 +39,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
               </button>
 
               <%!-- Collapse (status dot + title + expandable content) --%>
-              <div class={["collapse flex-1", has_expandable && "collapse-arrow"]}>
+              <div class={["eits-disclosure flex-1", has_expandable && ""]}>
                 <input type="checkbox" class="min-h-0 p-0" disabled={!has_expandable} />
-                <div class="collapse-title py-3.5 px-0 min-h-0 flex items-center gap-3">
+                <div class="eits-disclosure__summary py-3.5 px-0 min-h-0 flex items-center gap-3">
                   <%!-- Status dot --%>
                   <div class="flex-shrink-0 w-5 flex justify-center">
                     <%= if task.state_id == WorkflowState.in_progress_id() do %>
@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTab do
                   </div>
                 </div>
                 <%= if has_expandable do %>
-                  <div class="collapse-content px-0 pt-0 pb-4 pl-8">
+                  <div class="eits-disclosure__content px-0 pt-0 pb-4 pl-8">
                     <%= if task.description do %>
                       <div class="text-message text-base-content/65 leading-relaxed mb-2">
                         <span class="whitespace-pre-wrap">{String.trim(task.description)}</span>

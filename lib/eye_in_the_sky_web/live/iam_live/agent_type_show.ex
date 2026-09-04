@@ -190,9 +190,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       </div>
 
       <%!-- Attached documents --%>
-      <section class="card bg-base-200">
-        <div class="card-body p-4 space-y-3">
-          <h2 class="card-title text-message">Attached documents</h2>
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-4 space-y-3">
+          <h2 class="eits-panel__title text-message">Attached documents</h2>
 
           <%= if @attached_docs == [] do %>
             <p class="text-message text-base-content/50 py-2">No documents attached yet.</p>
@@ -228,9 +228,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       </section>
 
       <%!-- Attach document --%>
-      <section class="card bg-base-200">
-        <div class="card-body p-4 space-y-3">
-          <h2 class="card-title text-message">Attach document</h2>
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-4 space-y-3">
+          <h2 class="eits-panel__title text-message">Attach document</h2>
 
           <%= if @available_documents == [] do %>
             <p class="text-message text-base-content/50">All documents are already attached.</p>

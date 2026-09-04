@@ -371,11 +371,11 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             <.icon name="hero-play" class="size-3.5" /> Start Agent
           </button>
           <div class="ml-auto flex items-center gap-1">
-            <%!-- Copy to project dropdown --%>
+            <%!-- Copy to project relative --%>
             <%= if not is_nil(@copy_event) && @projects != [] do %>
               <% other_projects = Enum.reject(@projects, &(&1.id == @current_project_id)) %>
               <%= if other_projects != [] do %>
-                <div class="dropdown dropdown-top dropdown-end">
+                <div class="relative  ">
                   <button
                     type="button"
                     tabindex="0"
@@ -386,7 +386,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   </button>
                   <ul
                     tabindex="0"
-                    class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-box w-48 z-50"
+                    class="eits-menu absolute eits-menu-list p-1 shadow-lg bg-base-200 rounded-box w-48 z-50"
                   >
                     <%= for project <- other_projects do %>
                       <li>
@@ -406,7 +406,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <% end %>
             <% end %>
             <%!-- Overflow menu: archive + delete (demoted, destructive) --%>
-            <div class="dropdown dropdown-top dropdown-end">
+            <div class="relative  ">
               <button
                 type="button"
                 tabindex="0"
@@ -417,7 +417,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               </button>
               <ul
                 tabindex="0"
-                class="dropdown-content menu p-1 shadow-lg bg-base-200 rounded-box w-40 z-50"
+                class="eits-menu absolute eits-menu-list p-1 shadow-lg bg-base-200 rounded-box w-40 z-50"
               >
                 <li>
                   <button

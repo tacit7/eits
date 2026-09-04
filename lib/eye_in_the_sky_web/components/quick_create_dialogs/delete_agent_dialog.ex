@@ -9,9 +9,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
     <dialog
       id="quick-delete-agent"
       phx-hook="QuickDeleteAgent"
-      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+      class="eits-modal   p-0 bg-transparent"
     >
-      <div class="modal-box max-w-lg p-0 overflow-hidden">
+      <div class="eits-dialog max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-message font-semibold text-base-content">Delete Agent</h2>
           <button
@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
               class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message min-h-[44px]"
             />
           </div>
-          <div class="alert alert-warning text-message">
+          <div class="eits-alert eits-alert--warning text-message">
             <.icon name="hero-exclamation-triangle" class="shrink-0 size-5" />
             <span>Warning: This action cannot be undone. The agent will be permanently deleted.</span>
           </div>
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.DeleteAgentDialog do
           </div>
         </form>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button>close</button>
       </form>
     </dialog>

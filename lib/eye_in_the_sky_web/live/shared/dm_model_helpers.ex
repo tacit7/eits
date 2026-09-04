@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpers do
     end
   end
 
-  # Back-compat clause: the pre-Task-7 dropdown only ever sent
+  # Back-compat clause: the pre-Task-7 relative only ever sent
   # %{"model", "effort"} with no "provider" key. Kept so any stale client
   # bundle (mid-deploy) doesn't crash; treats the session's own provider as
   # implicit, same as before this change.

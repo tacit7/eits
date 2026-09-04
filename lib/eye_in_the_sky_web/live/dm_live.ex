@@ -566,7 +566,7 @@ defmodule EyeInTheSkyWeb.DmLive do
   # 5-second failsafe — fires if sync Task hasn't reported back.
   # Dismisses the skeleton and loads from DB directly so the user isn't stuck.
   def handle_info(:sync_timeout, %{assigns: %{syncing: true}} = socket) do
-    Logger.warning("DM mount sync timeout, loading from DB",
+    Logger.warning("DM mount sync timeout,  from DB",
       session_id: socket.assigns.session_id
     )
 

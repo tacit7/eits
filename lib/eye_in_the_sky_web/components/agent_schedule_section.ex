@@ -164,8 +164,8 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleSection do
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <%= for prompt <- @prompts do %>
               <% job = Map.get(@prompt_job_map, prompt.id) %>
-              <div class={"card bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
-                <div class="card-body p-4 gap-2">
+              <div class={"eits-panel bg-base-200 border #{if job, do: "border-primary", else: "border-base-300"}"}>
+                <div class="eits-panel__body p-4 gap-2">
                   <div class="flex items-start justify-between">
                     <div class="flex items-center gap-1.5">
                       <h3 class="font-semibold text-message leading-tight">{prompt.name}</h3>

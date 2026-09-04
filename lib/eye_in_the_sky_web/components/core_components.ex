@@ -63,8 +63,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     >
       <div class={[
         "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
+        @kind == :info && "alert--info",
+        @kind == :error && "alert--error"
       ]}>
         <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
@@ -988,7 +988,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a loading spinner using the DaisyUI loading class.
+  Renders a  spinner using the DaisyUI  class.
 
   ## Examples
 
@@ -1001,7 +1001,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def spinner(assigns) do
     ~H"""
     <span
-      class={"loading loading-spinner loading-#{@size} #{@class}"}
+      class={"eits-spinner eits-spinner--#{@size} #{@class}"}
       aria-label="Loading"
       role="status"
     />
@@ -1009,7 +1009,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a single skeleton placeholder row for list loading states.
+  Renders a single skeleton placeholder row for list  states.
 
   ## Examples
 
@@ -1164,7 +1164,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a DaisyUI skeleton placeholder for loading states.
+  Renders a DaisyUI skeleton placeholder for  states.
   Caller controls width/height via the class attribute.
 
   ## Examples

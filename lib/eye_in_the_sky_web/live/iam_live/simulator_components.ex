@@ -36,8 +36,8 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
   def winner_card(assigns) do
     ~H"""
     <%= if @decision.winning_policy do %>
-      <div class="card bg-base-100 border border-base-300">
-        <div class="card-body p-4">
+      <div class="eits-panel bg-base-100 border border-base-300">
+        <div class="eits-panel__body p-4">
           <div class="flex items-start justify-between gap-3">
             <div>
               <div class="text-mini text-base-content/60">Winning policy</div>
@@ -70,8 +70,8 @@ defmodule EyeInTheSkyWeb.IAMLive.SimulatorComponents do
   def instructions_list(assigns) do
     ~H"""
     <%= if @instructions != [] do %>
-      <div class="card bg-base-100 border border-base-300">
-        <div class="card-body p-4">
+      <div class="eits-panel bg-base-100 border border-base-300">
+        <div class="eits-panel__body p-4">
           <div class="text-mini text-base-content/60 flex items-center gap-2 mb-2">
             <.icon name="hero-megaphone" class="size-4" /> Instructions ({length(@instructions)})
           </div>

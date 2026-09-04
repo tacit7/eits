@@ -72,8 +72,8 @@
 {#if notes && notes.length > 0}
   <div class="space-y-4">
     {#each notes as note (note.id)}
-      <div class="card rounded-box bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
-        <div class="card-body p-4">
+      <div class="eits-panel rounded-box bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
+        <div class="eits-panel__body p-4">
           <!-- Markdown content; re-renders when renderReady flips true -->
           <div class="prose prose-sm max-w-none dark:prose-invert
                       prose-headings:font-semibold
@@ -90,7 +90,7 @@
           </div>
 
           <!-- Footer with ID and Timestamp -->
-          <div class="card-actions justify-between mt-3 pt-3 border-t border-base-300">
+          <div class="eits-panel__actions justify-between mt-3 pt-3 border-t border-base-300">
             <!-- Note ID Badge -->
             <button
               class="eits-chip eits-chip--muted eits-chip--mono cursor-pointer transition-colors hover:text-primary"

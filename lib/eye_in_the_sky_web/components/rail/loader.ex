@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.Rail.Loader do
   @moduledoc """
-  Data-loading helpers for the Rail live component.
+  Data- helpers for the Rail live component.
 
   Each maybe_load_* function takes a socket and returns an updated socket.
   They are no-ops when the section argument doesn't match, so they can be
@@ -300,7 +300,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Loader do
 
   defp filter_prompts_by_scope(prompts, _scope, _project_id), do: prompts
 
-  # Resets the usage assign to nil (loading state). The actual HTTP fetch
+  # Resets the usage assign to nil ( state). The actual HTTP fetch
   # is kicked off asynchronously via start_async/3 in rail.ex after this runs.
   def maybe_load_usage(socket, :usage) do
     assign(socket, :flyout_usage, nil)

@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
   client (localStorage) and live statuses fetched from the server.
 
   The JS hook `FavoriteFab` handles only positioning, CSS transitions, and
-  click events (expand/collapse, chat open).
+  click events (expand/disclosure, chat open).
   """
 
   use EyeInTheSkyWeb, :live_component

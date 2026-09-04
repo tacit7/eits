@@ -118,8 +118,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
         phx-submit="save"
         class="space-y-4"
       >
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
             <.input
               field={@form[:name]}
               type="text"

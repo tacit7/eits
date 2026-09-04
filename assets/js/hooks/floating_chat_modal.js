@@ -37,7 +37,7 @@ export class FloatingChatModal {
   /** Append a single message bubble and scroll to bottom. */
   appendMessage(msg) {
     if (!this._messagesEl) return
-    this._messagesEl.querySelector(`#${this._id}-loading, #${this._id}-empty`)?.remove()
+    this._messagesEl.querySelector(`#${this._id}-, #${this._id}-empty`)?.remove()
     const div = document.createElement('div')
     div.innerHTML = this._messageHtml(msg)
     this._messagesEl.appendChild(div.firstChild)
@@ -118,7 +118,7 @@ export class FloatingChatModal {
         </div>
 
         <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
-          <div id="${this._id}-loading" class="text-center text-base-content/25 text-mini py-10">
+          <div id="${this._id}-" class="text-center text-base-content/25 text-mini py-10">
             Loading messages...
           </div>
         </div>

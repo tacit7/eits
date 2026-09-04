@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
   # ---------------------------------------------------------------------------
   # message_tier/1
   # Classifies an agent message into a display tier:
-  #   :primary   — substantial content (text body, DM) → full card treatment
+  #   :primary   — substantial content (text body, DM) → full panel treatment
   #   :secondary — tool event / tool result → plain muted row
   #   :user      — fallback / user-like agent message
   # ---------------------------------------------------------------------------

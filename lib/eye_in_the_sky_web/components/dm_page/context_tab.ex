@@ -24,11 +24,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
         <div class="space-y-1 bg-base-200 rounded-box shadow-sm p-4" id="dm-context-list">
           <%= for {title, body, idx} <- @sections do %>
             <div
-              class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+              class="eits-disclosure  rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
               id={"dm-context-section-#{idx}"}
             >
               <input type="checkbox" />
-              <div class="collapse-title py-3 px-4">
+              <div class="eits-disclosure__summary py-3 px-4">
                 <div class="flex items-center gap-3">
                   <.icon name="hero-document-text" class="size-4 flex-shrink-0 text-base-content/30" />
                   <div class="flex-1 min-w-0">
@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTab do
                   </div>
                 </div>
               </div>
-              <div class="collapse-content px-4 pb-4">
+              <div class="eits-disclosure__content px-4 pb-4">
                 <div class="pl-7">
                   <div
                     id={"context-body-#{idx}"}

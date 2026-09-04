@@ -9,9 +9,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
     <dialog
       id="quick-resume-agent"
       phx-hook="QuickResumeAgent"
-      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+      class="eits-modal   p-0 bg-transparent"
     >
-      <div class="modal-box max-w-lg p-0 overflow-hidden">
+      <div class="eits-dialog max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-message font-semibold text-base-content">Resume Agent</h2>
           <button
@@ -44,7 +44,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
               class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message resize-none"
             ></textarea>
           </div>
-          <div class="alert alert-info text-message">
+          <div class="eits-alert eits-alert--info text-message">
             <.icon name="hero-information-circle" class="shrink-0 size-5" />
             <span>This will spawn a new Claude session for the existing agent.</span>
           </div>
@@ -65,7 +65,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ResumeAgentDialog do
           </div>
         </form>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button>close</button>
       </form>
     </dialog>

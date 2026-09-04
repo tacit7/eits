@@ -295,7 +295,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         <% end %>
 
         <%!-- Agent-type bypass note --%>
-        <div class="alert alert-info">
+        <div class="eits-alert eits-alert--info">
           <.icon name="hero-information-circle" class="size-5 shrink-0" />
           <span>
             When policies run from a document, the policy-level agent type is bypassed.
@@ -305,7 +305,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
         <%!-- Conflict notice --%>
         <%= if conflict_detected?(@document) do %>
-          <div class="alert alert-warning">
+          <div class="eits-alert eits-alert--warning">
             <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
             <span>
               This document contains both allow and deny policies that may overlap.
@@ -315,8 +315,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         <% end %>
 
         <%!-- Policies section --%>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
             <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-semibold flex items-center gap-2">
                 <.icon name="hero-shield-check" class="size-5" /> Policies in this document
@@ -410,8 +410,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         </section>
 
         <%!-- Attached agent types section --%>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
             <h2 class="text-lg font-semibold flex items-center gap-2">
               <.icon name="hero-cpu-chip" class="size-5" /> Attached agent types
               <span class="eits-chip eits-chip--muted">

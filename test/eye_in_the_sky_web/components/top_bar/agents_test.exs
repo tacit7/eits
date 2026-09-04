@@ -22,14 +22,14 @@ defmodule EyeInTheSkyWeb.TopBar.AgentsTest do
       html = render_component(&Agents.toolbar/1, %{})
 
       assert html =~ "Source:"
-      assert html =~ "agents-scope-dropdown"
+      assert html =~ "agents-scope-relative"
     end
 
     test "renders sort dropdown" do
       html = render_component(&Agents.toolbar/1, %{})
 
       assert html =~ "Sort:"
-      assert html =~ "agents-sort-dropdown"
+      assert html =~ "agents-sort-relative"
     end
 
     test "renders all scope options" do
@@ -84,7 +84,7 @@ defmodule EyeInTheSkyWeb.TopBar.AgentsTest do
     test "renders dropdown detail elements" do
       html = render_component(&Agents.toolbar/1, %{})
 
-      assert html =~ "dropdown"
+      assert html =~ "eits-menu"
     end
 
     test "renders with default scope and sort labels when no props passed" do

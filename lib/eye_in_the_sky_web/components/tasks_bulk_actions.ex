@@ -27,9 +27,9 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
             {MapSet.size(@selected_task_ids)} selected
           </span>
           <details
-            id="tasks-bulk-state-dropdown"
+            id="tasks-bulk-state-relative"
             phx-update="ignore"
-            class="dropdown"
+            class="relative"
           >
             <summary class="eits-action eits-action--ghost eits-action--touch gap-1 [list-style:none] [&::-webkit-details-marker]:hidden">
               <.icon name="hero-arrows-right-left-mini" class="size-3.5" /> Move to
@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
                 class="size-3 opacity-50"
               />
             </summary>
-            <ul class="dropdown-content z-50 mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-1 min-w-[140px]">
+            <ul class="eits-menu absolute z-50 mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-1 min-w-[140px]">
               <%= for state <- @workflow_states do %>
                 <li>
                   <button
@@ -93,9 +93,9 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
     ~H"""
     <dialog
       id="tasks-archive-confirm-modal"
-      class={"modal modal-bottom sm:modal-middle " <> if(@show, do: "modal-open", else: "")}
+      class={"eits-modal   " <> if(@show, do: "eits-modal-open", else: "")}
     >
-      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+      <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive tasks</h3>
         <p class="py-4 text-message text-base-content/70">
           <% count = MapSet.size(@selected_task_ids) %> Archive {count} selected task{if count == 1,
@@ -103,7 +103,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
             else: "s"}?
           Archived tasks can be unarchived later.
         </p>
-        <div class="modal-action">
+        <div class="eits-panel__actions">
           <button
             phx-click="cancel_archive_selected_tasks"
             class="eits-action eits-action--ghost eits-action--touch"
@@ -118,7 +118,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
           </button>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button phx-click="cancel_archive_selected_tasks">close</button>
       </form>
     </dialog>

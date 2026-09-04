@@ -450,7 +450,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-8">
       <div class="max-w-4xl mx-auto space-y-6">
-        <div class="tabs tabs-bordered overflow-x-auto flex-nowrap whitespace-nowrap">
+        <div class="eits-tabs overflow-x-auto flex-nowrap whitespace-nowrap">
           <%= for {label, key} <- [
             {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
             {"Providers", "providers"},
@@ -458,7 +458,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
             {"Desktop", "desktop"}
           ] do %>
             <button
-              class={"tab #{if @active_tab == String.to_existing_atom(key), do: "tab-active", else: ""}"}
+              class={
+                "eits-tab #{if @active_tab == String.to_existing_atom(key), do: "eits-tab--active", else: ""}"
+              }
               phx-click="set_tab"
               phx-value-tab={key}
             >

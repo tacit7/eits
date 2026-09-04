@@ -267,12 +267,12 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
 
   defp cron_reference(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-box">
+    <div class="eits-disclosure  bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2 px-3 flex items-center gap-1.5 text-mini text-base-content/60">
+      <div class="eits-disclosure__summary min-h-0 py-2 px-3 flex items-center gap-1.5 text-mini text-base-content/60">
         <.icon name="hero-question-mark-circle" class="size-3.5" /> Cron syntax reference
       </div>
-      <div class="collapse-content px-3 pb-3">
+      <div class="eits-disclosure__content px-3 pb-3">
         <div class="overflow-x-auto">
           <table class="table table-xs w-full">
             <thead>
@@ -352,12 +352,12 @@ defmodule EyeInTheSkyWeb.Components.AgentScheduleForm do
     assigns = assign(assigns, :config, config)
 
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-box">
+    <div class="eits-disclosure  bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
+      <div class="eits-disclosure__summary min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced CLI Flags
       </div>
-      <div class="collapse-content px-3 pb-3 space-y-3">
+      <div class="eits-disclosure__content px-3 pb-3 space-y-3">
         <.budget_and_turns_row
           max_budget_usd={@config["max_budget_usd"]}
           max_turns={@config["max_turns"]}

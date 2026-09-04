@@ -163,7 +163,7 @@ export const ModelSelectorPopup = {
       const visible = expanded ? models : primary
       const hiddenCount = expanded ? 0 : legacy.length
 
-      html += `<div class="menu-title text-mini px-3 pt-2 pb-0.5 text-base-content/40">${this._esc(group)}</div>`
+      html += `<div class="eits-menu__label text-mini px-3 pt-2 pb-0.5 text-base-content/40">${this._esc(group)}</div>`
       html += visible.map((m) => this._rowHtml(m, q)).join("")
 
       if (hiddenCount > 0) {

@@ -247,7 +247,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Config do
       <div class="h-[calc(100dvh-10rem)]">
         <div class="p-6">
           <%= if @error do %>
-            <div class="alert alert-error mb-4">
+            <div class="eits-alert eits-alert--error mb-4">
               <.icon name="hero-x-circle" class="shrink-0 size-6" />
               <span>{@error}</span>
             </div>

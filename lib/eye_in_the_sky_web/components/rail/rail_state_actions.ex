@@ -37,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   end
 
   @doc """
-  Toggles the flyout panel (rail collapse). Fired by the vsbar toggle button,
+  Toggles the flyout panel (rail disclosure). Fired by the vsbar toggle button,
   the hover chevron on the rail divider, and double-click on the divider —
   one state, three affordances. Persisted via the RailState hook's
   save_rail_state localStorage patch.

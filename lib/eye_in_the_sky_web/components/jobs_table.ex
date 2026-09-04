@@ -54,7 +54,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
             >
               <%!-- Status icon: spinner when running, coloured dot otherwise --%>
               <%= if job_state == :running do %>
-                <span class="loading loading-spinner loading-xs text-primary flex-shrink-0" />
+                <span class=" spinner spinner--xs text-primary flex-shrink-0" />
               <% else %>
                 <span class={[
                   "size-2 rounded-full flex-shrink-0",

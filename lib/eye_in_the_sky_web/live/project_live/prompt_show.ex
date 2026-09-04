@@ -172,22 +172,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
               <div class="text-mini text-base-content/50 uppercase font-semibold">Slug</div>
               <code class="text-message font-mono mt-1">{@prompt.slug}</code>
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
               <div class="text-mini text-base-content/50 uppercase font-semibold">Version</div>
               <div class="text-lg font-semibold mt-1">v{@prompt.version}</div>
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
               <div class="text-mini text-base-content/50 uppercase font-semibold">Created</div>
               <div class="text-message mt-1" title={format_datetime_full(@prompt.created_at)}>
                 {relative_time(@prompt.created_at)}
@@ -195,8 +195,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
               <div class="text-mini text-base-content/50 uppercase font-semibold">Updated</div>
               <div class="text-message mt-1" title={format_datetime_full(@prompt.updated_at)}>
                 {relative_time(@prompt.updated_at)}
@@ -210,10 +210,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
             for={@form}
             phx-change="validate"
             phx-submit="save"
-            class="card bg-base-100 shadow-xl"
+            class="eits-panel bg-base-100 shadow-xl"
           >
-            <div class="card-body">
-              <h2 class="card-title text-lg">Edit Prompt</h2>
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Edit Prompt</h2>
 
               <div class="form-control mt-4">
                 <label class="label">
@@ -249,15 +249,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
                 />
               </div>
 
-              <div class="card-actions justify-end mt-6">
+              <div class="eits-panel__actions justify-end mt-6">
                 <.form_actions submit_text="Save Changes" cancel_event="cancel_edit" />
               </div>
             </div>
           </.form>
         <% else %>
-          <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-              <h2 class="card-title text-lg">Prompt Text</h2>
+          <div class="eits-panel bg-base-100 shadow-xl">
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Prompt Text</h2>
               <div class="mockup-code mt-4">
                 <pre class="px-6 py-4 whitespace-pre-wrap break-words"><code>{@prompt.prompt_text}</code></pre>
               </div>
@@ -266,9 +266,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
         <% end %>
 
         <%= if @prompt.tags || @prompt.created_by || @prompt.project_id do %>
-          <div class="card bg-base-100 shadow-xl mt-6">
-            <div class="card-body">
-              <h2 class="card-title text-lg">Additional Information</h2>
+          <div class="eits-panel bg-base-100 shadow-xl mt-6">
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Additional Information</h2>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
                 <%= if @prompt.tags do %>
                   <div>

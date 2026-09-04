@@ -216,8 +216,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTabTest do
           notes: notes
         )
 
-      assert html =~ "collapse"
-      assert html =~ "collapse-arrow"
+      assert html =~ "eits-disclosure"
+      assert html =~ "eits-disclosure__summary"
     end
 
     test "renders note with unique id" do

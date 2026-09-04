@@ -338,7 +338,7 @@ export function itemsFor(type, dataset, isTauri) {
   const builder = REGISTRY[type]
   if (!builder) return null
   const items = builder(dataset).filter((it) => !it.tauri || isTauri)
-  // collapse leading/trailing/doubled separators after filtering
+  // disclosure leading/trailing/doubled separators after filtering
   const out = []
   for (const it of items) {
     if (it.sep && (out.length === 0 || out[out.length - 1].sep)) continue

@@ -289,7 +289,7 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       # 640px+ (sm breakpoint) uses modal-middle
       {:ok, _view, html} = live(conn, ~p"/")
 
-      assert html =~ "modal-bottom sm:modal-middle"
+      assert html =~ "eits-modal"
     end
 
     test "command palette input has descriptive placeholder", %{conn: conn} do

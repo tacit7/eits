@@ -1109,7 +1109,7 @@
     </div>
   {/if}
 
-  <!-- Composer (matches DM page card style) -->
+  <!-- Composer (matches DM page panel style) -->
   <div class="flex-shrink-0 pt-2 px-4 pb-3">
   <div class="max-w-[960px]">
     <form
@@ -1215,15 +1215,15 @@
   {/if}
 
   {#if inspectMessage}
-    <dialog bind:this={inspectDialog} class="modal" aria-labelledby="inspect-title" on:close={closeInspect}>
-      <div class="modal-box max-w-2xl">
+    <dialog bind:this={inspectDialog} class="eits-modal" aria-labelledby="inspect-title" on:close={closeInspect}>
+      <div class="eits-dialog max-w-2xl">
         <div class="flex items-center justify-between mb-3">
           <h3 id="inspect-title" class="font-bold text-message">Message #{inspectMessage.id}</h3>
           <button class="eits-action eits-action--ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
         </div>
         <pre class="text-mini bg-base-200 rounded-box p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button>close</button>
       </form>
     </dialog>

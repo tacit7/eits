@@ -171,7 +171,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                 "py-0.5",
                 selected? && "relative"
               ]}>
-                <div id={"skill-collapse-#{skill.id}"} class="collapse overflow-visible">
+                <div id={"skill-disclosure-#{skill.id}"} class="eits-disclosure overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"
@@ -180,7 +180,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   />
                   <div
                     class={[
-                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
+                      "eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
                       if(selected?,
                         do: "bg-primary/5",
                         else: "hover:bg-base-content/4"
@@ -225,7 +225,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                     </div>
                   </div>
                   <%!-- Mobile inline viewer --%>
-                  <div class="collapse-content md:hidden px-3 pb-3">
+                  <div class="eits-disclosure__content md:hidden px-3 pb-3">
                     <div
                       id={"skill-mobile-#{skill.id}"}
                       class="dm-markdown text-message text-base-content leading-relaxed mt-2"

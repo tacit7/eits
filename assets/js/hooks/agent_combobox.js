@@ -7,7 +7,7 @@
 // Codex-flagged bugs addressed:
 //   1. Tuple encoding — handled server-side (tuples → lists before Jason.encode!)
 //   2. HEEx JSON quoting — browser HTML parser restores &quot; → " before JS reads it; no issue
-//   3. Enter key form submit — preventDefault when dropdown is open
+//   3. Enter key form submit — preventDefault when relative is open
 //   4. updated() mid-selection — guard with previousAgentsJson diff
 
 export const AgentCombobox = {
@@ -62,7 +62,7 @@ export const AgentCombobox = {
     if (newJson === this._previousAgentsJson) return
     this._previousAgentsJson = newJson
     this._agents = this._parseAgents()
-    // Re-render only if dropdown is already open
+    // Re-render only if relative is already open
     if (this._open) this._filter()
   },
 
@@ -172,7 +172,7 @@ export const AgentCombobox = {
       e.preventDefault()
       this._setActive((this._activeIndex - 1 + count) % count)
     } else if (e.key === "Enter") {
-      // Prevent form submit while dropdown is open
+      // Prevent form submit while relative is open
       e.preventDefault()
       const active = items[this._activeIndex]
       if (active) this._select(active.dataset.slug, active.dataset.label)

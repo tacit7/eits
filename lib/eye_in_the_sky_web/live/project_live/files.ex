@@ -384,7 +384,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     ~H"""
     <%= if @error do %>
       <div class="p-4">
-        <div class="alert alert-error">
+        <div class="eits-alert eits-alert--error">
           <.icon name="hero-x-circle" class="shrink-0 size-6" />
           <span>{@error}</span>
         </div>
@@ -573,7 +573,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       >
         <div class="p-3 md:p-4">
           <h2 class="text-message font-semibold text-base-content/80 mb-2">Files</h2>
-          <ul class="menu menu-sm bg-base-200 rounded-box max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
+          <ul class="eits-menu-list bg-base-200 rounded-box max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
             <.tree_item :for={item <- @file_tree} item={item} project_id={@project.id} />
           </ul>
         </div>
@@ -622,7 +622,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <%!-- Directory Listing --%>
         <div class="p-6">
           <%= if @error do %>
-            <div class="alert alert-error mb-4">
+            <div class="eits-alert eits-alert--error mb-4">
               <.icon name="hero-x-circle" class="shrink-0 size-6" />
               <span>{@error}</span>
             </div>

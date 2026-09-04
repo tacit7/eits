@@ -12,9 +12,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
       id="quick-create-task"
       phx-hook="QuickCreateTask"
       data-project-id={@project_id}
-      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+      class="eits-modal   p-0 bg-transparent"
     >
-      <div class="modal-box max-w-lg p-0 overflow-hidden">
+      <div class="eits-dialog max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-message font-semibold text-base-content">New Task</h2>
           <button
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.TaskDialog do
           </div>
         </form>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button>close</button>
       </form>
     </dialog>

@@ -1,11 +1,11 @@
 // assets/js/hooks/diff_collapse.js
-// Intercepts the DaisyUI collapse checkbox for commit diffs.
+// Intercepts the DaisyUI disclosure checkbox for commit diffs.
 //
 // First click (diff not yet cached):
-//   - Prevents the collapse from opening immediately
+//   - Prevents the disclosure from opening immediately
 //   - Shows a spinner in the commit header
 //   - Pushes load_diff to LiveView
-//   - updated() auto-opens the collapse once data-loaded becomes "true"
+//   - updated() auto-opens the disclosure once data-loaded becomes "true"
 //
 // Subsequent clicks: normal checkbox toggle (diff already in cache).
 

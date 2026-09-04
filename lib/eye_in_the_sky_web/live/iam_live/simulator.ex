@@ -199,9 +199,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
       </p>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section class="card bg-base-200">
-          <div class="card-body space-y-4">
-            <h2 class="card-title text-lg">Input</h2>
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body space-y-4">
+            <h2 class="eits-panel__title text-lg">Input</h2>
 
             <div class="flex flex-wrap gap-2">
               <button
@@ -372,7 +372,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
             <.winner_card decision={@result.decision} />
             <.instructions_list instructions={@result.decision.instructions} />
           <% else %>
-            <div class="alert">
+            <div class="eits-alert">
               <.icon name="hero-information-circle" class="size-5" />
               <span>Fill in the form and click Simulate to see a decision and per-policy trace.</span>
             </div>
@@ -382,9 +382,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
 
       <%= if @result do %>
         <%= if @result.document_contributions != [] do %>
-          <section class="card bg-base-200">
-            <div class="card-body">
-              <h2 class="card-title text-lg flex items-center gap-2">
+          <section class="eits-panel bg-base-200">
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg flex items-center gap-2">
                 <.icon name="hero-document-text" class="size-5" /> Document contributions
               </h2>
               <div class="flex flex-wrap gap-2">
@@ -407,9 +407,9 @@ defmodule EyeInTheSkyWeb.IAMLive.Simulator do
           </section>
         <% end %>
 
-        <section class="card bg-base-200">
-          <div class="card-body">
-            <h2 class="card-title text-lg flex items-center gap-2">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body">
+            <h2 class="eits-panel__title text-lg flex items-center gap-2">
               <.icon name="hero-queue-list" class="size-5" /> Trace
               <span class="rounded-box bg-base-content/10 px-2 py-0.5 text-mini font-medium text-base-content/55">
                 {length(@result.traces)}

@@ -296,14 +296,14 @@ eits-chip eits-chip--warning   -> compact labels</code></pre>
               Flash (inline preview — not toast position)
             </p>
             <div class="space-y-2">
-              <div class="alert alert-info w-full sm:w-96">
+              <div class="eits-alert eits-alert--info w-full sm:w-96">
                 <.icon name="hero-information-circle" class="size-5 shrink-0" />
                 <div>
                   <p class="font-semibold">Info flash</p>
                   <p>This is an informational message.</p>
                 </div>
               </div>
-              <div class="alert alert-error w-full sm:w-96">
+              <div class="eits-alert eits-alert--error w-full sm:w-96">
                 <.icon name="hero-exclamation-circle" class="size-5 shrink-0" />
                 <div>
                   <p class="font-semibold">Error flash</p>
@@ -333,7 +333,7 @@ eits-chip eits-chip--warning   -> compact labels</code></pre>
           </.tab_pills>
           <div class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto">
             <p class="text-warning mb-1 not-italic font-sans text-mini uppercase tracking-normal">
-              Note: Never use DaisyUI `tabs`. This bespoke pattern is canonical.
+              Note: Use EITS tabs for this surface.
             </p>
             <pre><code>bg-base-200/40 rounded-box p-0.5       ← container
 bg-base-100 shadow-sm                  ← active tab
@@ -349,28 +349,28 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
         </h2>
         <div class="p-4 bg-base-200/30 rounded-box border border-base-content/5 space-y-4">
           <div class="flex items-start gap-4">
-            <details phx-update="ignore" id="demo-dropdown" class="dropdown dropdown-end">
+            <details phx-update="ignore" id="demo-relative" class="relative ">
               <summary
                 aria-label="Open menu"
                 class="eits-action eits-action--ghost eits-action--icon !h-8 !min-h-0 !min-w-8"
               >
                 <.icon name="hero-ellipsis-horizontal" class="size-4" />
               </summary>
-              <ul class="dropdown-content menu bg-base-100 border border-base-content/10 rounded-box shadow-lg w-48 z-50">
+              <ul class="eits-menu absolute eits-menu-list bg-base-100 border border-base-content/10 rounded-box shadow-lg w-48 z-50">
                 <li><button>Edit</button></li>
                 <li><button>Duplicate</button></li>
                 <li class="text-error"><button>Delete</button></li>
               </ul>
             </details>
             <div class="text-message text-base-content/60">
-              Click the ellipsis to open the dropdown.
+              Click the ellipsis to open the relative.
             </div>
           </div>
           <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code><.icon name="hero-information-circle" class="size-3 inline" /> Always &lt;details&gt; + phx-update="ignore". Never JS-toggled.
 
-&lt;details phx-update="ignore" id="demo-dropdown" class="dropdown dropdown-end"&gt;
+&lt;details phx-update="ignore" id="demo-relative" class="relative "&gt;
   &lt;summary class="eits-action eits-action--ghost eits-action--icon !h-8 !min-h-0 !min-w-8"&gt;...&lt;/summary&gt;
-  &lt;ul class="dropdown-content menu bg-base-100 border border-base-content/10
+  &lt;ul class="eits-menu absolute eits-menu-list bg-base-100 border border-base-content/10
              rounded-box shadow-lg w-48 z-50"&gt;
     &lt;li&gt;&lt;button&gt;Edit&lt;/button&gt;&lt;/li&gt;
     ...
@@ -392,22 +392,22 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
             Open demo modal
           </button>
 
-          <dialog id="demo-modal" class="modal modal-bottom sm:modal-middle">
-            <div class="modal-box">
+          <dialog id="demo-modal" class="eits-modal  ">
+            <div class="eits-dialog">
               <h3 class="text-xl font-semibold mb-1">Demo Modal</h3>
               <p class="text-message text-base-content/60 mb-4">
-                This is the canonical EITS modal using <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal modal-bottom sm:modal-middle</code>. On mobile it slides up from the bottom; on sm+ it centers.
+                This is the canonical EITS modal using <code class="font-mono bg-base-content/[0.07] px-1 rounded">eits-modal</code>. On mobile it slides up from the bottom; on sm+ it centers.
               </p>
               <p class="text-message mb-4">
                 Always use a native
                 <code class="font-mono bg-base-content/[0.07] px-1 rounded">&lt;dialog&gt;</code>
-                element with DaisyUI
-                <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal</code>
+                element with EITS
+                <code class="font-mono bg-base-content/[0.07] px-1 rounded">eits-modal</code>
                 classes. Call
                 <code class="font-mono bg-base-content/[0.07] px-1 rounded">showModal()</code>
                 via JS.
               </p>
-              <div class="modal-action">
+              <div class="eits-panel__actions">
                 <form method="dialog">
                   <button class="eits-action eits-action--ghost h-8 min-h-0 px-3 text-mini">
                     Close
@@ -415,22 +415,22 @@ text-base-content/60 hover:bg-base-200/60  ← inactive tab</code></pre>
                 </form>
               </div>
             </div>
-            <form method="dialog" class="modal-backdrop">
+            <form method="dialog" class="eits-modal-backdrop">
               <button>close</button>
             </form>
           </dialog>
 
-          <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code>&lt;dialog id="my-modal" class="modal modal-bottom sm:modal-middle"&gt;
-  &lt;div class="modal-box"&gt;
+          <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code>&lt;dialog id="my-modal" class="eits-modal  "&gt;
+  &lt;div class="eits-dialog"&gt;
     &lt;h3 class="text-xl font-semibold"&gt;Title&lt;/h3&gt;
     ...content...
-    &lt;div class="modal-action"&gt;
+    &lt;div class="eits-panel__actions"&gt;
       &lt;form method="dialog"&gt;
         &lt;button class="eits-action eits-action--ghost h-8 min-h-0 px-3 text-mini"&gt;Close&lt;/button&gt;
       &lt;/form&gt;
     &lt;/div&gt;
   &lt;/div&gt;
-  &lt;form method="dialog" class="modal-backdrop"&gt;
+  &lt;form method="dialog" class="eits-modal-backdrop"&gt;
     &lt;button&gt;close&lt;/button&gt;
   &lt;/form&gt;
 &lt;/dialog&gt;</code></pre>
@@ -839,9 +839,9 @@ overflow menu: phx-update="ignore"      ← survives stream re-inserts
             </div>
           </div>
 
-          <%!-- Grid card --%>
+          <%!-- Grid panel --%>
           <div>
-            <p class="text-mini text-base-content/40 mb-2">Grid card (fixed width)</p>
+            <p class="text-mini text-base-content/40 mb-2">Grid panel (fixed width)</p>
             <div class="group w-56 p-3 border border-base-content/10 rounded-box bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
               <div class="flex items-start justify-between mb-2">
                 <span class="eits-chip eits-chip--warning">In Progress</span>
@@ -857,10 +857,10 @@ overflow menu: phx-update="ignore"      ← survives stream re-inserts
             </div>
           </div>
 
-          <%!-- Kanban card --%>
+          <%!-- Kanban panel --%>
           <div>
             <p class="text-mini text-base-content/40 mb-2">
-              Kanban card (fixed width, more detail)
+              Kanban panel (fixed width, more detail)
             </p>
             <div class="w-64 p-3 border border-base-content/10 rounded-box bg-base-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
               <div class="flex items-center justify-between mb-2">
@@ -907,8 +907,8 @@ overflow menu: phx-update="ignore"      ← survives stream re-inserts
             Open layout demo modal
           </button>
 
-          <dialog id="layout-demo-modal" class="modal modal-bottom sm:modal-middle">
-            <div class="modal-box max-w-lg">
+          <dialog id="layout-demo-modal" class="eits-modal  ">
+            <div class="eits-dialog max-w-lg">
               <div class="flex items-center justify-between mb-6">
                 <h2 class="text-xl font-semibold">New Item</h2>
                 <form method="dialog">
@@ -923,14 +923,14 @@ overflow menu: phx-update="ignore"      ← survives stream re-inserts
               <p class="text-message text-base-content/60 mb-4">
                 Form content goes here. Uses
                 <code class="font-mono bg-base-content/[0.07] px-1 rounded">
-                  modal-box max-w-lg
+                  eits-dialog max-w-lg
                 </code>
                 with a <code class="font-mono bg-base-content/[0.07] px-1 rounded">modal_header</code>-style close button.
               </p>
               <div class="space-y-3">
                 <.input field={@form[:modal_name]} label="Name" placeholder="Enter a name…" />
               </div>
-              <div class="modal-action">
+              <div class="eits-panel__actions">
                 <form method="dialog" class="flex gap-2">
                   <button class="eits-action eits-action--ghost h-8 min-h-0 px-3 text-mini">
                     Cancel
@@ -941,15 +941,15 @@ overflow menu: phx-update="ignore"      ← survives stream re-inserts
                 </form>
               </div>
             </div>
-            <form method="dialog" class="modal-backdrop">
+            <form method="dialog" class="eits-modal-backdrop">
               <button>close</button>
             </form>
           </dialog>
 
-          <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code>modal modal-bottom sm:modal-middle   ← responsive: bottom sheet on mobile, centered on sm+
-modal-box max-w-lg                   ← constrained width
-modal-backdrop form[method=dialog]   ← click-outside to close
-modal-action                         ← right-aligned action buttons</code></pre>
+          <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code>eits-modal     ← responsive: bottom sheet on mobile, centered on sm+
+eits-dialog max-w-lg                   ← constrained width
+eits-modal-backdrop form[method=dialog]   ← click-outside to close
+eits-panel__actions                         ← right-aligned action buttons</code></pre>
         </div>
       </section>
 
@@ -1146,7 +1146,7 @@ no CTA in top bar; actions in-form</code></pre>
             <code class="font-mono bg-base-content/[0.06] px-1 rounded">
               [object name][flex-1 toolbar][CTA]
             </code>
-            · All controls h-7 · One CTA max · Filter = pill group · Sort = dropdown button
+            · All controls h-7 · One CTA max · Filter = pill group · Sort = relative button
           </p>
           <pre class="bg-base-content/[0.04] rounded-box p-3 text-mini font-mono overflow-x-auto"><code>h-10 bg-base-100 border-b border-base-content/8 px-3 gap-2
 
@@ -1168,7 +1168,7 @@ All children: shrink-0</code></pre>
           <p class="text-mini text-base-content/50">
             Pattern: <strong class="text-base-content/70">filter = pill group</strong>
             (state visible at a glance) ·
-            <strong class="text-base-content/70">sort = dropdown button</strong>
+            <strong class="text-base-content/70">sort = relative button</strong>
             (incidental, collapses to save space) · no
             <code class="font-mono bg-base-content/[0.06] px-1 rounded">&lt;select&gt;</code>
             anywhere.
@@ -1178,7 +1178,7 @@ All children: shrink-0</code></pre>
           <%!-- Active pill: bg-base-100 text-base-content shadow-sm --%>
           <%!-- Inactive pill: text-base-content/45 (no bg) --%>
           <%!-- Pill group container: bg-base-200/40 rounded-box p-0.5 shrink-0 flex items-center gap-0.5 --%>
-          <%!-- Sort dropdown: h-7 px-2.5 flex items-center gap-1 rounded-box border border-base-content/10 text-mini text-base-content/60 shrink-0 --%>
+          <%!-- Sort relative: h-7 px-2.5 flex items-center gap-1 rounded-box border border-base-content/10 text-mini text-base-content/60 shrink-0 --%>
 
           <%!-- 1. Sessions — Index / List --%>
           <div>
@@ -1821,7 +1821,7 @@ All children: shrink-0</code></pre>
             </div>
           </div>
           <p class="text-micro text-base-content/30 mt-1.5 px-1">
-            Rail · top bar with filter pills + sort dropdown · padded content · status dots · task pill on row 1
+            Rail · top bar with filter pills + sort relative · padded content · status dots · task pill on row 1
           </p>
         </div>
 

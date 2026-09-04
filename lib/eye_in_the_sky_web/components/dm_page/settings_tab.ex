@@ -139,7 +139,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
 
   defp subtab_nav(assigns) do
     ~H"""
-    <div role="tablist" class="tabs tabs-bordered">
+    <div role="tablist" class="eits-tabs ">
       <.subtab_button subtab={@subtab} value="general" label="General" />
       <.subtab_button
         :if={@provider == "claude"}
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
       type="button"
       id={"dm-subtab-#{@value}"}
       role="tab"
-      class={["tab", @subtab == @value && "tab-active"]}
+      class={["eits-tab", @subtab == @value && "eits-tab--active"]}
       phx-click="dm_setting_subtab"
       phx-value-subtab={@value}
     >

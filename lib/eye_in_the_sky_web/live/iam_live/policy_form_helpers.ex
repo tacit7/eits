@@ -72,8 +72,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
 
   def policy_form_fields(assigns) do
     ~H"""
-    <section class="card bg-base-200">
-      <div class="card-body p-4 space-y-3">
+    <section class="eits-panel bg-base-200">
+      <div class="eits-panel__body p-4 space-y-3">
         <div class="flex items-center justify-between">
           <h2 class="font-semibold flex items-center gap-2">
             <.icon name="hero-funnel" class="size-5" /> Scope
@@ -150,8 +150,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyFormHelpers do
       </div>
     </section>
 
-    <section class="card bg-base-200">
-      <div class="card-body p-4 space-y-2">
+    <section class="eits-panel bg-base-200">
+      <div class="eits-panel__body p-4 space-y-2">
         <div class="flex items-center justify-between">
           <h2 class="font-semibold flex items-center gap-2">
             <.icon name="hero-code-bracket" class="size-5" /> Condition (JSON)

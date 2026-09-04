@@ -105,9 +105,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
         for={@form}
         phx-change="validate"
         phx-submit="save"
-        class="card bg-base-100 shadow-xl max-w-3xl"
+        class="eits-panel bg-base-100 shadow-xl max-w-3xl"
       >
-        <div class="card-body gap-4">
+        <div class="eits-panel__body gap-4">
           <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Name <span class="text-error">*</span></span>
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
             />
           </div>
 
-          <div class="card-actions justify-end mt-2">
+          <div class="eits-panel__actions justify-end mt-2">
             <%= if @project do %>
               <.link
                 navigate={~p"/projects/#{@project.id}/prompts"}

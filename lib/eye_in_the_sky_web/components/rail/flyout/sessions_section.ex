@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
         <% visible = Map.get(@session_project_visible, project.id, 5) %>
         <% shown = if collapsed, do: [], else: Enum.take(project_sessions, visible) %>
         <% has_more = not collapsed and length(project_sessions) > visible %>
-        <%!-- Project header — click to collapse/expand --%>
+        <%!-- Project header — click to disclosure/expand --%>
         <div class="flex items-center justify-between px-3 pt-3 pb-1 group/proj select-none">
           <button
             phx-click="toggle_project_sessions"

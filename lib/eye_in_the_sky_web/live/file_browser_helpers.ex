@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.Live.FileBrowserHelpers do
   Shared helpers for file-browser LiveViews.
 
   Provides:
-  - `file_listing/1` — responsive mobile-card / desktop-table directory listing component
+  - `file_listing/1` — responsive mobile-panel / desktop-table directory listing component
   - `read_file_for_display/4` — socket-aware file reader shared by OverviewLive.Config
     and ProjectLive.Config
 

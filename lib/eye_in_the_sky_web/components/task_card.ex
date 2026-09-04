@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.TaskCard do
   @moduledoc """
-  Thin dispatcher for task card variants.
+  Thin dispatcher for task panel variants.
 
   Delegates to:
   - `TaskCard.KanbanCard` — kanban board cards

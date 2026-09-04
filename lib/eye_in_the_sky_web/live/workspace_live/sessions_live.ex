@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         class="py-4 flex justify-center"
       >
         <%= if @has_more do %>
-          <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+          <span class=" spinner spinner--sm text-base-content/30"></span>
         <% end %>
       </div>
 

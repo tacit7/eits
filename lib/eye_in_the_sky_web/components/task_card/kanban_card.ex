@@ -1,6 +1,6 @@
 defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
   @moduledoc """
-  Kanban card content components: card body, context menu, and footer.
+  Kanban panel content components: panel body, context menu, and footer.
   """
 
   use Phoenix.Component
@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
     ~H"""
     <div
       class={[
-        "group/card card bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer",
+        "group/panel panel bg-base-200 hover:bg-base-300 border border-base-content/8 transition-all cursor-pointer",
         @aging && elem(@aging, 0)
       ]}
       {@rest}
@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
           style={"background-color: #{priority_bar_color(Map.get(@task, :priority))}"}
         />
       <% end %>
-      <div class="card-body p-2">
+      <div class="eits-panel__body p-2">
         <.kanban_card_content
           task={@task}
           task_id={@task_id}
@@ -135,13 +135,13 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
 
   defp kanban_context_menu(assigns) do
     ~H"""
-    <div class="flex-shrink-0 md:opacity-0 md:group-hover/card:opacity-100 transition-opacity">
-      <details id={"kanban-menu-#{@task_id}"} phx-update="ignore" class="dropdown dropdown-end">
+    <div class="flex-shrink-0 md:opacity-0 md:group-hover/panel:opacity-100 transition-opacity">
+      <details id={"kanban-menu-#{@task_id}"} phx-update="ignore" class="relative ">
         <summary class="flex items-center justify-center min-w-[44px] min-h-[44px] -mx-2.5 rounded-box text-base-content/25 hover:text-base-content/60 hover:bg-base-content/8 cursor-pointer list-none transition-colors">
           <.icon name="hero-ellipsis-horizontal-mini" class="size-3.5" />
         </summary>
-        <div class="dropdown-content z-50 mt-1 w-48 rounded-box bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
-          <%!-- Open card --%>
+        <div class="eits-menu absolute z-50 mt-1 w-48 rounded-box bg-base-300 shadow-xl p-1.5 flex flex-col gap-0.5">
+          <%!-- Open panel --%>
           <button
             type="button"
             phx-click={@on_click}
@@ -151,7 +151,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.KanbanCard do
             <.icon
               name="hero-rectangle-stack-mini"
               class="size-4 text-base-content/60 flex-shrink-0"
-            /> Open card
+            /> Open panel
           </button>
           <%!-- Edit labels --%>
           <button

@@ -230,7 +230,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.TasksTabTest do
         )
 
       # Collapse should be present but not have arrow if no expandable content
-      assert html =~ "collapse"
+      assert html =~ "eits-disclosure"
     end
 
     test "renders task uuid truncated to 8 characters" do

@@ -599,7 +599,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         </button>
 
         <%!-- Flyout toggle lives in the rail so it stays aligned with the icon strip.
-             Desktop uses the persisted collapse event; mobile opens/closes the drawer. --%>
+             Desktop uses the persisted disclosure event; mobile opens/closes the drawer. --%>
         <button
           id="rail-collapse-toggle"
           phx-click="toggle_collapsed"

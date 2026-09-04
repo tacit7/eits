@@ -16,17 +16,17 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
   def toolbar(assigns) do
     ~H"""
     <details
-      id="agents-scope-dropdown"
+      id="agents-scope-relative"
       phx-update="ignore"
       phx-hook="SortDropdown"
       data-label={scope_label(@scope_filter)}
-      class="dropdown"
+      class="relative"
     >
       <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         Source: <span class="js-sort-label">{scope_label(@scope_filter)}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 min-w-[110px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
+      <ul class="eits-menu absolute z-50 mt-1 min-w-[110px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- scope_options() do %>
           <li>
             <button
@@ -43,17 +43,17 @@ defmodule EyeInTheSkyWeb.TopBar.Agents do
       </ul>
     </details>
     <details
-      id="agents-sort-dropdown"
+      id="agents-sort-relative"
       phx-update="ignore"
       phx-hook="SortDropdown"
       data-label={Helpers.sort_label(@sort_by, sort_options())}
-      class="dropdown"
+      class="relative"
     >
       <summary class="focus-ring flex h-7 cursor-pointer select-none items-center gap-1 rounded-box border border-base-content/8 bg-base-100 px-2 text-mini font-medium text-base-content/60 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
         Sort: <span class="js-sort-label">{Helpers.sort_label(@sort_by, sort_options())}</span>
         <.icon name="hero-chevron-down-mini" class="size-3 opacity-50" />
       </summary>
-      <ul class="dropdown-content z-50 mt-1 min-w-[140px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
+      <ul class="eits-menu absolute z-50 mt-1 min-w-[140px] rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
         <%= for {value, label} <- sort_options() do %>
           <li>
             <button

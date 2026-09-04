@@ -536,16 +536,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
 
         <dialog
           id="teams-archive-confirm-modal"
-          class={"modal modal-bottom sm:modal-middle " <> if(@show_archive_confirm, do: "modal-open", else: "")}
+          class={"eits-modal   " <> if(@show_archive_confirm, do: "eits-modal-open", else: "")}
         >
-          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+          <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
             <h3 class="text-lg font-bold">Archive teams</h3>
             <p class="py-4 text-message text-base-content/70">
               <% count = MapSet.size(@selected_ids) %> Archive {count} selected team{if count == 1,
                 do: "",
                 else: "s"}? Archived teams can be restored later.
             </p>
-            <div class="modal-action">
+            <div class="eits-panel__actions">
               <button
                 phx-click="cancel_archive_selected"
                 class="eits-action eits-action--ghost eits-action--touch"
@@ -560,7 +560,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               </button>
             </div>
           </div>
-          <form method="dialog" class="modal-backdrop">
+          <form method="dialog" class="eits-modal-backdrop">
             <button phx-click="cancel_archive_selected">close</button>
           </form>
         </dialog>

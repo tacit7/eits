@@ -118,9 +118,9 @@ export const ConfigChatGuide = {
 
   _setButtonLoading(loading) {
     this.el.disabled = loading
-    const existing = this.el.querySelector('.loading-spinner')
+    const existing = this.el.querySelector('.spinner')
     if (loading && !existing) {
-      this.el.insertAdjacentHTML('afterbegin', '<span class="loading loading-spinner loading-xs mr-1"></span>')
+      this.el.insertAdjacentHTML('afterbegin', '<span class="spinner spinner--xs mr-1"></span>')
     } else if (!loading && existing) {
       existing.remove()
     }

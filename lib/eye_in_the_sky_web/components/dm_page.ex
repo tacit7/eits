@@ -107,8 +107,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     >
       <%!-- Create note modal --%>
       <%= if @overlay_data.active_overlay == :create_note do %>
-        <div class="modal modal-open modal-bottom sm:modal-middle" id="create-note-modal">
-          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+        <div class="eits-modal eits-modal-open  " id="create-note-modal">
+          <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
             <h3 class="font-semibold text-message mb-3">Create Note</h3>
 
             <form id="create-note-form" phx-submit="create_note">
@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 ></textarea>
               </div>
 
-              <div class="modal-action">
+              <div class="eits-panel__actions">
                 <button
                   type="button"
                   phx-click="close_create_note_modal"
@@ -155,17 +155,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </form>
           </div>
-          <div class="modal-backdrop" phx-click="close_create_note_modal"></div>
+          <div class="eits-modal-backdrop" phx-click="close_create_note_modal"></div>
         </div>
       <% end %>
 
       <%!-- Reload confirm modal --%>
       <dialog
         id="dm-reload-confirm-modal"
-        class="modal modal-bottom sm:modal-middle"
+        class="eits-modal  "
         phx-hook="ReloadConfirmModal"
       >
-        <div class="modal-box pb-[env(safe-area-inset-bottom)]">
+        <div class="eits-dialog pb-[env(safe-area-inset-bottom)]">
           <h3 class="font-semibold text-message">Reload from file?</h3>
           <p class="py-3 text-message text-base-content/70">
             This will <strong class="text-warning">delete all messages</strong>
@@ -177,7 +177,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <span class="label-text text-message">Don't show this message again</span>
             </label>
           </div>
-          <div class="modal-action">
+          <div class="eits-panel__actions">
             <button data-reload-cancel class="eits-action eits-action--ghost eits-action--touch">
               Cancel
             </button>
@@ -189,15 +189,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             </button>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop">
+        <form method="dialog" class="eits-modal-backdrop">
           <button data-reload-cancel>close</button>
         </form>
       </dialog>
 
       <%!-- Schedule timer modal --%>
       <%= if @overlay_data.active_overlay == :schedule_timer do %>
-        <div class="modal modal-open modal-bottom sm:modal-middle" id="schedule-timer-modal">
-          <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+        <div class="eits-modal eits-modal-open  " id="schedule-timer-modal">
+          <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
             <h3 class="font-semibold text-message mb-3">
               {if @overlay_data.active_timer, do: "Edit Scheduled Message", else: "Schedule Message"}
             </h3>
@@ -252,7 +252,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 </div>
               </div>
 
-              <div class="modal-action">
+              <div class="eits-panel__actions">
                 <button
                   type="button"
                   phx-click="close_schedule_modal"
@@ -263,17 +263,17 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               </div>
             </form>
           </div>
-          <div class="modal-backdrop" phx-click="close_schedule_modal"></div>
+          <div class="eits-modal-backdrop" phx-click="close_schedule_modal"></div>
         </div>
       <% end %>
 
-      <%!-- Reload loading overlay --%>
+      <%!-- Reload  overlay --%>
       <div
         :if={@overlay_data.reloading}
         class="absolute inset-0 z-40 flex items-center justify-center bg-base-100/80 backdrop-blur-sm rounded-box"
       >
         <div class="flex flex-col items-center gap-3">
-          <span class="loading loading-spinner loading-lg text-primary"></span>
+          <span class=" spinner spinner--lg text-primary"></span>
           <p class="text-message text-base-content/60">Reloading messages...</p>
         </div>
       </div>
@@ -343,10 +343,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         />
       </div>
 
-      <%!-- Header card (desktop only) --%>
+      <%!-- Header panel (desktop only) --%>
       <div
         class="hidden max-w-6xl mx-auto w-full bg-base-200 rounded-box border border-base-content/10 shadow-sm mb-3 flex-shrink-0"
-        id="dm-header-card"
+        id="dm-header-panel"
       >
         <div class="px-4 sm:px-5 py-3" id="dm-header">
           <div class="flex items-center gap-2 min-w-0">

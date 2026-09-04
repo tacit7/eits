@@ -132,8 +132,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
       >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
-        <section class="card bg-base-200">
-          <div class="card-body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <.input
               field={@form[:name]}
               type="text"

@@ -15,7 +15,7 @@
  * 2. A MutationObserver on the stream container fires after each stream
  *    mutation (direct childList only — rows are direct children).
  * 3. On mutation: if _openDetailsId is still set, the user did not close the
- *    dropdown — the DOM swap did. Find the new element by ID and set open=true.
+ *    relative — the DOM swap did. Find the new element by ID and set open=true.
  */
 export const SessionsDropdownGuard = {
   mounted() {

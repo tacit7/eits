@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Details/summary dropdown for switching between workspace and project scope.
+  Details/summary relative for switching between workspace and project scope.
 
   Shows current context in the trigger. Workspace at top, then project list.
   Uses phx-update="ignore" with a stable id to preserve open state across LiveView patches.
@@ -77,7 +77,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
 
   def context_switcher(assigns) do
     ~H"""
-    <details id="context-switcher" phx-update="ignore" class="dropdown">
+    <details id="context-switcher" phx-update="ignore" class="relative">
       <summary class="focus-ring inline-flex min-h-[44px] cursor-pointer list-none items-center justify-center gap-1.5 rounded-box px-3 text-message font-medium text-base-content/80 transition-colors hover:bg-base-content/5 hover:text-base-content">
         <span class="text-message leading-tight">
           <%= if Scope.project?(@scope) do %>
@@ -90,8 +90,8 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
         </span>
         <.icon name="hero-chevron-down" class="size-3 text-base-content/50" />
       </summary>
-      <ul class="dropdown-content menu bg-base-100 border border-base-300 rounded-box shadow-sm w-48 z-50 p-1">
-        <li class="menu-title text-mini text-base-content/40 px-2 pt-1">WORKSPACE</li>
+      <ul class="eits-menu absolute eits-menu-list bg-base-100 border border-base-300 rounded-box shadow-sm w-48 z-50 p-1">
+        <li class="eits-menu__label text-mini text-base-content/40 px-2 pt-1">WORKSPACE</li>
         <li>
           <.link navigate={~p"/workspace/sessions"} class="gap-2 text-message">
             <.icon name="hero-squares-2x2" class="size-4" />
@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.Components.ScopeComponents do
             </span>
           </.link>
         </li>
-        <li class="menu-title text-mini text-base-content/40 px-2 pt-2">PROJECTS</li>
+        <li class="eits-menu__label text-mini text-base-content/40 px-2 pt-2">PROJECTS</li>
         <li :for={project <- @projects}>
           <.link
             navigate={~p"/projects/#{project.id}/sessions"}

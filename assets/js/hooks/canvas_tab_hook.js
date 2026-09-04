@@ -29,10 +29,10 @@ function getOrCreateHelp() {
 
   const card = document.createElement("div")
   card.style.cssText = "position:relative;z-index:1;min-width:280px"
-  card.className = "card bg-base-100 shadow-xl rounded-box"
+  card.className = "eits-panel bg-base-100 shadow-xl rounded-box"
 
   const body = document.createElement("div")
-  body.className = "card-body p-5 gap-3"
+  body.className = "eits-panel__body p-5 gap-3"
 
   const title = document.createElement("h3")
   title.className = "font-semibold text-message text-base-content/80"

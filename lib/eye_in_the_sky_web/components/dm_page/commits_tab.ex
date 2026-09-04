@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
               <% hash = commit.commit_hash || "" %>
               <% diff = Map.get(@diff_cache, hash) %>
               <div
-                class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                class="eits-disclosure  rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
                 id={"dm-commit-#{commit.id}"}
                 phx-hook="DiffCollapse"
                 data-hash={hash}
@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                 }
               >
                 <input type="checkbox" />
-                <div class="collapse-title py-3 px-4">
+                <div class="eits-disclosure__summary py-3 px-4">
                   <div class="flex items-center gap-3">
                     <.icon name="hero-code-bracket" class="size-4 flex-shrink-0 text-base-content/30" />
                     <div class="flex-1 min-w-0">
@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                         >
                         </time>
                         <span
-                          class="loading loading-spinner loading-xs hidden"
+                          class=" spinner spinner--xs hidden"
                           data-role="diff-spinner"
                         >
                         </span>
@@ -125,7 +125,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
                     </div>
                   </div>
                 </div>
-                <div class="collapse-content pb-2 overflow-x-auto">
+                <div class="eits-disclosure__content pb-2 overflow-x-auto">
                   <%= cond do %>
                     <% is_nil(diff) -> %>
                       <div></div>
@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.CommitsTab do
             <%= cond do %>
               <% is_nil(@cumulative_diff) -> %>
                 <div class="flex items-center gap-2 py-4 text-mini text-base-content/40">
-                  <span class="loading loading-spinner loading-xs"></span> Loading full diff&hellip;
+                  <span class=" spinner spinner--xs"></span> Loading full diff&hellip;
                 </div>
               <% @cumulative_diff == :error -> %>
                 <div class="py-4 text-mini text-error/60">

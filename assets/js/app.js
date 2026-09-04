@@ -193,13 +193,13 @@ topbar.config({
   shadowColor: "color-mix(in oklch, var(--color-base-content) 30%, transparent)",
 })
 // Track navigation kind so we can reset main scroll on full navigations only.
-// phx:page-loading-stop doesn't carry detail; capture kind from start and apply on stop.
+// phx:page--stop doesn't carry detail; capture kind from start and apply on stop.
 let _pendingNavKind = null
-window.addEventListener("phx:page-loading-start", (e) => {
+window.addEventListener("phx:page--start", (e) => {
   _pendingNavKind = e.detail?.kind ?? null
   topbar.show(300)
 })
-window.addEventListener("phx:page-loading-stop", (_info) => {
+window.addEventListener("phx:page--stop", (_info) => {
   topbar.hide()
   // Reset main scroll on navigate (not patch/submit) so pages always start at the top.
   // Without this, scrolling down the sessions list then clicking a session leaves
@@ -282,7 +282,7 @@ document.addEventListener("click", (e) => {
   })
 }, true)
 
-// Rail divider double-click = collapse/expand (bonus gesture; the hover
+// Rail divider double-click = disclosure/expand (bonus gesture; the hover
 // chevron #rail-collapse-toggle is the discoverable affordance). Persistence
 // happens server-side via the RailState hook's save_rail_state patch.
 window.addEventListener("dblclick", (e) => {
@@ -322,7 +322,7 @@ liveSocket.socket.onError(() => applySocketState("disconnected"))
 // VimNav is mounted directly (not via phx-hook) because Phoenix doesn't
 // call mounted() for hooks on live layout elements.
 // Keep the instance alive across LiveView navigations — destroying + re-creating
-// on every phx:page-loading-stop briefly removes the keydown listener and breaks
+// on every phx:page--stop briefly removes the keydown listener and breaks
 // vim mode after history.back/forward. Only re-init when the enabled state on
 // #vim-nav-root flips, so toggling vim_nav_enabled in Settings still takes effect
 // on the next LiveView render without a hard reload.
@@ -366,7 +366,7 @@ function _mountVimNav() {
   inst.mounted()
   _vimNavInst = inst
 }
-window.addEventListener("phx:page-loading-stop", _mountVimNav)
+window.addEventListener("phx:page--stop", _mountVimNav)
 
 // Intercept flyout canvas-session links before LiveView navigation fires.
 // If the clicked session is already on the current canvas, dispatch canvas:focus-session

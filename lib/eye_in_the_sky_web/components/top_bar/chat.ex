@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
     <div class="flex-1" />
     <%!-- Action group: filter, members, new agent --%>
     <div class="flex items-center gap-1">
-      <details class="dropdown dropdown-end" id="sender-filter-dropdown" phx-update="ignore">
+      <details class="relative " id="sender-filter-relative" phx-update="ignore">
         <summary class={[
           "focus-ring flex h-7 items-center gap-1.5 rounded-box px-2 text-mini font-medium transition-colors cursor-pointer list-none [list-style:none] [&::-webkit-details-marker]:hidden",
           if(@sender_filter,
@@ -47,7 +47,7 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
             Filter
           <% end %>
         </summary>
-        <div class="dropdown-content z-[10] mt-1 w-52 rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
+        <div class="eits-menu absolute z-[10] mt-1 w-52 rounded-box border border-base-content/10 bg-base-100 p-1 shadow-lg">
           <button
             type="button"
             phx-click="set_sender_filter"
@@ -81,12 +81,12 @@ defmodule EyeInTheSkyWeb.TopBar.Chat do
           <% end %>
         </div>
       </details>
-      <details class="dropdown dropdown-end">
+      <details class="relative ">
         <summary class="focus-ring flex h-7 items-center gap-1.5 rounded-box px-2 text-mini font-medium transition-colors text-base-content/40 hover:text-base-content/70 hover:bg-base-content/5 cursor-pointer list-none [list-style:none] [&::-webkit-details-marker]:hidden">
           <.icon name="hero-user-group-mini" class="size-3.5" />
           {length(@channel_members)} members
         </summary>
-        <div class="dropdown-content z-[10] mt-1 w-80 rounded-box border border-base-content/10 bg-base-100 shadow-lg">
+        <div class="eits-menu absolute z-[10] mt-1 w-80 rounded-box border border-base-content/10 bg-base-100 shadow-lg">
           <div class="px-3 pb-3 pt-2.5" id="chat-members-panel">
             <div class="flex items-center justify-between mb-2">
               <span class="text-micro uppercase tracking-normal font-medium text-base-content/30">

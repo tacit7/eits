@@ -136,9 +136,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
       </div>
 
       <%= if @show_add_form do %>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
-            <h2 class="card-title text-message">Attach documents to agent type</h2>
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
+            <h2 class="eits-panel__title text-message">Attach documents to agent type</h2>
 
             <div class="space-y-3">
               <label class="form-control">
@@ -191,8 +191,8 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         </section>
       <% end %>
 
-      <section class="card bg-base-200">
-        <div class="card-body p-0">
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-0">
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>

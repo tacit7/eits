@@ -152,7 +152,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
             <%= for prompt <- @filtered_prompts do %>
               <% selected? = @selected_prompt && @selected_prompt.id == prompt.id %>
               <div class={["py-0.5", selected? && "relative"]}>
-                <div class="collapse overflow-visible">
+                <div class="eits-disclosure overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"
@@ -161,7 +161,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                   />
                   <div
                     class={[
-                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
+                      "eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
                       if(selected?,
                         do: "bg-primary/5",
                         else: "hover:bg-base-content/4"
@@ -206,7 +206,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Prompts do
                       </span>
                     </div>
                   </div>
-                  <div class="collapse-content md:hidden px-3 pb-3">
+                  <div class="eits-disclosure__content md:hidden px-3 pb-3">
                     <div
                       id={"global-prompt-mobile-#{prompt.id}"}
                       class="dm-markdown text-message text-base-content leading-relaxed mt-2"

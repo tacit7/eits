@@ -125,8 +125,8 @@
 </div>
 
 <!-- Modal for chat -->
-<dialog bind:this={chatDialog} class="modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
-  <div class="modal-box max-w-lg">
+<dialog bind:this={chatDialog} class="eits-modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
+  <div class="eits-dialog max-w-lg">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
@@ -194,7 +194,7 @@
         </button>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="eits-modal-backdrop">
       <button>close</button>
     </form>
 </dialog>

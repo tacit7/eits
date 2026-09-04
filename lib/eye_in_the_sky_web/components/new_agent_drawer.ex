@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
           id="new-agent-panel"
           phx-hook="DrawerSwipeClose"
           data-close-event={@toggle_event}
-          class="menu p-6 w-full max-w-sm min-h-full bg-base-100 text-base-content"
+          class="eits-menu-list p-6 w-full max-w-sm min-h-full bg-base-100 text-base-content"
         >
           <.modal_header title="New Agent" toggle_event={@toggle_event} />
 
@@ -151,12 +151,12 @@ defmodule EyeInTheSkyWeb.Components.NewAgentDrawer do
 
   defp advanced_section(assigns) do
     ~H"""
-    <div class="collapse collapse-arrow bg-base-200 rounded-box">
+    <div class="eits-disclosure  bg-base-200 rounded-box">
       <input type="checkbox" class="min-h-0" />
-      <div class="collapse-title min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
+      <div class="eits-disclosure__summary min-h-0 py-2.5 px-3 flex items-center gap-1.5 text-mini font-medium text-base-content/60">
         <.icon name="hero-adjustments-horizontal" class="size-3.5" /> Advanced
       </div>
-      <div class="collapse-content px-3 pb-3 space-y-3">
+      <div class="eits-disclosure__content px-3 pb-3 space-y-3">
         <.advanced_execution />
         <.advanced_output />
         <.advanced_scripting />

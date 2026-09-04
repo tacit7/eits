@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FileActions do
   end
 
   # Emits a save_rail_state patch with the current expanded path list.
-  # Called after any expand/collapse mutation so localStorage stays in sync.
+  # Called after any expand/disclosure mutation so localStorage stays in sync.
   defp persist_file_expanded(socket) do
     paths = socket.assigns.flyout_file_expanded |> MapSet.to_list()
     push_event(socket, "save_rail_state", %{file_expanded: paths})

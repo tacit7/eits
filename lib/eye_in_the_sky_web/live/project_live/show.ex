@@ -123,22 +123,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
       <div class="max-w-7xl mx-auto">
         <%!-- Stats bar --%>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
               <p class="text-mini text-base-content/50 uppercase tracking-normal">Sessions</p>
               <p class="text-2xl font-semibold text-base-content">{@session_count}</p>
               <p class="text-mini text-base-content/40">{length(@active_sessions)} active</p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
               <p class="text-mini text-base-content/50 uppercase tracking-normal">Tasks</p>
               <p class="text-2xl font-semibold text-base-content">{length(@tasks)}</p>
               <p class="text-mini text-base-content/40">{@open_tasks} open · {@done_tasks} done</p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
               <p class="text-mini text-base-content/50 uppercase tracking-normal">Agents</p>
               <p class="text-2xl font-semibold text-base-content">{@agent_count}</p>
               <p class="text-mini text-base-content/40">
@@ -146,8 +146,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
               <p class="text-mini text-base-content/50 uppercase tracking-normal">Commits</p>
               <p class="text-2xl font-semibold text-base-content">{length(@recent_commits)}</p>
               <p class="text-mini text-base-content/40">recent</p>
@@ -158,9 +158,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         <%!-- Responsive Grid Layout --%>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <%!-- Claude Files --%>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-4">
-              <h2 class="card-title text-message mb-2">Claude Files</h2>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-4">
+              <h2 class="eits-panel__title text-message mb-2">Claude Files</h2>
               <%= if @project && @project.path do %>
                 <div class="mb-2 pb-2 border-b border-base-300">
                   <p class="text-mini text-base-content/60 mb-1">Project Path</p>
@@ -195,9 +195,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
 
           <%!-- Active Sessions --%>
           <%= if @active_sessions != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-message mb-3">Active Sessions</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-3">Active Sessions</h2>
                 <div class="space-y-2">
                   <%= for session <- @active_sessions do %>
                     <div class="flex items-center justify-between gap-3 p-2 rounded-box hover:bg-base-200 transition-colors">
@@ -232,9 +232,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
 
           <%!-- Recent Tasks --%>
           <%= if @tasks != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-message mb-2">Recent Tasks</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Tasks</h2>
                 <div class="space-y-1">
                   <%= for task <- @recent_tasks do %>
                     <div class="flex items-center gap-2 p-2 rounded-box hover:bg-base-200 transition-colors">
@@ -265,9 +265,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
 
           <%!-- Recent Notes --%>
           <%= if @recent_notes != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-message mb-2">Recent Notes</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Notes</h2>
                 <div class="space-y-2 max-h-64 overflow-y-auto">
                   <%= for note <- @recent_notes do %>
                     <div class="p-2 rounded-box bg-base-200/30 border border-base-300">
@@ -285,9 +285,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
           <% end %>
           <%!-- Recent Commits --%>
           <%= if @recent_commits != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-message mb-2">Recent Commits</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Commits</h2>
                 <div class="space-y-1">
                   <%= for commit <- @recent_commits do %>
                     <div class="flex items-start gap-2 p-2 rounded-box hover:bg-base-200 transition-colors">

@@ -137,8 +137,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageHandlers do
   @sync_timeout_ms 5_000
 
   @doc """
-  On mount, shows a loading skeleton and defers message loading until after the
-  session file sync completes. This prevents the "one by one" loading effect
+  On mount, shows a  skeleton and defers message  until after the
+  session file sync completes. This prevents the "one by one"  effect
   caused by a stream reset mid-render.
 
   Both dead and connected renders start with `syncing: true` (set in

@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
           <span class="text-mini font-normal">{@preferred.label}</span>
         </button>
         <%= if @others != [] do %>
-          <div class="dropdown dropdown-end join-item">
+          <div class="relative  join-item">
             <button
               tabindex="0"
               class="eits-action eits-action--ghost h-[30px] min-h-0 border-l border-base-content/10 px-1"
@@ -89,7 +89,7 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
             </button>
             <ul
               tabindex="0"
-              class="dropdown-content menu bg-base-200 border border-base-content/10 rounded-box z-50 w-40 shadow-lg p-1 mt-1"
+              class="eits-menu absolute eits-menu-list bg-base-200 border border-base-content/10 rounded-box z-50 w-40 shadow-lg p-1 mt-1"
             >
               <%= for ed <- @others do %>
                 <li>

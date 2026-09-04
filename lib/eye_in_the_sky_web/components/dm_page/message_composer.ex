@@ -407,13 +407,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       <div class="w-px h-4 bg-base-content/[0.10] flex-shrink-0" />
 
       <%!-- Segment 3: Effort level picker --%>
-      <%!-- phx-click must be on the .dropdown div (not the inner button) so that --%>
+      <%!-- phx-click must be on the .relative div (not the inner button) so that --%>
       <%!-- focus stays on the child after the LiveView re-render, keeping the    --%>
-      <%!-- DaisyUI :focus-within selector true and the menu visible.             --%>
+      <%!-- Focus-within keeps the menu visible after LiveView re-renders.        --%>
       <div
-        class="dropdown dropdown-top"
+        class="relative "
         phx-click="toggle_effort_menu"
-        id="reasoning-pill-effort-dropdown"
+        id="reasoning-pill-effort-relative"
       >
         <button
           type="button"
@@ -428,10 +428,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
         <%= if @active_overlay == :effort_menu do %>
           <ul
             tabindex="0"
-            class="dropdown-content menu z-[1] w-52 rounded-box border border-base-content/8 bg-base-100 p-1.5 shadow-lg mb-1"
+            class="eits-menu absolute eits-menu-list z-[1] w-52 rounded-box border border-base-content/8 bg-base-100 p-1.5 shadow-lg mb-1"
             id="reasoning-pill-effort-menu"
           >
-            <li class="menu-title text-mini px-3 pt-1 pb-0.5 text-base-content/40">
+            <li class="eits-menu__label text-mini px-3 pt-1 pb-0.5 text-base-content/40">
               Effort Level
             </li>
             <%= for {label, value, desc, color} <- effort_levels(@is_claude) do %>
@@ -519,7 +519,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       |> Map.put(:progress_color, progress_color)
 
     ~H"""
-    <div class="relative dropdown dropdown-top">
+    <div class="relative relative ">
       <%!-- Trigger: progress bar --%>
       <button
         type="button"
@@ -538,7 +538,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       <%!-- Popover --%>
       <%= if @active_overlay == :context_meter do %>
         <div
-          class="dropdown-content z-50 mb-2 w-64 rounded-box border border-base-content/10 bg-base-100 shadow-xl p-4"
+          class="eits-menu absolute z-50 mb-2 w-64 rounded-box border border-base-content/10 bg-base-100 shadow-xl p-4"
           role="dialog"
           aria-label="Context window details"
         >

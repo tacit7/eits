@@ -59,7 +59,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
           <h2 class="text-message font-semibold text-base-content/80 mb-2 flex items-center gap-1">
             <.icon name="hero-cog-6-tooth" class="size-4" /> .claude/
           </h2>
-          <ul class="menu menu-sm bg-base-200 rounded-box">
+          <ul class="eits-menu-list bg-base-200 rounded-box">
             <.tree_item :for={entry <- @entries} entry={entry} />
           </ul>
         </div>
@@ -68,8 +68,8 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @selected_file do %>
           <div class="p-6">
-            <div class="card bg-base-100 border border-base-300 shadow-sm">
-              <div class="card-body p-0">
+            <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+              <div class="eits-panel__body p-0">
                 <div class="flex items-center justify-between px-4 py-2 border-b border-base-300 bg-base-200/50">
                   <code class="text-message font-semibold text-base-content">{@selected_file}</code>
                   <div class="flex items-center gap-1">
@@ -128,7 +128,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
     <div class="h-[calc(100dvh-10rem)]">
       <div class="p-6">
         <%= if @error do %>
-          <div class="alert alert-error mb-4">
+          <div class="eits-alert eits-alert--error mb-4">
             <.icon name="hero-x-circle" class="shrink-0 size-6" />
             <span>{@error}</span>
           </div>

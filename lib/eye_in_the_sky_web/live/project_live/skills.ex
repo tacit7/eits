@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
             <%= for skill <- @filtered_skills do %>
               <% selected? = @selected_skill && @selected_skill.id == skill.id %>
               <div class={["py-0.5", selected? && "relative"]}>
-                <div class="collapse overflow-visible">
+                <div class="eits-disclosure overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"
@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   />
                   <div
                     class={[
-                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
+                      "eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
                       if(selected?,
                         do: "bg-primary/5",
                         else: "hover:bg-base-content/4"
@@ -255,7 +255,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                       </span>
                     </div>
                   </div>
-                  <div class="collapse-content md:hidden px-3 pb-3">
+                  <div class="eits-disclosure__content md:hidden px-3 pb-3">
                     <div
                       id={"proj-skill-mobile-#{skill.id}"}
                       class="dm-markdown text-message text-base-content leading-relaxed mt-2"

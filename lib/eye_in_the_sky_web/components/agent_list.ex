@@ -105,7 +105,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     <details
       id={"session-menu-#{@agent.id}"}
       phx-update="ignore"
-      class="md:opacity-0 md:group-hover/row:opacity-100 open:opacity-100 relative dropdown dropdown-end"
+      class="md:opacity-0 md:group-hover/row:opacity-100 open:opacity-100 relative relative "
     >
       <summary
         class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box text-base-content/35 hover:text-base-content/70 hover:bg-base-content/5 transition-colors cursor-pointer list-none"
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
       >
         <.icon name="hero-ellipsis-horizontal-mini" class="size-4" />
       </summary>
-      <ul class="dropdown-content z-50 menu menu-xs bg-base-200 border border-base-content/10 rounded-box shadow-lg w-48 p-1">
+      <ul class="eits-menu absolute z-50 eits-menu-list  bg-base-200 border border-base-content/10 rounded-box shadow-lg w-48 p-1">
         <%= if @agent.id do %>
           <li>
             <a href={~p"/dm/#{@agent.id}"} target="_blank" class="flex items-center gap-2">
@@ -199,16 +199,16 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     ~H"""
     <dialog
       id="delete-confirm-modal"
-      class={"modal modal-bottom sm:modal-middle " <> if(@show_delete_confirm, do: "modal-open", else: "")}
+      class={"eits-modal   " <> if(@show_delete_confirm, do: "eits-modal-open", else: "")}
     >
-      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+      <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Delete sessions</h3>
         <p class="py-4 text-message text-base-content/70">
           Permanently delete {MapSet.size(@selected_ids)} selected session{if MapSet.size(
                                                                                 @selected_ids
                                                                               ) != 1, do: "s"}? This cannot be undone.
         </p>
-        <div class="modal-action">
+        <div class="eits-panel__actions">
           <button
             phx-click="cancel_delete_selected"
             class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
@@ -223,7 +223,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </button>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button phx-click="cancel_delete_selected">close</button>
       </form>
     </dialog>
@@ -297,9 +297,9 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     ~H"""
     <dialog
       id="archive-confirm-modal"
-      class={"modal modal-bottom sm:modal-middle " <> if(@show_archive_confirm, do: "modal-open", else: "")}
+      class={"eits-modal   " <> if(@show_archive_confirm, do: "eits-modal-open", else: "")}
     >
-      <div class="modal-box w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
+      <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
         <h3 class="text-lg font-bold">Archive sessions</h3>
         <p class="py-4 text-message text-base-content/70">
           <% count = MapSet.size(@selected_ids) %> Archive {count} selected session{if count == 1,
@@ -307,7 +307,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
             else: "s"}?
           Archived sessions can be unarchived later.
         </p>
-        <div class="modal-action">
+        <div class="eits-panel__actions">
           <button
             phx-click="cancel_archive_selected"
             class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
@@ -322,7 +322,7 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
           </button>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button phx-click="cancel_archive_selected">close</button>
       </form>
     </dialog>

@@ -9,8 +9,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTab do
       <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         Token Pricing
       </h2>
-      <div class="card bg-base-100 border border-base-300 shadow-sm">
-        <div class="card-body p-5">
+      <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+        <div class="eits-panel__body p-5">
           <div class="flex items-center justify-between mb-4">
             <p class="text-mini text-base-content/50">
               Cost per 1M tokens (USD). Used for usage cost estimates.

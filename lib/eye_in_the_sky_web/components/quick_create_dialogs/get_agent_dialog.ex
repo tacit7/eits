@@ -9,9 +9,9 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.GetAgentDialog do
     <dialog
       id="quick-get-agent"
       phx-hook="QuickGetAgent"
-      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
+      class="eits-modal   p-0 bg-transparent"
     >
-      <div class="modal-box max-w-lg p-0 overflow-hidden">
+      <div class="eits-dialog max-w-lg p-0 overflow-hidden">
         <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
           <h2 class="text-message font-semibold text-base-content">Get Agent Details</h2>
           <button
@@ -72,7 +72,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.GetAgentDialog do
           </div>
         </div>
       </div>
-      <form method="dialog" class="modal-backdrop">
+      <form method="dialog" class="eits-modal-backdrop">
         <button>close</button>
       </form>
     </dialog>

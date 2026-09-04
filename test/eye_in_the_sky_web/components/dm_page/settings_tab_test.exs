@@ -302,7 +302,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert LazyHTML.attribute(
                LazyHTML.query(document, "#dm-subtab-general"),
                "class"
-             ) == ["tab tab-active"]
+             ) == ["eits-tab eits-tab--active"]
     end
 
     test "nil subtab falls back to general section" do

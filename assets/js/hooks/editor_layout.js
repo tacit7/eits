@@ -221,5 +221,5 @@ export function installEditorWindowListeners() {
   }
   window.addEventListener("phx:file-editor-open", reapply)
   window.addEventListener("phx:file-editor-close", reapply)
-  window.addEventListener("phx:page-loading-stop", reapply)
+  window.addEventListener("phx:page--stop", reapply)
 }

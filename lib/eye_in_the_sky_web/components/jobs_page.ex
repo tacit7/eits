@@ -480,8 +480,8 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
 
       <%!-- Run Now Confirmation Modal --%>
       <%= if @confirm_run_modal_job do %>
-        <div class="modal modal-open">
-          <div class="modal-box max-w-sm">
+        <div class="eits-modal eits-modal-open">
+          <div class="eits-dialog max-w-sm">
             <h3 class="font-bold text-lg mb-4">Confirm Run Job</h3>
             <div class="space-y-3 mb-6">
               <div>
@@ -522,7 +522,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                 </p>
               </div>
             </div>
-            <div class="modal-action gap-2">
+            <div class="eits-panel__actions gap-2">
               <button
                 class="eits-action eits-action--ghost"
                 phx-click="cancel_run_job"
@@ -540,7 +540,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               </button>
             </div>
           </div>
-          <div class="modal-backdrop" phx-click="cancel_run_job" phx-target={@myself}></div>
+          <div class="eits-modal-backdrop" phx-click="cancel_run_job" phx-target={@myself}></div>
         </div>
       <% end %>
 
@@ -594,7 +594,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                 <div class="flex items-center gap-3 min-w-0">
                   <%!-- Status indicator --%>
                   <%= if job_state == :running do %>
-                    <span class="loading loading-spinner loading-xs text-primary flex-shrink-0 mt-0.5" />
+                    <span class=" spinner spinner--xs text-primary flex-shrink-0 mt-0.5" />
                   <% else %>
                     <span class={[
                       "size-2 rounded-full flex-shrink-0 mt-1.5",

@@ -13,8 +13,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Appearance
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body px-5 py-4">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body px-5 py-4">
             <p class="text-message font-medium text-base-content mb-3">Theme</p>
             <div class="flex flex-wrap gap-2">
               <button
@@ -40,8 +40,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Agent Defaults
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             <%!-- Default Model --%>
             <div class="flex items-center justify-between px-5 py-4">
               <div>
@@ -179,8 +179,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Notifications
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-message font-medium text-base-content">Agent status notifications</p>
@@ -205,8 +205,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Terminal
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-message font-medium text-base-content">
@@ -233,8 +233,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
         <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
           Keyboard
         </h2>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-0 divide-y divide-base-300">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-0 divide-y divide-base-300">
             <div class="flex items-center justify-between px-5 py-4">
               <div>
                 <p class="text-message font-medium text-base-content">Vim navigation</p>

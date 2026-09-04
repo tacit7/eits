@@ -42,11 +42,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           >
             <%= for note <- @notes do %>
               <div
-                class="collapse collapse-arrow rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                class="eits-disclosure  rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
                 id={"dm-note-#{note.id}"}
               >
                 <input type="checkbox" />
-                <div class="collapse-title py-3 px-4 min-h-0">
+                <div class="eits-disclosure__summary py-3 px-4 min-h-0">
                   <div class="flex items-center gap-3">
                     <%!-- Star button --%>
                     <button
@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   </div>
                 </div>
 
-                <div class="collapse-content px-4 pb-4">
+                <div class="eits-disclosure__content px-4 pb-4">
                   <div class="pl-[30px]">
                     <div
                       id={"note-body-#{note.id}"}

@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponentTest do
       html = render_component(&TerminalWindowComponent.render/1, base_assigns())
 
       assert html =~ "bg-base-300"
-      assert html =~ "rounded-lg"
+      assert html =~ "rounded-box"
       assert html =~ "shadow-2xl"
       assert html =~ "border border-base-content/10"
     end

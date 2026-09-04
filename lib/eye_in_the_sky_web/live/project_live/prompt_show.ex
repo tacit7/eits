@@ -120,7 +120,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
         <%= if @project do %>
-          <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
+          <.link
+            navigate={~p"/projects/#{@project.id}/prompts"}
+            class="eits-action eits-action--ghost gap-2"
+          >
             <.icon name="hero-arrow-left" class="size-4" /> Back to Prompts
           </.link>
         <% end %>
@@ -134,11 +137,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
                 {@prompt.name}
               </h1>
               <%= if is_nil(@prompt.project_id) do %>
-                <span class="badge badge-primary">Global</span>
+                <span class="eits-chip eits-chip--primary">Global</span>
               <% else %>
-                <span class="badge badge-secondary">Project</span>
+                <span class="eits-chip eits-chip--secondary">Project</span>
               <% end %>
-              <span class="badge badge-ghost">v{@prompt.version}</span>
+              <span class="eits-chip eits-chip--muted">v{@prompt.version}</span>
             </div>
 
             <%= if @prompt.description do %>
@@ -150,16 +153,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
 
           <div class="mt-4 sm:mt-0 flex items-center gap-2">
             <%= if @editing do %>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-sm">
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost">
                 Cancel
               </button>
             <% else %>
-              <button phx-click="edit" class="btn btn-primary btn-sm">
+              <button phx-click="edit" class="eits-action eits-action--primary gap-1.5">
                 <.icon name="hero-pencil-square" class="size-4" /> Edit
               </button>
               <button
                 phx-click="delete"
-                class="btn btn-error btn-sm"
+                class="eits-action eits-action--destructive gap-1.5"
                 data-confirm="Are you sure you want to deactivate this prompt?"
               >
                 <.icon name="hero-trash" class="size-4" /> Deactivate

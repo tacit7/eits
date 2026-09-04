@@ -499,7 +499,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               <div>
                 <p class="text-mini font-medium text-base-content/70">Type</p>
                 <p class="text-message">
-                  <span class="badge badge-xs badge-ghost">
+                  <span class="eits-chip eits-chip--muted">
                     <%= case @confirm_run_modal_job.job_type do %>
                       <% "spawn_agent" -> %>
                         Agent
@@ -523,11 +523,15 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
               </div>
             </div>
             <div class="modal-action gap-2">
-              <button class="btn btn-ghost" phx-click="cancel_run_job" phx-target={@myself}>
+              <button
+                class="eits-action eits-action--ghost"
+                phx-click="cancel_run_job"
+                phx-target={@myself}
+              >
                 Cancel
               </button>
               <button
-                class="btn btn-primary"
+                class="eits-action eits-action--primary"
                 phx-click="confirm_run_job"
                 phx-value-id={@confirm_run_modal_job.id}
                 phx-target={@myself}
@@ -623,7 +627,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                   phx-click="expand_job"
                   phx-value-id={job.id}
                   phx-target={@myself}
-                  class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                  class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9 flex-shrink-0"
                   title="Close"
                 >
                   <.icon name="hero-x-mark" class="size-4" />
@@ -647,7 +651,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                 </label>
                 <div class="ml-auto flex items-center gap-1">
                   <button
-                    class="btn btn-sm btn-primary gap-1"
+                    class="eits-action eits-action--primary gap-1"
                     phx-click="run_now"
                     phx-value-id={job.id}
                     phx-target={@myself}
@@ -656,7 +660,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                   </button>
                   <%= if job.origin != "system" do %>
                     <button
-                      class="btn btn-sm btn-ghost"
+                      class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9"
                       phx-click="edit_job"
                       phx-value-id={job.id}
                       phx-target={@myself}
@@ -665,7 +669,7 @@ defmodule EyeInTheSkyWeb.Components.JobsPage do
                       <.icon name="hero-pencil-square" class="size-4" />
                     </button>
                     <button
-                      class="btn btn-sm btn-ghost text-error/60 hover:text-error"
+                      class="eits-action eits-action--danger eits-action--icon h-9 min-h-0 min-w-9"
                       phx-click="delete_job"
                       phx-value-id={job.id}
                       phx-target={@myself}

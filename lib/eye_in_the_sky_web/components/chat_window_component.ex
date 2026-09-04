@@ -147,11 +147,15 @@ defmodule EyeInTheSkyWeb.Components.ChatWindowComponent do
             data-autoscroll-btn
             type="button"
             title="Auto-scroll"
-            class="btn btn-ghost btn-xs px-1 text-base-content/30 hover:text-base-content"
+            class="eits-action eits-action--ghost h-7 min-h-0 px-1"
           >
             <.icon name="hero-arrow-down-mini" class="size-3.5" />
           </button>
-          <button type="submit" class="btn btn-primary btn-xs px-2" aria-label="Send message">
+          <button
+            type="submit"
+            class="eits-action eits-action--primary h-7 min-h-0 px-2"
+            aria-label="Send message"
+          >
             <.icon name="hero-arrow-up-mini" class="size-3.5" />
           </button>
         </.form>

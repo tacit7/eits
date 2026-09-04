@@ -1187,7 +1187,7 @@
 
         <button
           type="submit"
-          class="btn btn-sm btn-primary min-h-0 h-9 px-3"
+          class="eits-action eits-action--primary h-9 min-h-0 px-3"
           disabled={!inputValue || inputValue.trim() === ''}
           aria-label="Send message"
         >
@@ -1219,7 +1219,7 @@
       <div class="modal-box max-w-2xl">
         <div class="flex items-center justify-between mb-3">
           <h3 id="inspect-title" class="font-bold text-message">Message #{inspectMessage.id}</h3>
-          <button class="btn btn-xs btn-ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
+          <button class="eits-action eits-action--ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
         </div>
         <pre class="text-mini bg-base-200 rounded-box p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>

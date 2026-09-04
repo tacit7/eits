@@ -66,9 +66,9 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
 
     ~H"""
     <%= if @preferred && @active do %>
-      <div class="join">
+      <div class="flex items-center overflow-hidden rounded-box border border-base-content/10">
         <button
-          class="btn btn-ghost btn-xs join-item gap-1.5 min-h-[30px] h-[30px]"
+          class="eits-action eits-action--ghost h-[30px] min-h-0 gap-1.5 px-2"
           phx-click="open_in_editor"
           phx-value-editor={@preferred.id}
           phx-value-path={@path}
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
           <div class="dropdown dropdown-end join-item">
             <button
               tabindex="0"
-              class="btn btn-ghost btn-xs join-item px-1 min-h-[30px] h-[30px] border-l border-base-content/10"
+              class="eits-action eits-action--ghost h-[30px] min-h-0 border-l border-base-content/10 px-1"
               title="Open in..."
             >
               <.icon name="hero-chevron-down" class="size-3" />

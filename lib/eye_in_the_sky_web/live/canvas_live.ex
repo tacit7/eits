@@ -366,7 +366,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     >
       <button
         onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-        class="focus-ring mr-1 inline-flex min-h-[44px] min-w-[44px] items-center justify-center self-center rounded-box text-base-content/50 transition-colors hover:bg-base-content/5 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon mr-1 self-center"
         aria-label="Go back"
         title="Go back"
       >
@@ -424,7 +424,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           />
           <button
             type="submit"
-            class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box bg-primary text-primary-content transition-colors hover:bg-primary/85"
+            class="eits-action eits-action--primary eits-action--icon"
             aria-label="Create canvas"
           >
             <.icon name="hero-plus-mini" class="size-3.5" />
@@ -441,7 +441,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       <% end %>
       <span
         id="canvas-ws-badge"
-        class="mx-2 hidden items-center gap-1 self-center rounded-box bg-warning/15 px-2 py-1 text-mini font-medium text-warning"
+        class="eits-chip eits-chip--warning mx-2 hidden self-center px-2 py-1"
       >
         <span class="loading loading-spinner loading-xs"></span> Reconnecting...
       </span>
@@ -453,7 +453,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             detail: %{commandId: "canvas-add-session"}
           )
         }
-        class="focus-ring ml-auto inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon ml-auto"
         title="Add session to canvas"
         aria-label="Add session to canvas"
       >
@@ -462,7 +462,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       <button
         :if={not is_nil(@active_canvas_id)}
         phx-click="add_terminal"
-        class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon"
         title="Add terminal to canvas"
         aria-label="Add terminal to canvas"
       >
@@ -475,7 +475,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         data-layout-btn="auto"
         data-session-count={length(@canvas_sessions)}
         phx-update="ignore"
-        class="focus-ring mr-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/50 transition-colors hover:bg-base-content/5 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon mr-2"
         title="Auto layout"
         aria-label="Auto layout"
       >
@@ -520,7 +520,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           </span>
           <.link
             navigate={~p"/sessions"}
-            class="focus-ring mt-1 inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/75"
+            class="eits-action eits-action--ghost mt-1"
           >
             Go to Sessions
           </.link>
@@ -554,7 +554,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             <button
               type="button"
               phx-click="close_session_picker"
-              class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
+              class="eits-action eits-action--ghost eits-action--icon"
               aria-label="Close session picker"
             >
               <.icon name="hero-x-mark-mini" class="size-4" />
@@ -577,7 +577,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 type="button"
                 phx-click="pick_session"
                 phx-value-session-id={s.id}
-                class="focus-ring inline-flex min-h-[44px] w-full items-center justify-start gap-2 rounded-box px-3 text-left text-message text-base-content/70 transition-colors hover:bg-base-content/5 hover:text-base-content"
+                class="eits-action eits-action--ghost w-full justify-start gap-2 text-left text-message"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
                 <.status_badge status={s.status} size="xs" class="shrink-0" label={s.status} />

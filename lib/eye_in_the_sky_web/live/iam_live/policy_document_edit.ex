@@ -101,7 +101,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
-        <.link navigate={~p"/iam/documents/#{@document.id}"} class="btn btn-ghost btn-sm">
+        <.link
+          navigate={~p"/iam/documents/#{@document.id}"}
+          class="eits-action eits-action--ghost eits-action--icon"
+        >
           <.icon name="hero-arrow-left" class="size-4" />
         </.link>
         <.icon name="hero-pencil-square" class="size-6 text-primary" />
@@ -134,10 +137,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentEdit do
         </section>
 
         <div class="flex justify-end gap-2">
-          <.link navigate={~p"/iam/documents/#{@document.id}"} class="btn btn-ghost">
+          <.link navigate={~p"/iam/documents/#{@document.id}"} class="eits-action eits-action--ghost">
             Cancel
           </.link>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="eits-action eits-action--primary">
             Save changes
           </button>
         </div>

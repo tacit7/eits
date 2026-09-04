@@ -169,7 +169,8 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
           is_bookmarked: false
         })
 
-      assert html =~ "btn btn-ghost btn-sm gap-2"
+      assert html =~ "focus-ring inline-flex"
+      assert html =~ "gap-2"
     end
 
     test "has transition classes" do
@@ -247,8 +248,8 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButtonTest do
           is_bookmarked: false
         })
 
-      assert html_bookmarked =~ "text-sm"
-      assert html_unbookmarked =~ "text-sm"
+      assert html_bookmarked =~ "text-mini"
+      assert html_unbookmarked =~ "text-mini"
     end
   end
 

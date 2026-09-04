@@ -93,7 +93,7 @@
           <div class="card-actions justify-between mt-3 pt-3 border-t border-base-300">
             <!-- Note ID Badge -->
             <button
-              class="badge badge-ghost badge-sm hover:badge-primary cursor-pointer font-mono transition-colors"
+              class="eits-chip eits-chip--muted eits-chip--mono cursor-pointer transition-colors hover:text-primary"
               on:click={(e) => handleCopyId(note.id, e)}
               title="Copy ID: {note.id}"
             >
@@ -102,7 +102,7 @@
 
             <!-- Timestamp -->
             {#if note.created_at}
-              <div class="badge badge-ghost badge-sm">
+              <div class="eits-chip eits-chip--muted">
                 <span class="h-3 w-3 mr-1">{@html ClockSvg}</span>
                 {formatDateTime(note.created_at)}
               </div>
@@ -122,7 +122,7 @@
         <p class="py-3 text-message text-base-content/70">
           Add a note to capture decisions, blockers, or next steps for this session.
         </p>
-        <button class="btn btn-primary btn-sm">
+        <button class="eits-action eits-action--primary gap-1.5">
           <span class="h-4 w-4">{@html PlusSvg}</span>
           Add Your First Note
         </button>

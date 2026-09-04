@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
         <div class="min-w-0">
           <div class="flex items-center flex-wrap gap-3 mb-1">
             <h1 class="text-2xl font-bold text-base-content tracking-tight">{@team.name}</h1>
-            <span class={["badge badge-sm font-medium", status_badge_class(@team.status)]}>
+            <span class={["eits-chip", status_badge_class(@team.status)]}>
               {@team.status}
             </span>
           </div>
@@ -251,9 +251,9 @@ defmodule EyeInTheSkyWeb.TeamDetailComponent do
     """
   end
 
-  defp status_badge_class("active"), do: "badge-success"
-  defp status_badge_class("archived"), do: "badge-ghost"
-  defp status_badge_class(_), do: "badge-neutral"
+  defp status_badge_class("active"), do: "eits-chip--success"
+  defp status_badge_class("archived"), do: "eits-chip--muted"
+  defp status_badge_class(_), do: "eits-chip--neutral"
 
   defp member_status_text("active"), do: "text-success"
   defp member_status_text("idle"), do: "text-base-content/50"

@@ -1,8 +1,7 @@
 /**
  * Shared styling utilities for Svelte components
  *
- * Note: Most badge and button styles now use Daisy UI components.
- * This file contains only specialized utility styles.
+ * Note: shared chips and actions use EITS primitives; this file contains only specialized utility styles.
  */
 
 /**

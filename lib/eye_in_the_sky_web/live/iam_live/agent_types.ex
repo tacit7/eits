@@ -122,12 +122,12 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         <div class="flex items-center gap-3">
           <.icon name="hero-users" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">Agent Types</h1>
-          <span class="badge badge-ghost">{length(@agent_types)}</span>
+          <span class="eits-chip eits-chip--muted">{length(@agent_types)}</span>
         </div>
 
         <button
           type="button"
-          class="btn btn-primary btn-sm"
+          class="eits-action eits-action--primary gap-1.5"
           phx-click="toggle_add_form"
         >
           <.icon name="hero-plus" class="size-4" />
@@ -181,7 +181,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
 
               <button
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="eits-action eits-action--primary"
                 phx-click="attach_documents"
               >
                 Attach
@@ -223,7 +223,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                     <td class="max-w-sm">
                       <div class="flex flex-wrap gap-1">
                         <%= for doc <- docs do %>
-                          <span class="badge badge-ghost badge-sm">{doc.name}</span>
+                          <span class="eits-chip eits-chip--muted">{doc.name}</span>
                         <% end %>
                       </div>
                     </td>

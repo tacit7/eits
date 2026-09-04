@@ -244,7 +244,7 @@ defmodule EyeInTheSkyWeb.Components.TaskCard.ListRow do
     """
   end
 
-  # State pill — muted bg-*/15 pattern, not full DaisyUI badge saturation
+  # State pill: muted bg-*/15 pattern, not full status saturation.
   defp state_pill_class(@state_todo), do: "bg-base-content/10 text-base-content/50"
   defp state_pill_class(@state_in_progress), do: "bg-info/15 text-info"
   defp state_pill_class(@state_in_review), do: "bg-warning/15 text-warning"

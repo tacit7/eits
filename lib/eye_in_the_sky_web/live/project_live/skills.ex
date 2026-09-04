@@ -241,7 +241,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                       {skill.description}
                     </p>
                     <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                      <span class={"inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium " <>
+                      <span class={"eits-chip " <>
                         source_badge_class(skill.source)}>
                         {source_label(skill.source)}
                       </span>
@@ -295,7 +295,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                 {@selected_skill.path}
               </code>
               <span class="text-micro text-base-content/40">Ctrl+S to save</span>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost h-7 min-h-0 px-2">
+                Cancel
+              </button>
             </div>
           <% else %>
             <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
@@ -305,7 +307,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                     <code class="text-message font-semibold text-base-content">
                       /{@selected_skill.slug}
                     </code>
-                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium " <>
+                    <span class={"eits-chip " <>
                       source_badge_class(@selected_skill.source)}>
                       {source_label(@selected_skill.source)}
                     </span>
@@ -325,7 +327,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   />
                   <button
                     phx-click="close_viewer"
-                    class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                    class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9 flex-shrink-0"
                   >
                     <.icon name="hero-x-mark" class="size-4" />
                   </button>
@@ -335,27 +337,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :preview,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Preview
                 </button>
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="raw"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :raw,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Raw
                 </button>
                 <%= if is_binary(@selected_skill.abs_path) do %>
                   <button
                     phx-click="edit_content"
-                    class="px-3 py-1 rounded-box text-mini font-medium text-base-content/50 hover:text-base-content"
+                    class="eits-action eits-action--ghost h-7 min-h-0 px-3"
                   >
                     Edit
                   </button>

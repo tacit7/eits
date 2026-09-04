@@ -142,13 +142,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <button
                   type="button"
                   phx-click="close_create_note_modal"
-                  class="btn btn-ghost btn-sm min-h-[44px]"
+                  class="eits-action eits-action--ghost eits-action--touch"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  class="btn btn-primary btn-sm min-h-[44px]"
+                  class="eits-action eits-action--primary eits-action--touch"
                 >
                   Create Note
                 </button>
@@ -178,8 +178,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             </label>
           </div>
           <div class="modal-action">
-            <button data-reload-cancel class="btn btn-ghost btn-sm min-h-[44px]">Cancel</button>
-            <button data-reload-confirm class="btn btn-error btn-sm min-h-[44px]">Reload</button>
+            <button data-reload-cancel class="eits-action eits-action--ghost eits-action--touch">
+              Cancel
+            </button>
+            <button
+              data-reload-confirm
+              class="eits-action eits-action--destructive eits-action--touch"
+            >
+              Reload
+            </button>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -219,7 +226,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                         JS.set_attribute({"value", "once"}, to: "#timer-mode-input")
                         |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
                       }
-                      class="btn btn-sm btn-outline"
+                      class="eits-action eits-action--secondary"
                     >
                       {preset}
                     </button>
@@ -237,7 +244,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                         JS.set_attribute({"value", "repeating"}, to: "#timer-mode-input")
                         |> JS.set_attribute({"value", preset}, to: "#timer-preset-input")
                       }
-                      class="btn btn-sm btn-outline"
+                      class="eits-action eits-action--secondary"
                     >
                       {preset}
                     </button>
@@ -249,7 +256,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
                 <button
                   type="button"
                   phx-click="close_schedule_modal"
-                  class="btn btn-ghost btn-sm min-h-[44px]"
+                  class="eits-action eits-action--ghost eits-action--touch"
                 >
                   Cancel
                 </button>
@@ -288,7 +295,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
       <div class="md:hidden sticky top-0 z-30 flex-shrink-0 flex items-center gap-1 px-2 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100">
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
-          class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-ring"
+          class="eits-action eits-action--ghost eits-action--icon h-10 min-h-0 min-w-10"
           aria-label="Open menu"
         >
           <.icon name="hero-bars-3" class="size-5" />
@@ -320,7 +327,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
           </div>
         </div>
         <ActionMenu.action_menu
-          button_class="btn btn-ghost btn-square w-10 h-10 text-base-content/60 focus-ring"
+          button_class="eits-action eits-action--ghost eits-action--icon h-10 min-h-0 min-w-10"
           show_tabs={true}
           tabs={@tabs}
           active_tab={@active_tab}
@@ -402,7 +409,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
               <%!-- Unified hamburger menu (desktop + mobile) --%>
               <ActionMenu.action_menu
                 wrapper_id="dm-actions-menu"
-                button_class="btn btn-ghost btn-square w-9 h-9 text-base-content/60"
+                button_class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9"
                 show_jsonl_export={true}
                 show_push_setup={true}
                 show_iterm={true}

@@ -145,14 +145,14 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
         <div class="flex items-center gap-3">
           <.icon name="hero-shield-check" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">IAM Policies</h1>
-          <span class="badge badge-ghost">{length(@policies)}</span>
+          <span class="eits-chip eits-chip--muted">{length(@policies)}</span>
         </div>
 
         <div class="flex items-center gap-2">
-          <.link navigate={~p"/iam/simulator"} class="btn btn-ghost btn-sm">
+          <.link navigate={~p"/iam/simulator"} class="eits-action eits-action--ghost gap-1.5">
             <.icon name="hero-beaker" class="size-4" /> Simulator
           </.link>
-          <.link navigate={~p"/iam/policies/new"} class="btn btn-primary btn-sm">
+          <.link navigate={~p"/iam/policies/new"} class="eits-action eits-action--primary gap-1.5">
             <.icon name="hero-plus" class="size-4" /> New policy
           </.link>
         </div>
@@ -203,7 +203,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                 <option value="false" selected={@filters["enabled"] == "false"}>disabled</option>
               </select>
             </label>
-            <button type="button" class="btn btn-ghost btn-sm" phx-click="reset_filters">
+            <button type="button" class="eits-action eits-action--ghost" phx-click="reset_filters">
               Reset
             </button>
           </form>
@@ -245,7 +245,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                       <% end %>
                     </td>
                     <td>
-                      <span class={"badge badge-sm " <> effect_badge(p.effect)}>{p.effect}</span>
+                      <span class={"eits-chip " <> effect_badge(p.effect)}>{p.effect}</span>
                     </td>
                     <td class="font-mono text-mini">{p.agent_type}</td>
                     <td class="font-mono text-mini">{p.action}</td>
@@ -256,7 +256,10 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                         phx-click="toggle"
                         phx-value-id={p.id}
                         phx-value-enabled={to_string(not p.enabled)}
-                        class={"btn btn-xs " <> (if p.enabled, do: "btn-success", else: "btn-ghost")}
+                        class={[
+                          "eits-action h-7 min-h-0 gap-1 px-2",
+                          if(p.enabled, do: "eits-action--success", else: "eits-action--ghost")
+                        ]}
                       >
                         <.icon
                           name={if p.enabled, do: "hero-check-circle", else: "hero-x-circle"}
@@ -267,21 +270,24 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                     </td>
                     <td>
                       <%= if p.system_key do %>
-                        <span class="badge badge-sm badge-info gap-1">
+                        <span class="eits-chip eits-chip--info gap-1">
                           <.icon name="hero-lock-closed" class="size-3" /> system
                         </span>
                       <% else %>
-                        <span class="badge badge-sm badge-ghost">user</span>
+                        <span class="eits-chip eits-chip--muted">user</span>
                       <% end %>
                     </td>
                     <td class="text-right whitespace-nowrap">
-                      <.link navigate={~p"/iam/policies/#{p.id}/edit"} class="btn btn-ghost btn-xs">
+                      <.link
+                        navigate={~p"/iam/policies/#{p.id}/edit"}
+                        class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
+                      >
                         <.icon name="hero-pencil-square" class="size-4" /> Edit
                       </.link>
                       <%= if p.system_key do %>
                         <button
                           type="button"
-                          class="btn btn-ghost btn-xs btn-disabled"
+                          class="eits-action eits-action--ghost h-7 min-h-0 px-2"
                           disabled
                           title="System policies cannot be deleted"
                         >
@@ -290,7 +296,7 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
                       <% else %>
                         <button
                           type="button"
-                          class="btn btn-ghost btn-xs text-error"
+                          class="eits-action eits-action--danger h-7 min-h-0 px-2"
                           phx-click="delete"
                           phx-value-id={p.id}
                           data-confirm={"Delete policy \"#{p.name}\"? This cannot be undone."}
@@ -310,8 +316,8 @@ defmodule EyeInTheSkyWeb.IAMLive.Policies do
     """
   end
 
-  defp effect_badge("allow"), do: "badge-success"
-  defp effect_badge("deny"), do: "badge-error"
-  defp effect_badge("instruct"), do: "badge-warning"
-  defp effect_badge(_), do: "badge-ghost"
+  defp effect_badge("allow"), do: "eits-chip--success"
+  defp effect_badge("deny"), do: "eits-chip--error"
+  defp effect_badge("instruct"), do: "eits-chip--warning"
+  defp effect_badge(_), do: "eits-chip--muted"
 end

@@ -238,7 +238,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                       {prompt.slug}
                     </code>
                     <%= if !prompt.active do %>
-                      <span class="badge badge-xs badge-ghost">Inactive</span>
+                      <span class="eits-chip eits-chip--muted">Inactive</span>
                     <% end %>
                   </div>
                   <%= if prompt.description do %>
@@ -248,10 +248,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                   <% end %>
                   <div class="flex items-center gap-1.5 pl-5 mt-0.5">
                     <span class={[
-                      "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
+                      "eits-chip",
                       if(is_nil(prompt.project_id),
-                        do: "bg-primary/10 text-primary/70",
-                        else: "bg-secondary/10 text-secondary/70"
+                        do: "eits-chip--primary",
+                        else: "eits-chip--secondary"
                       )
                     ]}>
                       {if is_nil(prompt.project_id), do: "global", else: "project"}
@@ -294,7 +294,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 {@selected_prompt.slug}
               </span>
               <span class="text-micro text-base-content/40">Ctrl+S to save</span>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost h-7 min-h-0 px-2">
+                Cancel
+              </button>
             </div>
           <% else %>
             <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
@@ -305,19 +307,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                       {@selected_prompt.name}
                     </span>
                     <span class={[
-                      "inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium",
+                      "eits-chip",
                       if(is_nil(@selected_prompt.project_id),
-                        do: "bg-primary/10 text-primary/70",
-                        else: "bg-secondary/10 text-secondary/70"
+                        do: "eits-chip--primary",
+                        else: "eits-chip--secondary"
                       )
                     ]}>
                       {if is_nil(@selected_prompt.project_id), do: "global", else: "project"}
                     </span>
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium bg-base-content/5 text-base-content/50">
+                    <span class="eits-chip eits-chip--muted">
                       v{@selected_prompt.version}
                     </span>
                     <%= if !@selected_prompt.active do %>
-                      <span class="badge badge-xs badge-ghost">Inactive</span>
+                      <span class="eits-chip eits-chip--muted">Inactive</span>
                     <% end %>
                   </div>
                   <p class="text-mini text-base-content/45 font-mono">{@selected_prompt.slug}</p>
@@ -329,7 +331,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                   <%= if @selected_prompt.tags do %>
                     <div class="flex flex-wrap gap-1 mt-2">
                       <%= for tag <- String.split(@selected_prompt.tags, ",", trim: true) do %>
-                        <span class="badge badge-xs">
+                        <span class="eits-chip eits-chip--neutral">
                           {String.trim(tag)}
                         </span>
                       <% end %>
@@ -344,7 +346,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                   />
                   <.link
                     navigate={~p"/projects/#{@project.id}/prompts/#{@selected_prompt.uuid}"}
-                    class="btn btn-ghost btn-xs gap-1"
+                    class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
                   >
                     <.icon name="hero-arrow-top-right-on-square" class="size-3.5" /> Full edit
                   </.link>
@@ -354,26 +356,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Prompts do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :preview,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Preview
                 </button>
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="raw"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :raw,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Raw
                 </button>
                 <button
                   phx-click="edit_content"
-                  class="px-3 py-1 rounded-box text-mini font-medium text-base-content/50 hover:text-base-content"
+                  class="eits-action eits-action--ghost h-7 min-h-0 px-3"
                 >
                   Edit
                 </button>

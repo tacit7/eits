@@ -69,17 +69,17 @@
   };
 
   const buttonSizeClasses = {
-    xs: 'btn-xs',
-    sm: 'btn-sm',
-    md: 'btn-md',
-    lg: 'btn-lg'
+    xs: 'h-7 min-h-0 px-2',
+    sm: 'h-8 min-h-0 px-2.5',
+    md: '',
+    lg: 'eits-action--touch px-4'
   };
 </script>
 
 <button
   on:click={toggleBookmark}
   disabled={loading}
-  class="btn btn-ghost {buttonSizeClasses[size]} {showLabel ? 'gap-2' : 'btn-square'} hover:bg-base-200 transition-colors"
+  class="eits-action eits-action--ghost {buttonSizeClasses[size]} {showLabel ? 'gap-2' : 'eits-action--icon'} hover:bg-base-200 transition-colors"
   title={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
   aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
   aria-pressed={isBookmarked}

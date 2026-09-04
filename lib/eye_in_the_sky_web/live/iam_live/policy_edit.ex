@@ -212,13 +212,13 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
-        <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
+        <.link navigate={~p"/iam/policies"} class="eits-action eits-action--ghost eits-action--icon">
           <.icon name="hero-arrow-left" class="size-4" />
         </.link>
         <.icon name="hero-pencil-square" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">Edit policy</h1>
         <%= if @system? do %>
-          <span class="badge badge-info gap-1">
+          <span class="eits-chip eits-chip--info gap-1">
             <.icon name="hero-lock-closed" class="size-3" /> system
           </span>
         <% end %>
@@ -335,7 +335,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           <%= if @system? do %>
             <button
               type="button"
-              class="btn btn-ghost btn-sm text-warning"
+              class="eits-action eits-action--warning gap-1.5"
               phx-click="reseed"
               data-confirm="Reset this policy to its seed defaults? All customizations (enabled, priority, condition, message) will be overwritten."
             >

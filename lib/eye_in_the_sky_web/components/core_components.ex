@@ -159,11 +159,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    variants = %{"primary" => "eits-action--primary", nil => "eits-action--secondary"}
 
     assigns =
       assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
+        ["eits-action", Map.fetch!(variants, assigns[:variant])]
       end)
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
@@ -663,13 +663,16 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class={["flex gap-2", @class]}>
       <button
         type="submit"
-        class={["btn btn-primary flex-1", @size && "btn-#{@size}"]}
+        class={["eits-action eits-action--primary flex-1", action_size_class(@size)]}
         disabled={@submit_disabled}
       >
         {@submit_text}
       </button>
       <%= if @cancel_navigate do %>
-        <.link navigate={@cancel_navigate} class={["btn btn-ghost", @size && "btn-#{@size}"]}>
+        <.link
+          navigate={@cancel_navigate}
+          class={["eits-action eits-action--ghost", action_size_class(@size)]}
+        >
           {@cancel_text}
         </.link>
       <% else %>
@@ -677,7 +680,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           type="button"
           phx-click={@cancel_event}
           phx-target={@cancel_target}
-          class={["btn btn-ghost", @size && "btn-#{@size}"]}
+          class={["eits-action eits-action--ghost", action_size_class(@size)]}
         >
           {@cancel_text}
         </button>
@@ -837,7 +840,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <button
         phx-click={@toggle_event}
         phx-target={@phx_target}
-        class="btn btn-ghost btn-sm btn-circle"
+        class="eits-action eits-action--ghost eits-action--icon"
       >
         <.icon name="hero-x-mark" class="size-4" />
       </button>
@@ -1052,7 +1055,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a DaisyUI badge with semantic status coloring and an optional dot.
+  Renders an EITS status chip with semantic coloring and an optional dot.
 
   ## Examples
 
@@ -1074,7 +1077,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       )
 
     ~H"""
-    <span class={"badge badge-#{@size} #{status_badge_color(@status)} #{@class}"}>
+    <span class={["eits-chip", status_chip_class(@status), status_chip_size(@size), @class]}>
       <%= if @show_dot do %>
         <.status_dot status={@status} size="xs" />
       <% end %>
@@ -1277,29 +1280,38 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   defp status_dot_color(_), do: "bg-base-content/25"
 
-  defp status_badge_color(:working), do: "badge-success"
-  defp status_badge_color(:running), do: "badge-success"
-  defp status_badge_color(:idle), do: "badge-ghost"
-  defp status_badge_color(:waiting), do: "badge-warning"
-  defp status_badge_color(:pending), do: "badge-warning"
-  defp status_badge_color(:completed), do: "badge-success"
-  defp status_badge_color(:failed), do: "badge-error"
-  defp status_badge_color(:stopped), do: "badge-ghost"
-  defp status_badge_color(:archived), do: "badge-ghost"
+  defp action_size_class("xs"), do: "h-7 min-h-0 px-2"
+  defp action_size_class("sm"), do: "h-8 min-h-0 px-2.5"
+  defp action_size_class(_), do: nil
 
-  defp status_badge_color(s) when is_binary(s) do
+  defp status_chip_size("xs"), do: "px-1.5 py-0.5"
+  defp status_chip_size("sm"), do: nil
+  defp status_chip_size("md"), do: "px-2 py-1 text-message"
+  defp status_chip_size(_), do: nil
+
+  defp status_chip_class(:working), do: "eits-chip--success"
+  defp status_chip_class(:running), do: "eits-chip--success"
+  defp status_chip_class(:idle), do: "eits-chip--muted"
+  defp status_chip_class(:waiting), do: "eits-chip--warning"
+  defp status_chip_class(:pending), do: "eits-chip--warning"
+  defp status_chip_class(:completed), do: "eits-chip--success"
+  defp status_chip_class(:failed), do: "eits-chip--error"
+  defp status_chip_class(:stopped), do: "eits-chip--muted"
+  defp status_chip_class(:archived), do: "eits-chip--muted"
+
+  defp status_chip_class(s) when is_binary(s) do
     case s do
-      "working" -> "badge-success"
-      "running" -> "badge-success"
-      "idle" -> "badge-ghost"
-      "waiting" -> "badge-warning"
-      "pending" -> "badge-warning"
-      "completed" -> "badge-success"
-      "failed" -> "badge-error"
-      "stopped" -> "badge-ghost"
-      _ -> "badge-ghost"
+      "working" -> "eits-chip--success"
+      "running" -> "eits-chip--success"
+      "idle" -> "eits-chip--muted"
+      "waiting" -> "eits-chip--warning"
+      "pending" -> "eits-chip--warning"
+      "completed" -> "eits-chip--success"
+      "failed" -> "eits-chip--error"
+      "stopped" -> "eits-chip--muted"
+      _ -> "eits-chip--muted"
     end
   end
 
-  defp status_badge_color(_), do: "badge-ghost"
+  defp status_chip_class(_), do: "eits-chip--muted"
 end

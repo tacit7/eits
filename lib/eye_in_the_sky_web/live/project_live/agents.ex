@@ -249,7 +249,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                     {agent.description}
                   </p>
                   <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                    <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <> source_badge_class(agent.source)}>
+                    <span class={"eits-chip " <> source_badge_class(agent.source)}>
                       {source_label(agent.source)}
                     </span>
                     <span class="text-base-content/20 text-mini">|</span>
@@ -308,7 +308,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 {@selected_agent.path}
               </code>
               <span class="text-micro text-base-content/40">Ctrl+S to save</span>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost h-7 min-h-0 px-2">
+                Cancel
+              </button>
             </div>
           <% else %>
             <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
@@ -318,11 +320,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                     <code class="text-message font-semibold text-base-content">
                       {@selected_agent.name}
                     </code>
-                    <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <> source_badge_class(@selected_agent.source)}>
+                    <span class={"eits-chip " <> source_badge_class(@selected_agent.source)}>
                       {source_label(@selected_agent.source)}
                     </span>
                     <%= if @selected_agent.model do %>
-                      <span class="inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium bg-base-content/5 text-base-content/50">
+                      <span class="eits-chip eits-chip--muted">
                         {@selected_agent.model}
                       </span>
                     <% end %>
@@ -336,7 +338,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   <%= if @selected_agent.tools != [] do %>
                     <div class="flex flex-wrap gap-1 mt-2">
                       <%= for tool <- @selected_agent.tools do %>
-                        <span class="inline-flex items-center rounded-box px-1.5 py-0.5 font-mono text-micro bg-base-content/5 text-base-content/50">
+                        <span class="eits-chip eits-chip--muted eits-chip--mono">
                           {tool}
                         </span>
                       <% end %>
@@ -352,7 +354,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                   <button
                     phx-click="close_viewer"
                     title="Close"
-                    class="btn btn-ghost btn-xs btn-circle min-h-[36px] min-w-[36px]"
+                    class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9"
                   >
                     <.icon name="hero-x-mark" class="size-4" />
                   </button>
@@ -362,27 +364,27 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :preview,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Preview
                 </button>
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="raw"
-                  class={"px-3 py-1 rounded-box text-mini font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :raw,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Raw
                 </button>
                 <%= if is_binary(@selected_agent.abs_path) do %>
                   <button
                     phx-click="edit_content"
-                    class="px-3 py-1 rounded-box text-mini font-medium text-base-content/50 hover:text-base-content"
+                    class="eits-action eits-action--ghost h-7 min-h-0 px-3"
                   >
                     Edit
                   </button>
@@ -422,7 +424,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
       <% end %>
     </div>
 
-    <!-- New Agent Modal -->
+    <%!-- New Agent Modal --%>
     <%= if @show_new_agent_form do %>
       <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -479,13 +481,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Agents do
               <button
                 type="button"
                 phx-click="toggle_new_agent_form"
-                class="btn btn-ghost flex-1"
+                class="eits-action eits-action--ghost flex-1"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                class="btn btn-primary flex-1"
+                class="eits-action eits-action--primary flex-1"
                 disabled={@new_agent_name == "" or @new_agent_description == ""}
               >
                 Create Agent

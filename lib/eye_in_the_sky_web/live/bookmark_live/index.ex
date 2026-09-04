@@ -161,16 +161,16 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
                     <div class="flex-1 min-w-0">
                       <%!-- Badges --%>
                       <div class="flex items-center gap-2 mb-2">
-                        <span class="inline-flex items-center rounded-box bg-base-content/10 px-2 py-0.5 text-mini font-medium text-base-content/55">
+                        <span class="eits-chip eits-chip--neutral">
                           {bookmark.bookmark_type}
                         </span>
                         <%= if bookmark.category do %>
-                          <span class="inline-flex items-center rounded-box border border-base-content/15 px-2 py-0.5 text-mini font-medium text-base-content/55">
+                          <span class="eits-chip eits-chip--muted">
                             {bookmark.category}
                           </span>
                         <% end %>
                         <%= if not is_nil(bookmark.priority) && bookmark.priority > 0 do %>
-                          <span class="inline-flex items-center rounded-box bg-warning/15 px-2 py-0.5 text-mini font-medium text-warning">
+                          <span class="eits-chip eits-chip--warning">
                             P{bookmark.priority}
                           </span>
                         <% end %>
@@ -205,7 +205,7 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
                       <button
                         phx-click="delete"
                         phx-value-id={bookmark.id}
-                        class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-error/10 hover:text-error"
+                        class="eits-action eits-action--danger eits-action--icon"
                         title="Remove bookmark"
                         aria-label="Remove bookmark"
                       >

@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ChatDialog do
           <button
             data-qcc-cancel
             type="button"
-            class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
+            class="eits-action eits-action--ghost eits-action--icon"
             aria-label="Close"
           >
             <.icon name="hero-x-mark-mini" class="size-4" />
@@ -42,13 +42,13 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.ChatDialog do
             <button
               data-qcc-cancel
               type="button"
-              class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+              class="eits-action eits-action--ghost eits-action--touch"
             >
               Cancel
             </button>
             <button
               type="submit"
-              class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+              class="eits-action eits-action--primary eits-action--touch"
             >
               Start Chat
             </button>

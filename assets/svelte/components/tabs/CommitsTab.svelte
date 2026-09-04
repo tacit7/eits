@@ -15,8 +15,12 @@
     <div class="space-y-1">
       {#each commits as commit (commit.commit_hash)}
         <button
-          class="btn btn-ghost w-full justify-start text-left p-3 h-auto"
-          class:btn-active={selectedCommit?.commit_hash === commit.commit_hash}
+          class={[
+            "eits-action w-full justify-start p-3 text-left h-auto",
+            selectedCommit?.commit_hash === commit.commit_hash
+              ? "eits-action--primary"
+              : "eits-action--ghost"
+          ].join(" ")}
           on:click={() => (selectedCommit = commit)}
         >
           <div class="w-full">

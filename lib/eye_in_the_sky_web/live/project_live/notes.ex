@@ -323,13 +323,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
       <button
         type="button"
         phx-click="open_quick_note_modal"
-        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-box text-mini font-medium bg-base-200/60 hover:bg-base-200 text-base-content/70 hover:text-base-content transition-colors"
+        class="eits-action eits-action--secondary eits-action--touch gap-1.5"
       >
         <.icon name="hero-bolt" class="size-3.5" /> Quick Note
       </button>
       <.link
         navigate={@new_href || "/notes/new"}
-        class="flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] rounded-box text-mini font-medium bg-primary text-primary-content hover:bg-primary/80 transition-colors"
+        class="eits-action eits-action--primary eits-action--touch gap-1.5"
       >
         <.icon name="hero-plus" class="size-3.5" /> New Note
       </.link>
@@ -412,7 +412,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Notes do
           <button
             type="button"
             phx-click="close_quick_note_modal"
-            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
+            class="eits-action eits-action--ghost eits-action--icon"
             aria-label="Close"
           >
             <.icon name="hero-x-mark" class="size-4" />

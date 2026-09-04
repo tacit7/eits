@@ -210,7 +210,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                     </p>
                     <%!-- Metadata row --%>
                     <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                      <span class={"inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium " <>
+                      <span class={"eits-chip " <>
                         source_badge_class(skill.source)}>
                         {source_label(skill.source)}
                       </span>
@@ -267,7 +267,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Skills do
                   <code class="text-message font-semibold text-base-content">
                     /{@selected_skill.slug}
                   </code>
-                  <span class={"inline-flex items-center px-1.5 py-0.5 rounded-box text-micro font-medium " <>
+                  <span class={"eits-chip " <>
                     source_badge_class(@selected_skill.source)}>
                     {source_label(@selected_skill.source)}
                   </span>

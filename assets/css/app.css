@@ -155,6 +155,15 @@
     color: var(--color-base-content);
   }
 
+  .eits-action--success {
+    background: var(--color-success);
+    color: var(--color-success-content);
+  }
+
+  .eits-action--success:hover {
+    background: color-mix(in oklch, var(--color-success) 85%, var(--color-base-100));
+  }
+
   .eits-action--ghost {
     color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
   }
@@ -171,6 +180,37 @@
   .eits-action--danger:hover {
     background: color-mix(in oklch, var(--color-error) 10%, transparent);
     color: var(--color-error);
+  }
+
+  .eits-action--warning {
+    color: var(--color-warning);
+  }
+
+  .eits-action--warning:hover {
+    background: color-mix(in oklch, var(--color-warning) 10%, transparent);
+    color: var(--color-warning);
+  }
+
+  .eits-action--warning-solid {
+    background: var(--color-warning);
+    color: var(--color-warning-content);
+  }
+
+  .eits-action--warning-solid:hover {
+    background: color-mix(in oklch, var(--color-warning) 85%, var(--color-base-100));
+  }
+
+  .eits-action--destructive {
+    background: var(--color-error);
+    color: var(--color-error-content);
+  }
+
+  .eits-action--destructive:hover {
+    background: color-mix(in oklch, var(--color-error) 85%, var(--color-base-100));
+  }
+
+  .eits-action--touch {
+    min-height: 2.75rem;
   }
 
   .eits-action--icon {

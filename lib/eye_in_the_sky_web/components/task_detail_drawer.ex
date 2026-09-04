@@ -315,7 +315,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               ></textarea>
               <button
                 type="submit"
-                class="btn btn-sm btn-ghost text-mini self-end gap-1.5 text-base-content/50 hover:text-base-content/80"
+                class="eits-action eits-action--ghost h-8 min-h-0 self-end gap-1.5"
               >
                 <.icon name="hero-plus-mini" class="size-3.5" /> Add
               </button>
@@ -329,7 +329,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             <button
               type="submit"
               form="task-edit-form"
-              class="btn btn-sm btn-primary text-mini px-4 opacity-40 pointer-events-none"
+              class="eits-action eits-action--primary h-8 min-h-0 px-4 opacity-40 pointer-events-none"
             >
               Save
             </button>
@@ -360,7 +360,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
             phx-value-task_id={@task.uuid || to_string(@task.id)}
             disabled={has_agent}
             class={[
-              "btn btn-sm btn-ghost text-mini gap-1.5",
+              "eits-action eits-action--ghost h-8 min-h-0 gap-1.5",
               if(has_agent,
                 do: "text-base-content/25 cursor-not-allowed",
                 else: "text-base-content/50 hover:text-base-content/80"
@@ -379,7 +379,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
                   <button
                     type="button"
                     tabindex="0"
-                    class="btn btn-sm btn-ghost text-mini text-base-content/40 hover:text-primary hover:bg-primary/10"
+                    class="eits-action eits-action--ghost eits-action--icon h-8 min-h-0 min-w-8 hover:text-primary"
                     title="Copy to project"
                   >
                     <.icon name="hero-document-duplicate" class="size-3.5" />
@@ -410,7 +410,7 @@ defmodule EyeInTheSkyWeb.Components.TaskDetailDrawer do
               <button
                 type="button"
                 tabindex="0"
-                class="btn btn-sm btn-ghost text-mini text-base-content/30 hover:text-base-content/60"
+                class="eits-action eits-action--ghost eits-action--icon h-8 min-h-0 min-w-8"
                 title="More actions"
               >
                 <.icon name="hero-ellipsis-horizontal" class="size-4" />

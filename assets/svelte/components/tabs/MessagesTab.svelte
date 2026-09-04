@@ -38,7 +38,7 @@
         <!-- Date separator -->
         {#if idx === 0 || formatDateRelative(messages[idx - 1].inserted_at) !== formatDateRelative(message.inserted_at)}
           <div class="flex items-center justify-center my-6">
-            <div class="badge badge-ghost badge-sm text-mini font-semibold px-3 py-1">
+            <div class="eits-chip eits-chip--muted px-3 py-1 font-semibold">
               {formatDateRelative(message.inserted_at)}
             </div>
           </div>
@@ -72,7 +72,7 @@
                     {message.sender_role === 'user' ? 'You' : message.sender_role === 'agent' ? 'Agent' : message.sender_role}
                   </span>
                   {#if message.provider}
-                    <span class="badge badge-xs badge-ghost">{message.provider}</span>
+                    <span class="eits-chip eits-chip--muted">{message.provider}</span>
                   {/if}
                   <time class="text-micro text-base-content/30 ml-auto">{formatTime(message.inserted_at)}</time>
                 </div>
@@ -101,9 +101,9 @@
     <form on:submit|preventDefault={handleSubmit} class="flex items-center gap-2">
       <!-- Provider selector dropdown -->
       <div class="dropdown dropdown-top">
-        <button type="button" tabindex="0" class="btn btn-ghost btn-sm gap-2" title="Select AI Provider">
+        <button type="button" tabindex="0" class="eits-action eits-action--ghost gap-2" title="Select AI Provider">
           <span class="w-4 h-4">{@html ComputerDesktopSvg}</span>
-          <span class="badge badge-sm badge-primary">{selectedProvider}</span>
+          <span class="eits-chip eits-chip--primary">{selectedProvider}</span>
         </button>
         <ul class="dropdown-content menu p-2 shadow bg-base-100 rounded-box w-40 mb-2">
           <li>
@@ -138,7 +138,7 @@
       />
 
       <!-- Send button -->
-      <button type="submit" class="btn btn-primary btn-sm" aria-label="Send message">
+      <button type="submit" class="eits-action eits-action--primary" aria-label="Send message">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
         </svg>

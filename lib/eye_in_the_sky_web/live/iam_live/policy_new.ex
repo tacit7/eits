@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
-        <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
+        <.link navigate={~p"/iam/policies"} class="eits-action eits-action--ghost eits-action--icon">
           <.icon name="hero-arrow-left" class="size-4" />
         </.link>
         <.icon name="hero-shield-plus" class="size-6 text-primary" />

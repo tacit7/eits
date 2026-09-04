@@ -163,7 +163,7 @@
       <div class="flex justify-end mt-2">
         <button
           type="submit"
-          class="btn btn-xs btn-primary"
+          class="eits-action eits-action--primary"
           disabled={!replyInput || !replyInput.trim()}
         >
           Reply

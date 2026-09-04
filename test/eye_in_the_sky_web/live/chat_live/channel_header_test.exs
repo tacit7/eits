@@ -149,7 +149,7 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelHeaderTest do
           active_channel: channel
         )
 
-      assert html =~ "text-xs"
+      assert html =~ "text-mini"
       assert html =~ "Development work"
     end
 

@@ -98,7 +98,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
     test "set_theme updates button active state", %{conn: conn} do
       {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
       html = lv |> element(~s(button[phx-value-theme="light"]), "Light") |> render_click()
-      assert html =~ ~s(btn-primary)
+      assert html =~ ~s(eits-action--primary)
     end
 
     test "normalizes empty theme to dark on mount", %{conn: conn} do

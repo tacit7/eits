@@ -82,23 +82,23 @@
 
   function getStatusBadgeClass(status) {
     switch(status) {
-      case 'active': return 'badge-success'
-      case 'idle': return 'badge-info'
-      case 'working': return 'badge-warning'
-      default: return 'badge-ghost'
+      case 'active': return 'eits-chip--success'
+      case 'idle': return 'eits-chip--info'
+      case 'working': return 'eits-chip--warning'
+      default: return 'eits-chip--muted'
     }
   }
 </script>
 
-<!-- DaisyUI FAB with Flower Layout -->
+<!-- FAB with flower layout -->
 <div class="fab fab-flower" class:opacity-50={bookmarkedAgents.length === 0}>
   <div
     tabindex="0"
     role="button"
     aria-label="Bookmarked agents"
-    class="btn btn-lg btn-circle"
-    class:btn-primary={bookmarkedAgents.length > 0}
-    class:btn-disabled={bookmarkedAgents.length === 0}
+    class="eits-action eits-action--icon rounded-full"
+    class:eits-action--primary={bookmarkedAgents.length > 0}
+    class:pointer-events-none={bookmarkedAgents.length === 0}
     on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }}
   >
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
@@ -107,24 +107,24 @@
     </svg>
 
     {#if bookmarkedAgents.length > 0}
-      <span class="badge badge-sm badge-error absolute top-0 right-0">{bookmarkedAgents.length}</span>
+      <span class="eits-chip eits-chip--error absolute top-0 right-0">{bookmarkedAgents.length}</span>
     {/if}
   </div>
 
   <!-- Agent Buttons -->
   {#each bookmarkedAgents as agent (agent.session_id)}
     <button
-      class="btn btn-circle btn-sm relative"
+      class="eits-action eits-action--icon relative rounded-full"
       on:click={() => handleAgentClick(agent)}
       title={agent.name || agent.session_id}
     >
       <span class="font-bold text-nano">{getAgentInitials(agent.name)}</span>
-      <span class="badge {getStatusBadgeClass(agent.status)} badge-xs absolute -bottom-1 -right-1"></span>
+      <span class="eits-chip {getStatusBadgeClass(agent.status)} absolute -bottom-1 -right-1"></span>
     </button>
   {/each}
 </div>
 
-<!-- DaisyUI Modal for Chat -->
+<!-- Modal for chat -->
 <dialog bind:this={chatDialog} class="modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
   <div class="modal-box max-w-lg">
     <!-- Header -->
@@ -132,10 +132,10 @@
       <div class="flex items-center gap-2">
         <h3 id="fab-chat-modal-title" class="font-bold text-lg">{selectedAgent?.name || 'Agent'}</h3>
         {#if selectedAgent}
-          <span class="badge badge-sm badge-outline font-mono">{selectedAgent.session_id.substring(0, 8)}</span>
+          <span class="eits-chip eits-chip--neutral eits-chip--mono">{selectedAgent.session_id.substring(0, 8)}</span>
         {/if}
       </div>
-      <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close" on:click={closeChatModal}>
+      <button class="eits-action eits-action--ghost eits-action--icon rounded-full" aria-label="Close" on:click={closeChatModal}>
         <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="currentColor" viewBox="0 0 20 20">
           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
         </svg>
@@ -187,7 +187,7 @@
           bind:value={inputValue}
           autocomplete="off"
         />
-        <button type="submit" class="btn btn-primary" disabled={!inputValue.trim()} aria-label="Send">
+        <button type="submit" class="eits-action eits-action--primary" disabled={!inputValue.trim()} aria-label="Send">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
             <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
           </svg>

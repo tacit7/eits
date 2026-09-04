@@ -19,14 +19,14 @@
 
   function statusToBadgeVariant(status) {
     const map = {
-      active: 'badge-success',
-      working: 'badge-warning',
-      idle: 'badge-info',
-      stale: 'badge-warning badge-outline',
-      completed: 'badge-ghost',
-      failed: 'badge-error'
+      active: 'eits-chip--success',
+      working: 'eits-chip--warning',
+      idle: 'eits-chip--info',
+      stale: 'eits-chip--warning',
+      completed: 'eits-chip--muted',
+      failed: 'eits-chip--error'
     }
-    return map[status] || 'badge-ghost'
+    return map[status] || 'eits-chip--muted'
   }
 
   export let header
@@ -145,11 +145,11 @@
             <div class="flex flex-wrap items-center gap-2">
               <h1 class="text-2xl font-semibold text-base-content">{header.agent_type}</h1>
 
-              <span class="badge badge-outline font-mono">
+              <span class="eits-chip eits-chip--neutral font-mono">
                 {shortId(header.agent_id)}
               </span>
 
-              <span class="badge {statusToBadgeVariant(header.status)}" aria-label={`Status: ${header.status}`}>
+              <span class="eits-chip {statusToBadgeVariant(header.status)}" aria-label={`Status: ${header.status}`}>
                 {header.status}
               </span>
             </div>
@@ -163,7 +163,7 @@
                 </div>
                 <button
                   on:click={copySessionId}
-                  class="btn btn-ghost btn-xs btn-circle {copied ? 'btn-success' : ''}"
+                  class="eits-action eits-action--icon h-8 min-h-0 min-w-8 {copied ? 'eits-action--success' : 'eits-action--ghost'}"
                   title={copied ? 'Copied!' : 'Copy full session ID'}
                   aria-label="Copy session ID"
                 >
@@ -208,7 +208,7 @@
             <!-- Action Buttons (💬 ❤️ 🗑️) -->
             {#if header.can_chat}
               <button
-                class="btn btn-ghost btn-sm text-base-content/40 hover:text-info transition-colors"
+                class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9 hover:text-info"
                 title="Open chat"
                 aria-label="Open chat"
                 on:click={() => live.pushEvent('open_chat', { session_id: header.session_id })}
@@ -219,7 +219,7 @@
 
             {#if header.can_bookmark}
               <button
-                class="btn btn-ghost btn-sm text-base-content/40 hover:text-warning transition-colors"
+                class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9 hover:text-warning"
                 title="Bookmark agent"
                 aria-label="Bookmark agent"
                 on:click={() => live.pushEvent('toggle_bookmark', { agent_id: header.agent_id })}
@@ -230,7 +230,7 @@
 
             {#if header.can_archive}
               <button
-                class="btn btn-ghost btn-sm text-base-content/40 hover:text-warning transition-colors"
+                class="eits-action eits-action--warning eits-action--icon h-9 min-h-0 min-w-9"
                 title="Archive session"
                 aria-label="Archive session"
                 on:click={() => {
@@ -243,7 +243,7 @@
               </button>
             {/if}
 
-            <label class="swap swap-rotate btn btn-ghost btn-sm btn-circle">
+            <label class="swap swap-rotate eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9">
               <input type="checkbox" aria-label="Toggle theme" class="theme-controller" value="dark" />
               <!-- sun icon -->
               <span class="swap-on h-5 w-5">{@html SunSvg}</span>
@@ -252,7 +252,7 @@
             </label>
 
             <button
-              class="btn btn-primary btn-sm"
+              class="eits-action eits-action--primary"
               on:click={() => {
                 if (confirm('Are you sure you want to end this session?')) {
                   live.pushEvent('end_session')
@@ -264,7 +264,7 @@
               End Session
             </button>
             <button
-              class="btn btn-error btn-outline btn-sm"
+              class="eits-action eits-action--destructive gap-1.5"
               on:click={() => {
                 if (confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
                   live.pushEvent('delete_session')
@@ -279,14 +279,14 @@
               Delete
             </button>
             <button
-              class="btn btn-outline btn-sm"
+              class="eits-action eits-action--secondary"
               on:click={() => live.pushEvent('new_task')}
               aria-label="Create new task"
             >
               New Task
             </button>
             <button
-              class="btn btn-outline btn-sm"
+              class="eits-action eits-action--secondary"
               on:click={() => live.pushEvent('add_note')}
               aria-label="Add note"
             >
@@ -314,7 +314,7 @@
                 </svg>
                 <span>{t.label}</span>
                 {#if t.countKey && countFor(t.countKey) > 0}
-                  <span class="badge badge-sm badge-ghost">
+                  <span class="eits-chip eits-chip--muted">
                     {countFor(t.countKey)}
                   </span>
                 {/if}
@@ -349,7 +349,7 @@
 <dialog bind:this={noteDialog} class="modal" aria-labelledby="note-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
+      <button class="eits-action eits-action--ghost eits-action--icon absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
         <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
         </svg>
@@ -373,10 +373,10 @@
         ></textarea>
       </div>
       <div class="modal-action">
-        <button type="button" class="btn btn-ghost" on:click={() => live.pushEvent('close_modal')}>
+        <button type="button" class="eits-action eits-action--ghost" on:click={() => live.pushEvent('close_modal')}>
           Cancel
         </button>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eits-action eits-action--primary">
           Save Note
         </button>
       </div>
@@ -391,7 +391,7 @@
 <dialog bind:this={taskDialog} class="modal" aria-labelledby="task-modal-title">
   <div class="modal-box">
     <form method="dialog">
-      <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
+      <button class="eits-action eits-action--ghost eits-action--icon absolute right-2 top-2" aria-label="Close" on:click={() => live.pushEvent('close_modal')}>
         <svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
         </svg>
@@ -430,10 +430,10 @@
         ></textarea>
       </div>
       <div class="modal-action">
-        <button type="button" class="btn btn-ghost" on:click={() => live.pushEvent('close_modal')}>
+        <button type="button" class="eits-action eits-action--ghost" on:click={() => live.pushEvent('close_modal')}>
           Cancel
         </button>
-        <button type="submit" class="btn btn-primary">
+        <button type="submit" class="eits-action eits-action--primary">
           Create Task
         </button>
       </div>

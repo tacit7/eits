@@ -42,7 +42,7 @@
     <span class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
       <button
         onclick="history.back()"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Go back"
         aria-label="Go back"
       >
@@ -50,7 +50,7 @@
       </button>
       <button
         onclick="history.forward()"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Go forward"
         aria-label="Go forward"
       >
@@ -83,7 +83,7 @@
         id="push-setup-btn-vsbar"
         phx-hook="PushSetup"
         phx-update="ignore"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         data-push-state="disabled"
         title="Enable push notifications"
         aria-label="Enable push notifications"
@@ -93,7 +93,7 @@
       <button
         phx-click="toggle_collapsed"
         phx-target="#app-rail"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Toggle sidebar"
         aria-label="Toggle sidebar"
       >
@@ -102,7 +102,7 @@
       <button
         id="vsbar-pin"
         phx-update="ignore"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring hidden"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7 hidden"
         aria-pressed="false"
         title="Always on top"
         aria-label="Toggle always on top"
@@ -142,7 +142,7 @@
       ]}>
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
-          class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
           title="Open menu"
           aria-label="Open sidebar menu"
         >
@@ -151,7 +151,7 @@
         <span class="flex-1 text-message font-semibold text-base-content/80">Eye in the Sky</span>
         <button
           phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-          class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
           title="Open command palette"
           aria-label="Open command palette"
         >
@@ -161,7 +161,7 @@
           id="push-setup-btn"
           phx-hook="PushSetup"
           phx-update="ignore"
-          class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
           data-push-state="disabled"
           title="Enable push notifications"
           aria-label="Enable push notifications"
@@ -461,10 +461,20 @@
           class="input input-bordered w-full focus:border-primary/40"
         />
         <div class="modal-action mt-4">
-          <button type="button" value="cancel" data-rename-cancel class="btn btn-ghost btn-sm">
+          <button
+            type="button"
+            value="cancel"
+            data-rename-cancel
+            class="eits-action eits-action--ghost"
+          >
             Cancel
           </button>
-          <button type="submit" value="save" data-rename-save class="btn btn-primary btn-sm">
+          <button
+            type="submit"
+            value="save"
+            data-rename-save
+            class="eits-action eits-action--primary"
+          >
             Save
           </button>
         </div>

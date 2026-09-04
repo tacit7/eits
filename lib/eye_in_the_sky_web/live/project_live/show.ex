@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-7xl mx-auto">
-        <!-- Stats bar -->
+        <%!-- Stats bar --%>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-3">
@@ -154,10 +154,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
             </div>
           </div>
         </div>
-        
-    <!-- Responsive Grid Layout -->
+
+        <%!-- Responsive Grid Layout --%>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Claude Files -->
+          <%!-- Claude Files --%>
           <div class="card bg-base-100 shadow-sm">
             <div class="card-body p-4">
               <h2 class="card-title text-message mb-2">Claude Files</h2>
@@ -192,8 +192,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               <% end %>
             </div>
           </div>
-          
-    <!-- Active Sessions -->
+
+          <%!-- Active Sessions --%>
           <%= if @active_sessions != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
@@ -216,7 +216,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                       <%= if session.id do %>
                         <.link
                           navigate={~p"/dm/#{session.id}"}
-                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors min-h-[44px] min-w-[44px]"
+                          class="eits-action eits-action--ghost eits-action--icon hover:text-primary"
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >
@@ -229,8 +229,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </div>
             </div>
           <% end %>
-          
-    <!-- Recent Tasks -->
+
+          <%!-- Recent Tasks --%>
           <%= if @tasks != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                         <% end %>
                       </div>
                       <%= if not is_nil(task.priority) && task.priority > 0 do %>
-                        <span class="badge badge-xs">P{task.priority}</span>
+                        <span class="eits-chip eits-chip--warning">P{task.priority}</span>
                       <% end %>
                     </div>
                   <% end %>
@@ -262,8 +262,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </div>
             </div>
           <% end %>
-          
-    <!-- Recent Notes -->
+
+          <%!-- Recent Notes --%>
           <%= if @recent_notes != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">
@@ -283,7 +283,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </div>
             </div>
           <% end %>
-          <!-- Recent Commits -->
+          <%!-- Recent Commits --%>
           <%= if @recent_commits != [] do %>
             <div class="card bg-base-100 shadow-sm">
               <div class="card-body p-4">

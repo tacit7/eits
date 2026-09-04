@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
               <div class="flex flex-wrap gap-2">
                 <span
                   :for={{table, count} <- @db_info.table_counts}
-                  class="badge badge-ghost badge-sm gap-1"
+                  class="eits-chip eits-chip--muted gap-1"
                 >
                   {table}
                   <span class="font-semibold">{count}</span>

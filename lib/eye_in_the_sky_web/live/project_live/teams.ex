@@ -410,13 +410,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
               </span>
               <button
                 phx-click="confirm_archive_selected"
-                class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
+                class="eits-action eits-action--warning eits-action--touch gap-1"
               >
                 <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
               </button>
               <button
                 phx-click="exit_select_mode"
-                class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+                class="eits-action eits-action--ghost eits-action--icon ml-auto"
                 aria-label="Exit select mode"
               >
                 <.icon name="hero-x-mark" class="size-4" />
@@ -546,10 +546,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
                 else: "s"}? Archived teams can be restored later.
             </p>
             <div class="modal-action">
-              <button phx-click="cancel_archive_selected" class="btn btn-sm btn-ghost min-h-[44px]">
+              <button
+                phx-click="cancel_archive_selected"
+                class="eits-action eits-action--ghost eits-action--touch"
+              >
                 Cancel
               </button>
-              <button phx-click="archive_selected" class="btn btn-sm btn-warning min-h-[44px]">
+              <button
+                phx-click="archive_selected"
+                class="eits-action eits-action--warning-solid eits-action--touch"
+              >
                 Archive
               </button>
             </div>

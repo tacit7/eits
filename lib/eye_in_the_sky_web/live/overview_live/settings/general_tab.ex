@@ -21,7 +21,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                 :for={{val, label} <- @themes}
                 phx-click="set_theme"
                 phx-value-theme={val}
-                class={"btn btn-md sm:btn-sm #{if @settings["theme"] == val, do: "btn-primary", else: "btn-outline"}"}
+                class={[
+                  "eits-action eits-action--touch sm:h-8 sm:min-h-0",
+                  if(@settings["theme"] == val,
+                    do: "eits-action--primary",
+                    else: "eits-action--secondary"
+                  )
+                ]}
               >
                 {label}
               </button>
@@ -61,7 +67,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "default_model")}
                   phx-click="reset_setting"
                   phx-value-key="default_model"
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  class="eits-action eits-action--ghost eits-action--icon"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="size-3.5" />
@@ -96,7 +102,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "cli_idle_timeout_ms")}
                   phx-click="reset_setting"
                   phx-value-key="cli_idle_timeout_ms"
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  class="eits-action eits-action--ghost eits-action--icon"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="size-3.5" />
@@ -125,7 +131,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "tts_voice")}
                   phx-click="reset_setting"
                   phx-value-key="tts_voice"
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  class="eits-action eits-action--ghost eits-action--icon"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="size-3.5" />
@@ -158,7 +164,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "tts_rate")}
                   phx-click="reset_setting"
                   phx-value-key="tts_rate"
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  class="eits-action eits-action--ghost eits-action--icon"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="size-3.5" />
@@ -276,7 +282,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.GeneralTab do
                   :if={!default?(@settings, "palette_shortcut")}
                   phx-click="reset_setting"
                   phx-value-key="palette_shortcut"
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px]"
+                  class="eits-action eits-action--ghost eits-action--icon"
                   title="Reset to default"
                 >
                   <.icon name="hero-arrow-uturn-left" class="size-3.5" />

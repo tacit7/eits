@@ -202,19 +202,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   def render(assigns) do
     ~H"""
     <%= if @claude_dir && File.dir?(@claude_dir) do %>
-      <!-- View Mode Toggle -->
+      <%!-- View Mode Toggle --%>
       <div class="bg-base-100 border-b border-base-300">
         <div class="px-4 sm:px-6 lg:px-8 py-2">
-          <div class="join">
+          <div class="flex items-center gap-1 rounded-box bg-base-200/45 p-0.5">
             <button
-              class={"btn btn-sm join-item" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :tree, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
               <.icon name="hero-folder" class="size-4" /> Explore
             </button>
             <button
-              class={"btn btn-sm join-item" <> if @view_mode == :list, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :list, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >

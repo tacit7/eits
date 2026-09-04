@@ -396,7 +396,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           <%= if @show_back_button && @file_path && @file_path != "." do %>
             <.link
               patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-              class="btn btn-ghost btn-xs btn-square"
+              class="eits-action eits-action--ghost eits-action--icon"
             >
               <.icon name="hero-arrow-left" class="size-4" />
             </.link>
@@ -491,14 +491,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             >
               <.icon name="hero-no-symbol" class="size-4" />
               {@item.name}
-              <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
+              <span class="eits-chip eits-chip--muted eits-chip--mono ml-auto">bin</span>
             </span>
           <% else %>
             <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
               <.icon name="hero-document" class="size-4" />
               {@item.name}
               <%= if @item.size do %>
-                <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
+                <span class="eits-chip eits-chip--muted ml-auto">{@item.size}</span>
               <% end %>
             </.link>
           <% end %>
@@ -511,19 +511,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full">
-      <!-- View Mode Toggle -->
+      <%!-- View Mode Toggle --%>
       <div class="flex-shrink-0 bg-base-100 border-b border-base-300">
         <div class="px-4 sm:px-6 lg:px-8 py-2">
-          <div class="btn-group btn-group-sm">
+          <div class="flex items-center gap-1 rounded-box bg-base-200/45 p-0.5">
             <button
-              class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :list, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >
               <.icon name="hero-bars-3" class="size-4" /> List
             </button>
             <button
-              class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :tree, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
@@ -557,9 +563,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_tree_view(assigns) do
     ~H"""
-    <!-- Tree View -->
+    <%!-- Tree View --%>
     <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-      <!-- File Tree Sidebar -->
+      <%!-- File Tree Sidebar --%>
       <div
         id="file-tree-sidebar"
         class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-80 md:max-h-none md:h-full"
@@ -572,8 +578,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           </ul>
         </div>
       </div>
-      
-    <!-- File Content Viewer -->
+
+      <%!-- File Content Viewer --%>
       <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane
           error={@error}
@@ -610,10 +616,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_list_view(assigns) do
     ~H"""
-    <!-- List View -->
+    <%!-- List View --%>
     <div class="flex-1 min-h-0 overflow-auto">
       <%= if @files != [] && !@file_content do %>
-        <!-- Directory Listing -->
+        <%!-- Directory Listing --%>
         <div class="p-6">
           <%= if @error do %>
             <div class="alert alert-error mb-4">
@@ -625,7 +631,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             <%= if @file_path && @file_path != "." do %>
               <.link
                 patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                class="btn btn-sm btn-ghost mb-4"
+                class="eits-action eits-action--ghost mb-4 gap-1.5"
               >
                 <.icon name="hero-arrow-left" class="size-4" /> Back
               </.link>

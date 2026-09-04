@@ -78,7 +78,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
         <%= if @project do %>
-          <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
+          <.link
+            navigate={~p"/projects/#{@project.id}/prompts"}
+            class="eits-action eits-action--ghost gap-2"
+          >
             <.icon name="hero-arrow-left" class="size-4" /> Back to Prompts
           </.link>
         <% end %>
@@ -156,11 +159,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
 
           <div class="card-actions justify-end mt-2">
             <%= if @project do %>
-              <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost">
+              <.link
+                navigate={~p"/projects/#{@project.id}/prompts"}
+                class="eits-action eits-action--ghost"
+              >
                 Cancel
               </.link>
             <% end %>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="eits-action eits-action--primary gap-1.5">
               <.icon name="hero-check" class="size-4" /> Create Prompt
             </button>
           </div>

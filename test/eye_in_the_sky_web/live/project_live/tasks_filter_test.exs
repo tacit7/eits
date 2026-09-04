@@ -150,9 +150,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
       html = render(view)
 
-      # The created_asc button should show as active (btn-primary)
+      # The created_asc button should show as active
       assert html =~
-               ~r/phx-value-by="created_asc"[^>]*class="[^"]*btn-primary/s
+               ~r/phx-value-by="created_asc"[^>]*class="[^"]*bg-primary/s
     end
 
     test "backdrop click closes the sheet", %{conn: conn} do

@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   describe "mount" do
     test "renders jobs page for project", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert has_element?(view, "button", "+ New Job")
+      assert has_element?(view, "button", "New Job")
     end
 
     test "shows empty state when project has no jobs", %{conn: conn, project: project} do
@@ -68,13 +68,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   describe "new job form" do
     test "opens drawer on new job click", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
       assert has_element?(view, "h2", "New Job")
     end
 
     test "new job form pre-fills project_id", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       html = render(view)
       assert html =~ "value=\"#{project.id}\""
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "creates job scoped to project on submit", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       view
       |> form("form[phx-submit='save_job']", %{
@@ -101,7 +101,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "shows job in list after creation", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       view
       |> form("form[phx-submit='save_job']", %{
@@ -117,7 +117,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "closes drawer on cancel", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
       view |> element("button[phx-click='cancel_form']", "Cancel") |> render_click()
 
       # side_drawer sets aria-modal="false" when closed

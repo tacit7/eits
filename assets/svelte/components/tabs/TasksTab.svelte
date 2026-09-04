@@ -101,7 +101,7 @@
                 <div class="flex items-center gap-3 mt-2 text-mini text-base-content/50">
                   <!-- Task ID Badge -->
                   <button
-                    class="badge badge-ghost badge-xs hover:badge-primary cursor-pointer font-mono transition-colors"
+                    class="eits-chip eits-chip--muted eits-chip--mono cursor-pointer transition-colors hover:text-primary"
                     on:click={(e) => handleCopyId(task.id, e)}
                     title="Copy ID: {task.id}"
                   >
@@ -116,7 +116,7 @@
                   {/if}
 
                   {#if task.state_name}
-                    <span class="badge badge-ghost badge-xs">
+                    <span class="eits-chip eits-chip--muted">
                       {task.state_name}
                     </span>
                   {/if}
@@ -124,7 +124,7 @@
                   {#if task.tags && task.tags.length > 0}
                     <div class="flex items-center gap-1">
                       {#each task.tags as tag (tag.name)}
-                        <span class="badge badge-outline badge-xs">
+                        <span class="eits-chip eits-chip--neutral">
                           {tag.name}
                         </span>
                       {/each}
@@ -137,14 +137,14 @@
               {#if hoveredTask === task.id || selectedTask?.id === task.id}
                 <div class="flex items-center gap-1 flex-shrink-0">
                   <button
-                    class="btn btn-ghost btn-xs btn-square"
+                    class="eits-action eits-action--ghost eits-action--icon h-8 min-h-0 min-w-8"
                     on:click={(e) => {e.stopPropagation()}}
                     title="Edit task"
                   >
                     <span class="w-4 h-4">{@html PencilSvg}</span>
                   </button>
                   <button
-                    class="btn btn-ghost btn-xs btn-square text-error/70 hover:text-error"
+                    class="eits-action eits-action--danger eits-action--icon h-8 min-h-0 min-w-8"
                     on:click={(e) => {e.stopPropagation()}}
                     title="Delete task"
                   >
@@ -169,10 +169,3 @@
     {/if}
   </div>
 </div>
-
-<style>
-  .badge-xs {
-    font-size: 0.65rem;
-    padding: 0.125rem 0.375rem;
-  }
-</style>

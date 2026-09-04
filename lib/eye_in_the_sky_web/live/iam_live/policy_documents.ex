@@ -106,10 +106,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
         <div class="flex items-center gap-3">
           <.icon name="hero-document-text" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">Policy Documents</h1>
-          <span class="badge badge-ghost">{length(@documents)}</span>
+          <span class="eits-chip eits-chip--muted">{length(@documents)}</span>
         </div>
 
-        <.link navigate={~p"/iam/documents/new"} class="btn btn-primary btn-sm">
+        <.link navigate={~p"/iam/documents/new"} class="eits-action eits-action--primary gap-1.5">
           <.icon name="hero-plus" class="size-4" /> New document
         </.link>
       </div>
@@ -156,19 +156,19 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
                     <td class="text-right whitespace-nowrap">
                       <.link
                         navigate={~p"/iam/documents/#{doc.id}"}
-                        class="btn btn-ghost btn-xs"
+                        class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
                       >
                         <.icon name="hero-eye" class="size-4" /> Show
                       </.link>
                       <.link
                         navigate={~p"/iam/documents/#{doc.id}/edit"}
-                        class="btn btn-ghost btn-xs"
+                        class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
                       >
                         <.icon name="hero-pencil-square" class="size-4" /> Edit
                       </.link>
                       <button
                         type="button"
-                        class="btn btn-ghost btn-xs text-error"
+                        class="eits-action eits-action--danger h-7 min-h-0 px-2"
                         phx-click="delete"
                         phx-value-id={doc.id}
                         data-confirm={delete_confirm_text(doc)}

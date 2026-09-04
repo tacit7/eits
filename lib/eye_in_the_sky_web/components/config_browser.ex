@@ -40,7 +40,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
       >
         <.icon name="hero-document" class="size-4" />
         <span class="truncate">{@entry.name}</span>
-        <span class="badge badge-ghost badge-xs ml-auto shrink-0">{format_size(@entry.size)}</span>
+        <span class="eits-chip eits-chip--muted ml-auto shrink-0">{format_size(@entry.size)}</span>
       </button>
     </li>
     """
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
   def tree_view(assigns) do
     ~H"""
     <div class="h-[calc(100dvh-10rem)] flex flex-col md:flex-row">
-      <!-- Sidebar -->
+      <%!-- Sidebar --%>
       <div
         id="config-tree-sidebar"
         class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-[35dvh] md:max-h-none"
@@ -64,7 +64,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
           </ul>
         </div>
       </div>
-      <!-- Content viewer -->
+      <%!-- Content viewer --%>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @selected_file do %>
           <div class="p-6">
@@ -75,14 +75,14 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                   <div class="flex items-center gap-1">
                     <button
                       phx-click="open_file"
-                      class="btn btn-ghost btn-sm min-h-[44px]"
+                      class="eits-action eits-action--ghost eits-action--touch gap-1.5"
                       title="Open in editor"
                     >
                       <.icon name="hero-pencil-square" class="size-3.5" /> Edit
                     </button>
                     <button
                       phx-click="close_viewer"
-                      class="btn btn-ghost btn-sm btn-circle min-h-[44px] min-w-[44px]"
+                      class="eits-action eits-action--ghost eits-action--icon"
                     >
                       <.icon name="hero-x-mark" class="size-4" />
                     </button>
@@ -135,7 +135,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
         <% end %>
 
         <%= if @file_content do %>
-          <!-- File content -->
+          <%!-- File content --%>
           <div class="mb-4">
             <div class="flex items-center gap-2 mb-4">
               <.link
@@ -145,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                       ~p"/projects/#{@project.id}/config?mode=list&path=#{Path.dirname(@current_path)}",
                     else: ~p"/projects/#{@project.id}/config?mode=list"
                 }
-                class="btn btn-sm btn-ghost"
+                class="eits-action eits-action--ghost gap-1.5"
               >
                 <.icon name="hero-arrow-left" class="size-4" /> Back
               </.link>
@@ -157,7 +157,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
               </div>
               <button
                 phx-click="open_file"
-                class="btn btn-sm btn-ghost ml-auto"
+                class="eits-action eits-action--ghost ml-auto gap-1.5"
                 title="Open in editor"
               >
                 <.icon name="hero-pencil-square" class="size-4" /> Edit
@@ -178,7 +178,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
             </div>
           </div>
         <% else %>
-          <!-- Directory listing -->
+          <%!-- Directory listing --%>
           <%= if @files != [] do %>
             <div class="mb-4">
               <%= if @current_path do %>
@@ -189,7 +189,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                         ~p"/projects/#{@project.id}/config?mode=list&path=#{Path.dirname(@current_path)}",
                       else: ~p"/projects/#{@project.id}/config?mode=list"
                   }
-                  class="btn btn-sm btn-ghost mb-4"
+                  class="eits-action eits-action--ghost mb-4 gap-1.5"
                 >
                   <.icon name="hero-arrow-left" class="size-4" /> Back
                 </.link>
@@ -198,7 +198,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 .claude/{@current_path || ""}
               </h2>
             </div>
-            <!-- Mobile list -->
+            <%!-- Mobile list --%>
             <div class="md:hidden space-y-2">
               <%= for file <- @files do %>
                 <.link
@@ -219,7 +219,7 @@ defmodule EyeInTheSkyWeb.Components.ConfigBrowser do
                 </.link>
               <% end %>
             </div>
-            <!-- Desktop table -->
+            <%!-- Desktop table --%>
             <div class="hidden md:block overflow-x-auto">
               <table class="table table-sm">
                 <thead>

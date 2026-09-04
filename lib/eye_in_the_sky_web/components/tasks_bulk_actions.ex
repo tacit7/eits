@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
             phx-update="ignore"
             class="dropdown"
           >
-            <summary class="btn btn-ghost btn-xs gap-1 min-h-[44px] text-base-content/70 hover:text-base-content [list-style:none] [&::-webkit-details-marker]:hidden">
+            <summary class="eits-action eits-action--ghost eits-action--touch gap-1 [list-style:none] [&::-webkit-details-marker]:hidden">
               <.icon name="hero-arrows-right-left-mini" class="size-3.5" /> Move to
               <.icon
                 name="hero-chevron-down-mini"
@@ -45,7 +45,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
                     phx-click="bulk_set_state"
                     phx-value-state_id={state.id}
                     onclick="this.closest('details').removeAttribute('open')"
-                    class="flex items-center gap-2 w-full px-3 py-1.5 text-left text-mini rounded-box hover:bg-base-content/5 text-base-content/70 hover:text-base-content"
+                    class="eits-action eits-action--ghost w-full justify-start gap-2 text-left"
                   >
                     <span
                       class="inline-block w-2 h-2 rounded-full flex-shrink-0"
@@ -60,14 +60,14 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
           </details>
           <button
             phx-click="confirm_archive_selected_tasks"
-            class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
+            class="eits-action eits-action--warning eits-action--touch gap-1"
           >
             <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
           </button>
           <button
             phx-click="delete_selected_tasks"
             data-confirm={"Delete #{MapSet.size(@selected_task_ids)} task#{if MapSet.size(@selected_task_ids) != 1, do: "s"}?"}
-            class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 gap-1 min-h-[44px] min-w-[44px]"
+            class="eits-action eits-action--danger eits-action--touch gap-1"
           >
             <.icon name="hero-trash-mini" class="size-3.5" /> Delete
           </button>
@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
         <% end %>
         <button
           phx-click="exit_select_mode_tasks"
-          class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+          class="eits-action eits-action--ghost eits-action--icon ml-auto"
           aria-label="Exit select mode"
         >
           <.icon name="hero-x-mark" class="size-4" />
@@ -104,10 +104,16 @@ defmodule EyeInTheSkyWeb.Components.TasksBulkActions do
           Archived tasks can be unarchived later.
         </p>
         <div class="modal-action">
-          <button phx-click="cancel_archive_selected_tasks" class="btn btn-sm btn-ghost min-h-[44px]">
+          <button
+            phx-click="cancel_archive_selected_tasks"
+            class="eits-action eits-action--ghost eits-action--touch"
+          >
             Cancel
           </button>
-          <button phx-click="archive_selected_tasks" class="btn btn-sm btn-warning min-h-[44px]">
+          <button
+            phx-click="archive_selected_tasks"
+            class="eits-action eits-action--warning-solid eits-action--touch"
+          >
             Archive
           </button>
         </div>

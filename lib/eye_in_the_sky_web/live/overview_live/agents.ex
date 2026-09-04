@@ -185,7 +185,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   </p>
                   <%!-- Metadata row --%>
                   <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                    <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <>
+                    <span class={"eits-chip " <>
                       source_badge_class(agent.source)}>
                       {source_label(agent.source)}
                     </span>
@@ -248,12 +248,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                   <code class="text-message font-semibold text-base-content">
                     {@selected_agent.name}
                   </code>
-                  <span class={"inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium " <>
+                  <span class={"eits-chip " <>
                     source_badge_class(@selected_agent.source)}>
                     {source_label(@selected_agent.source)}
                   </span>
                   <%= if @selected_agent.model do %>
-                    <span class="inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium bg-base-content/5 text-base-content/50">
+                    <span class="eits-chip eits-chip--muted">
                       {@selected_agent.model}
                     </span>
                   <% end %>
@@ -267,7 +267,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Agents do
                 <%= if @selected_agent.tools != [] do %>
                   <div class="flex flex-wrap gap-1 mt-2">
                     <%= for tool <- @selected_agent.tools do %>
-                      <span class="inline-flex items-center rounded-box px-1.5 py-0.5 font-mono text-micro bg-base-content/5 text-base-content/50">
+                      <span class="eits-chip eits-chip--muted eits-chip--mono">
                         {tool}
                       </span>
                     <% end %>

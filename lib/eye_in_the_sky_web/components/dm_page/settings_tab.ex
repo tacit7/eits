@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <button
           type="button"
           id="dm-settings-reset"
-          class="btn btn-ghost btn-xs text-base-content/60"
+          class="eits-action eits-action--ghost h-7 min-h-0 px-2"
           phx-click="reset_dm_settings"
           phx-value-scope={@scope}
         >
@@ -93,13 +93,13 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
           {scope_help(@scope)}
         </div>
       </div>
-      <div class="join">
+      <div class="flex items-center gap-1 rounded-box bg-base-content/5 p-0.5">
         <button
           type="button"
           id="dm-scope-session"
           class={[
-            "join-item btn btn-sm",
-            if(@scope == "session", do: "btn-primary", else: "btn-ghost")
+            "eits-action",
+            if(@scope == "session", do: "eits-action--primary", else: "eits-action--ghost")
           ]}
           phx-click="dm_setting_scope"
           phx-value-scope="session"
@@ -109,7 +109,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <button
           type="button"
           id="dm-scope-agent"
-          class={["join-item btn btn-sm", if(@scope == "agent", do: "btn-primary", else: "btn-ghost")]}
+          class={[
+            "eits-action",
+            if(@scope == "agent", do: "eits-action--primary", else: "eits-action--ghost")
+          ]}
           phx-click="dm_setting_scope"
           phx-value-scope="agent"
           disabled={is_nil(@agent)}

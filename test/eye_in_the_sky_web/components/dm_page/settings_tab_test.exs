@@ -346,7 +346,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
     test "renders section title with uppercase styling" do
       html = render_settings()
       assert html =~ "uppercase"
-      assert html =~ "tracking-wide"
+      assert html =~ "tracking-normal"
     end
   end
 end

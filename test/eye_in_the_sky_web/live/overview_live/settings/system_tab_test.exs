@@ -124,8 +124,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
     test "renders Table Counts section" do
       html = render_tab(%{}, db_info(table_counts: %{"sessions" => 42, "tasks" => 7}))
       assert html =~ "Table Counts"
-      # Each table/count pair is rendered as a badge element
-      assert html =~ ~s(class="badge badge-ghost badge-sm gap-1")
+      # Each table/count pair is rendered as a chip element
+      assert html =~ ~s(class="eits-chip eits-chip--muted gap-1")
       assert html =~ "sessions"
       assert html =~ "42"
       assert html =~ "tasks"

@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           <button
             type="button"
             phx-click="open_create_note_modal"
-            class="btn btn-primary btn-sm mt-4"
+            class="eits-action eits-action--primary mt-4 gap-1.5"
           >
             <.icon name="hero-plus" class="size-4" /> Create Note
           </button>
@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           <button
             type="button"
             phx-click="open_create_note_modal"
-            class="btn btn-primary btn-sm self-start"
+            class="eits-action eits-action--primary self-start gap-1.5"
           >
             <.icon name="hero-plus" class="size-4" /> Create Note
           </button>

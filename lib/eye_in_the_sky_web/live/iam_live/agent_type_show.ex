@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
 
         <.link
           navigate={~p"/iam/simulator?agent_type=#{@agent_type}"}
-          class="btn btn-ghost btn-sm"
+          class="eits-action eits-action--ghost gap-1.5"
         >
           <.icon name="hero-beaker" class="size-4" /> Test in simulator
         </.link>
@@ -214,7 +214,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
                 </div>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs text-error"
+                  class="eits-action eits-action--danger h-7 min-h-0 gap-1 px-2"
                   phx-click="detach_document"
                   phx-value-doc_id={doc.id}
                   data-confirm={"Remove \"#{doc.name}\" from #{@agent_type}?"}
@@ -253,7 +253,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
               </label>
               <button
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="eits-action eits-action--primary"
                 phx-click="attach_document"
                 disabled={is_nil(@attach_doc_id)}
               >

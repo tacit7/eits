@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.DesktopTab do
                   value={@desktop_port || DesktopConfig.default_port()}
                   class="input input-bordered input-sm w-28 font-mono"
                 />
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                <button type="submit" class="eits-action eits-action--primary">Save</button>
               </form>
             </div>
             <p class="text-mini text-warning mt-3">

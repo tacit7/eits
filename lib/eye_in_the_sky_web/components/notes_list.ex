@@ -88,25 +88,30 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
             </div>
             <%!-- Collapse: chevron expands inline body --%>
             <div class="eits-disclosure eits-disclosure--row flex-1 overflow-visible">
-              <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5">
-                <%!-- Title — clicking navigates to full editor --%>
+              <input
+                id={"note-disclosure-#{note.id}"}
+                type="checkbox"
+                class="min-h-0 p-0"
+                checked={note.id == @editing_note_id}
+              />
+              <label
+                for={"note-disclosure-#{note.id}"}
+                data-vim-list-item
+                data-vim-item-type="note"
+                data-vim-item-id={note.id}
+                data-vim-item-title={note.title || extract_title(note.body)}
+                data-vim-item-url={"/notes/#{note.id}/edit"}
+                class="eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5"
+              >
+                <%!-- Title — clicking expands the inline note body --%>
                 <div class="flex items-center gap-2 pr-6">
                   <.icon
                     name="hero-document-text"
                     class="size-3.5 flex-shrink-0 text-base-content/35"
                   />
-                  <.link
-                    data-vim-list-item
-                    data-vim-item-type="note"
-                    data-vim-item-id={note.id}
-                    data-vim-item-title={note.title || extract_title(note.body)}
-                    data-vim-item-url={"/notes/#{note.id}/edit"}
-                    navigate={"/notes/#{note.id}/edit?return_to=#{URI.encode_www_form(@current_path)}"}
-                    class="text-message font-medium text-base-content/85 hover:text-base-content truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box"
-                  >
+                  <span class="text-message font-medium text-base-content/85 truncate [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box">
                     {note.title || extract_title(note.body)}
-                  </.link>
+                  </span>
                   <%= if starred?(note) do %>
                     <.icon name="hero-star-solid" class="size-3 text-warning flex-shrink-0" />
                   <% end %>
@@ -133,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                     {snippet}
                   </p>
                 <% end %>
-              </div>
+              </label>
               <div class="eits-disclosure__content px-3 pb-3">
                 <%= if note.id == @editing_note_id do %>
                   <div
@@ -185,7 +190,7 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   class="size-3.5"
                 />
               </button>
-              <div class="relative " id={"note-actions-#{note.id}"} phx-update="ignore">
+              <div class="eits-dropdown" id={"note-actions-#{note.id}"} phx-update="ignore">
                 <button
                   tabindex="0"
                   role="button"

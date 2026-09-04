@@ -296,14 +296,14 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class="fieldset mb-2">
       <label>
         <input type="hidden" name={@name} value="false" disabled={@rest[:disabled]} />
-        <span class="label">
+        <span class="eits-label">
           <input
             type="checkbox"
             id={@id}
             name={@name}
             value="true"
             checked={@checked}
-            class={@class || "checkbox checkbox-sm"}
+            class={@class || "eits-checkbox eits-checkbox--sm"}
             {@rest}
           />{@label}
         </span>
@@ -317,11 +317,14 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <select
           id={@id}
           name={@name}
-          class={[@class || "w-full select", @errors != [] && (@error_class || "select-error")]}
+          class={[
+            @class || "w-full eits-select",
+            @errors != [] && (@error_class || "eits-select--error")
+          ]}
           multiple={@multiple}
           {@rest}
         >
@@ -338,13 +341,13 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <textarea
           id={@id}
           name={@name}
           class={[
-            @class || "w-full textarea text-message",
-            @errors != [] && (@error_class || "textarea-error")
+            @class || "w-full eits-textarea text-message",
+            @errors != [] && (@error_class || "eits-textarea--error")
           ]}
           {@rest}
         >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
@@ -359,15 +362,15 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <input
           type={@type}
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            @class || "w-full input text-message",
-            @errors != [] && (@error_class || "input-error")
+            @class || "w-full eits-field text-message",
+            @errors != [] && (@error_class || "eits-field--error")
           ]}
           {@rest}
         />
@@ -442,7 +445,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       end
 
     ~H"""
-    <table class="table table-zebra">
+    <table class="eits-table">
       <thead>
         <tr>
           <th :for={col <- @col}>{col[:label]}</th>
@@ -775,11 +778,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   ## Examples
 
       <.form_field label="Title">
-        <input type="text" name="title" class="input input-bordered text-message" />
+        <input type="text" name="title" class="eits-field eits-field--bordered text-message" />
       </.form_field>
 
       <.form_field label="Budget" hint="Optional">
-        <input type="number" name="budget" class="input input-bordered" />
+        <input type="number" name="budget" class="eits-field eits-field--bordered" />
       </.form_field>
   """
   attr :label, :string, required: true
@@ -927,8 +930,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   Renders a search form with a magnifying glass icon on the left.
 
   Supports two sizes:
-  - `"sm"` (default) - page-level search bars (`input-sm min-h-[44px]`)
-  - `"xs"` - compact top-bar search bars (`input-xs h-7 text-mini`)
+  - `"sm"` (default) - page-level search bars (`eits-field--sm min-h-[44px]`)
+  - `"xs"` - compact top-bar search bars (`eits-field--xs h-7 text-mini`)
 
   ## Examples
 
@@ -973,11 +976,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         phx-debounce={@debounce}
         autocomplete={@autocomplete}
         data-vim-search={if @vim_search, do: "", else: nil}
-        class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
+        class={"eits-field w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
           "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
           if(@size == "xs",
-            do: "input-xs pl-8 h-7 text-mini",
-            else: "input-sm pl-9 min-h-[44px] text-message"
+            do: "eits-field--xs pl-8 h-7 text-mini",
+            else: "eits-field--sm pl-9 min-h-[44px] text-message"
           )}
       />
     </form>
@@ -1017,10 +1020,10 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def skeleton_row(assigns) do
     ~H"""
     <div class={"flex items-center gap-3 px-3 py-2.5 #{@class}"}>
-      <div class="skeleton size-4 rounded-full shrink-0" />
+      <div class="eits-skeleton size-4 rounded-full shrink-0" />
       <div class="flex flex-col gap-1.5 flex-1">
-        <div class="skeleton h-3 w-2/3" />
-        <div class="skeleton h-2.5 w-1/3" />
+        <div class="eits-skeleton h-3 w-2/3" />
+        <div class="eits-skeleton h-2.5 w-1/3" />
       </div>
     </div>
     """
@@ -1174,7 +1177,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def skeleton(assigns) do
     ~H"""
-    <div class={["skeleton", @class]} {@rest}></div>
+    <div class={["eits-skeleton", @class]} {@rest}></div>
     """
   end
 

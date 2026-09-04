@@ -488,6 +488,9 @@
     padding: 0 0.75rem 0.75rem;
   }
 
+  .eits-field,
+  .eits-select,
+  .eits-textarea,
   .input,
   .select,
   .textarea {
@@ -502,17 +505,22 @@
     transition-duration: 150ms;
   }
 
+  .eits-field,
+  .eits-select,
   .input,
   .select {
     min-height: 2.5rem;
     padding: 0.5rem 0.75rem;
   }
 
+  .eits-textarea,
   .textarea {
     min-height: 5rem;
     padding: 0.625rem 0.75rem;
   }
 
+  .eits-field--xs,
+  .eits-select--xs,
   .input-xs,
   .select-xs {
     min-height: 1.75rem;
@@ -520,6 +528,8 @@
     font-size: var(--text-mini);
   }
 
+  .eits-field--sm,
+  .eits-select--sm,
   .input-sm,
   .select-sm {
     min-height: 2rem;
@@ -527,23 +537,41 @@
     font-size: var(--text-mini);
   }
 
+  .eits-field--md,
+  .eits-select--md,
   .input-md,
   .select-md {
     min-height: 2.5rem;
   }
 
+  .eits-textarea--sm,
   .textarea-sm {
     min-height: 4rem;
     padding: 0.5rem 0.625rem;
     font-size: var(--text-mini);
   }
 
+  .eits-field--bordered,
+  .eits-select--bordered,
+  .eits-textarea--bordered,
   .input-bordered,
   .select-bordered,
   .textarea-bordered {
     border-color: color-mix(in oklch, var(--color-base-content) 14%, transparent);
   }
 
+  .eits-field--error,
+  .eits-select--error,
+  .eits-textarea--error,
+  .input-error,
+  .select-error,
+  .textarea-error {
+    border-color: color-mix(in oklch, var(--color-error) 55%, transparent);
+  }
+
+  .eits-field:focus,
+  .eits-select:focus,
+  .eits-textarea:focus,
   .input:focus,
   .select:focus,
   .textarea:focus {
@@ -552,11 +580,14 @@
     box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-primary) 16%, transparent);
   }
 
+  .eits-field::placeholder,
+  .eits-textarea::placeholder,
   .input::placeholder,
   .textarea::placeholder {
     color: color-mix(in oklch, var(--color-base-content) 32%, transparent);
   }
 
+  .eits-select,
   .select {
     appearance: none;
     padding-right: 2rem;
@@ -570,6 +601,7 @@
     background-repeat: no-repeat;
   }
 
+  .eits-label,
   .label {
     display: flex;
     min-height: 1.75rem;
@@ -580,10 +612,12 @@
     color: color-mix(in oklch, var(--color-base-content) 76%, transparent);
   }
 
+  .eits-label__text,
   .label-text {
     color: color-mix(in oklch, var(--color-base-content) 78%, transparent);
   }
 
+  .eits-label__hint,
   .label-text-alt {
     color: color-mix(in oklch, var(--color-base-content) 46%, transparent);
     font-size: var(--text-mini);
@@ -612,6 +646,7 @@
     font-size: var(--text-nano);
   }
 
+  .eits-checkbox,
   .checkbox {
     width: 1.125rem;
     height: 1.125rem;
@@ -626,6 +661,7 @@
     transition-duration: 150ms;
   }
 
+  .eits-checkbox:checked,
   .checkbox:checked {
     border-color: currentColor;
     background:
@@ -634,25 +670,30 @@
       currentColor;
   }
 
+  .eits-checkbox:focus-visible,
   .checkbox:focus-visible {
     outline: 2px solid color-mix(in oklch, var(--color-primary) 60%, transparent);
     outline-offset: 2px;
   }
 
+  .eits-checkbox--xs,
   .checkbox-xs {
     width: 0.875rem;
     height: 0.875rem;
   }
 
+  .eits-checkbox--sm,
   .checkbox-sm {
     width: 1rem;
     height: 1rem;
   }
 
+  .eits-checkbox--primary,
   .checkbox-primary {
     color: var(--color-primary);
   }
 
+  .eits-toggle,
   .toggle {
     width: 2.25rem;
     height: 1.25rem;
@@ -668,6 +709,7 @@
     transition-duration: 150ms;
   }
 
+  .eits-toggle:checked,
   .toggle:checked {
     border-color: currentColor;
     background:
@@ -675,24 +717,29 @@
       currentColor;
   }
 
+  .eits-toggle:focus-visible,
   .toggle:focus-visible {
     outline: 2px solid color-mix(in oklch, var(--color-primary) 60%, transparent);
     outline-offset: 2px;
   }
 
+  .eits-toggle--sm,
   .toggle-sm {
     width: 2rem;
     height: 1.125rem;
   }
 
+  .eits-toggle--primary,
   .toggle-primary {
     color: var(--color-primary);
   }
 
+  .eits-toggle--warning,
   .toggle-warning {
     color: var(--color-warning);
   }
 
+  .eits-table,
   .table {
     width: 100%;
     border-collapse: collapse;
@@ -700,6 +747,7 @@
     font-size: var(--text-message);
   }
 
+  .eits-table :where(th, td),
   .table :where(th, td) {
     border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 8%, transparent);
     padding: 0.75rem;
@@ -707,16 +755,19 @@
     vertical-align: top;
   }
 
+  .eits-table :where(th),
   .table :where(th) {
     color: color-mix(in oklch, var(--color-base-content) 56%, transparent);
     font-size: var(--text-mini);
     font-weight: 600;
   }
 
+  .eits-table--sm :where(th, td),
   .table-sm :where(th, td) {
     padding: 0.5rem;
   }
 
+  .eits-stats,
   .stats {
     display: grid;
     grid-auto-flow: column;
@@ -724,16 +775,19 @@
     border-radius: var(--radius-box);
   }
 
+  .eits-stat,
   .stat {
     display: inline-grid;
     gap: 0.25rem;
     padding: 1rem;
   }
 
+  .eits-tooltip,
   .tooltip {
     position: relative;
   }
 
+  .eits-tooltip::before,
   .tooltip::before {
     content: attr(data-tip);
     position: absolute;
@@ -752,17 +806,21 @@
     white-space: nowrap;
   }
 
+  .eits-tooltip:hover::before,
+  .eits-tooltip:focus-within::before,
   .tooltip:hover::before,
   .tooltip:focus-within::before {
     opacity: 1;
     transform: translateY(-50%) translateX(0);
   }
 
+  .eits-tooltip--right::before,
   .tooltip-right::before {
     top: 50%;
     left: calc(100% + 0.5rem);
   }
 
+  .eits-skeleton,
   .skeleton {
     background: linear-gradient(
       90deg,
@@ -1144,6 +1202,7 @@ form:focus-visible {
   background-color: hsl(60 2.1% 18.4%) !important; /* --bg-000 surfaces */
 }
 
+[data-theme="dark"] .eits-table,
 [data-theme="dark"] .table {
   background-color: transparent !important;
 }

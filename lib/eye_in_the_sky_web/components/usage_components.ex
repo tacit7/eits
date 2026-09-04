@@ -65,8 +65,8 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
       <%= if @recalculating do %>
         <div :for={_ <- 1..5} class="eits-panel bg-base-100 border border-base-300 shadow-sm">
           <div class="eits-panel__body p-4 text-center space-y-2">
-            <div class="skeleton h-3 w-20 mx-auto"></div>
-            <div class="skeleton h-8 w-24 mx-auto"></div>
+            <div class="eits-skeleton h-3 w-20 mx-auto"></div>
+            <div class="eits-skeleton h-8 w-24 mx-auto"></div>
           </div>
         </div>
       <% else %>
@@ -146,7 +146,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
           </span>
         </h2>
         <div class="overflow-x-auto">
-          <table class="table table-sm">
+          <table class="eits-table eits-table--sm">
             <thead>
               <tr class="text-base-content/60">
                 <th :for={col <- @column_defs} class={header_class(col)}>
@@ -163,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
               <%= if @recalculating do %>
                 <tr :for={_ <- 1..@loading_rows} class="hover">
                   <td :for={_ <- 1..length(@column_defs)}>
-                    <div class="skeleton h-4 w-full"></div>
+                    <div class="eits-skeleton h-4 w-full"></div>
                   </td>
                 </tr>
               <% else %>

@@ -47,6 +47,25 @@ defmodule EyeInTheSkyWeb.Components.NotesListTest do
     assert html =~ "Open full editor"
   end
 
+  test "renders notes with shared disclosure row styling" do
+    note = build_note()
+
+    html =
+      render_component(
+        &NotesList.notes_list/1,
+        notes: [note],
+        starred_filter: false,
+        search_query: "",
+        empty_id: "test-empty",
+        editing_note_id: nil,
+        current_path: "/notes"
+      )
+
+    assert html =~ "eits-disclosure--row"
+    assert html =~ "hero-document-text"
+    assert html =~ "pl-5"
+  end
+
   test "expand button encodes return_to from current_path" do
     note = build_note()
 

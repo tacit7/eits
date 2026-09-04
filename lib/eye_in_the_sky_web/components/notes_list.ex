@@ -87,14 +87,15 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
               />
             </div>
             <%!-- Collapse: chevron expands inline body --%>
-            <div class="eits-disclosure flex-1 overflow-visible">
+            <div class="eits-disclosure eits-disclosure--row flex-1 overflow-visible">
               <input type="checkbox" class="min-h-0 p-0" checked={note.id == @editing_note_id} />
-              <div class="eits-disclosure__summary py-2.5 px-0 min-h-0 flex flex-col gap-1">
+              <div class="eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5">
                 <%!-- Title — clicking navigates to full editor --%>
                 <div class="flex items-center gap-2 pr-6">
-                  <%= if starred?(note) do %>
-                    <.icon name="hero-star-solid" class="size-3 text-warning flex-shrink-0" />
-                  <% end %>
+                  <.icon
+                    name="hero-document-text"
+                    class="size-3.5 flex-shrink-0 text-base-content/35"
+                  />
                   <.link
                     data-vim-list-item
                     data-vim-item-type="note"
@@ -106,9 +107,12 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                   >
                     {note.title || extract_title(note.body)}
                   </.link>
+                  <%= if starred?(note) do %>
+                    <.icon name="hero-star-solid" class="size-3 text-warning flex-shrink-0" />
+                  <% end %>
                 </div>
                 <%!-- Metadata: type badge | source ref | age --%>
-                <div class="flex items-center gap-1.5 text-mini text-base-content/40">
+                <div class="flex items-center gap-1.5 pl-5 text-mini text-base-content/40">
                   <span class={[
                     "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-box text-mini font-medium",
                     parent_type_class(note.parent_type)
@@ -125,12 +129,12 @@ defmodule EyeInTheSkyWeb.Components.NotesList do
                 </div>
                 <%!-- Snippet preview --%>
                 <%= if snippet = extract_snippet(note.body) do %>
-                  <p class="text-mini text-base-content/35 truncate leading-snug mt-0.5 pr-6">
+                  <p class="text-mini text-base-content/55 truncate leading-snug mt-0.5 pl-5 pr-6">
                     {snippet}
                   </p>
                 <% end %>
               </div>
-              <div class="eits-disclosure__content px-0 pb-2">
+              <div class="eits-disclosure__content px-3 pb-3">
                 <%= if note.id == @editing_note_id do %>
                   <div
                     id={"note-editor-#{note.id}"}

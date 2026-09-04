@@ -506,6 +506,20 @@
     padding: 0 0.75rem 0.75rem;
   }
 
+  .eits-disclosure--row {
+    background: transparent;
+  }
+
+  .eits-disclosure--row .eits-disclosure__summary {
+    border-radius: var(--radius-box);
+    transition-property: color, background-color;
+    transition-duration: 150ms;
+  }
+
+  .eits-disclosure--row .eits-disclosure__summary:hover {
+    background: color-mix(in oklch, var(--color-base-content) 4%, transparent);
+  }
+
   .eits-field,
   .eits-select,
   .eits-textarea,

@@ -1376,7 +1376,7 @@ html[data-socket="disconnected"] #vsbar-status-dot {
   border-radius: 8px;
   border: 1px solid color-mix(in oklch, var(--color-base-content) 15%, transparent);
   background: var(--color-base-200);
-  box-shadow: 0 10px 38px rgb(0 0 0 / 45%);
+  box-shadow: 0 10px 38px color-mix(in oklch, var(--color-base-content) 32%, transparent);
   font-size: var(--text-message);
 }
 .ctx-menu-item {

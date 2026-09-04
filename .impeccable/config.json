@@ -1,3 +1,204 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-color",
+        "value": "rgb(40, 44, 52)",
+        "createdAt": "2026-09-04T07:14:23.175Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgb(171, 178, 191)",
+        "createdAt": "2026-09-04T07:14:23.215Z"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "17px",
+        "createdAt": "2026-09-04T07:14:23.255Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#c9d1d9",
+        "createdAt": "2026-09-04T07:14:23.296Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ff7b72",
+        "createdAt": "2026-09-04T07:14:23.357Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#d2a8ff",
+        "createdAt": "2026-09-04T07:14:23.398Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#79c0ff",
+        "createdAt": "2026-09-04T07:14:23.437Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#a5d6ff",
+        "createdAt": "2026-09-04T07:14:23.474Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffa657",
+        "createdAt": "2026-09-04T07:14:23.513Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#8b949e",
+        "createdAt": "2026-09-04T07:14:23.553Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#7ee787",
+        "createdAt": "2026-09-04T07:14:23.591Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#1f6feb",
+        "createdAt": "2026-09-04T07:14:23.628Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#f2cc60",
+        "createdAt": "2026-09-04T07:14:23.667Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#aff5b4",
+        "createdAt": "2026-09-04T07:14:23.708Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#033a16",
+        "createdAt": "2026-09-04T07:14:23.746Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffdcd7",
+        "createdAt": "2026-09-04T07:14:23.785Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#67060c",
+        "createdAt": "2026-09-04T07:14:23.824Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0d1117",
+        "createdAt": "2026-09-04T07:14:23.863Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#24292e",
+        "createdAt": "2026-09-04T07:14:23.902Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffffff",
+        "createdAt": "2026-09-04T07:14:23.941Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#d73a49",
+        "createdAt": "2026-09-04T07:14:23.979Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6f42c1",
+        "createdAt": "2026-09-04T07:14:24.018Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#005cc5",
+        "createdAt": "2026-09-04T07:14:24.057Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#032f62",
+        "createdAt": "2026-09-04T07:14:24.096Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#e36209",
+        "createdAt": "2026-09-04T07:14:24.134Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#6a737d",
+        "createdAt": "2026-09-04T07:14:24.172Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#22863a",
+        "createdAt": "2026-09-04T07:14:24.211Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#735c0f",
+        "createdAt": "2026-09-04T07:14:24.253Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#f0fff4",
+        "createdAt": "2026-09-04T07:14:24.293Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#b31d28",
+        "createdAt": "2026-09-04T07:14:24.414Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffeef0",
+        "createdAt": "2026-09-04T07:14:24.457Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#e6ffec",
+        "createdAt": "2026-09-04T07:14:24.498Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ffebe9",
+        "createdAt": "2026-09-04T07:14:24.545Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#ddf4ff",
+        "createdAt": "2026-09-04T07:14:24.589Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "#0550ae",
+        "createdAt": "2026-09-04T07:14:24.631Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(46, 160, 67, 0.18)",
+        "createdAt": "2026-09-04T07:14:24.674Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(248, 81, 73, 0.18)",
+        "createdAt": "2026-09-04T07:14:24.718Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(56, 139, 253, 0.12)",
+        "createdAt": "2026-09-04T07:14:24.757Z"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "rgba(88, 166, 255, 0.9)",
+        "createdAt": "2026-09-04T07:14:24.795Z"
+      }
+    ]
+  }
 }

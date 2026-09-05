@@ -1,3 +1,15 @@
+defmodule EyeInTheSky.Agents.CmdDispatcherTest.RecordingAgentManager do
+  @moduledoc false
+
+  def send_message(session_id, message, opts \\ []) do
+    if pid = Process.whereis(:cmd_dispatcher_dm_test) do
+      send(pid, {:agent_manager_send_message, session_id, message, opts})
+    end
+
+    {:ok, :sent}
+  end
+end
+
 defmodule EyeInTheSky.Agents.CmdDispatcherTest do
   use EyeInTheSky.DataCase, async: false
 
@@ -199,6 +211,54 @@ defmodule EyeInTheSky.Agents.CmdDispatcherTest do
   end
 
   describe "EITS-CMD: dm --to" do
+    test "delivers the DM through the target AgentWorker when one is live" do
+      sender = new_session()
+      receiver = create_session(create_agent(), %{provider: "codex", managed_by_app: false})
+      parent = self()
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Process.register(self(), :cmd_dispatcher_dm_test)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSky.Agents.CmdDispatcherTest.RecordingAgentManager
+      )
+
+      on_exit(fn ->
+        if Process.whereis(:cmd_dispatcher_dm_test) == self() do
+          Process.unregister(:cmd_dispatcher_dm_test)
+        end
+
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      worker =
+        spawn(fn ->
+          Registry.register(EyeInTheSky.Claude.AgentRegistry, {:session, receiver.id}, "codex")
+          send(parent, :registered)
+
+          receive do
+            :stop -> :ok
+          end
+        end)
+
+      on_exit(fn ->
+        if Process.alive?(worker), do: send(worker, :stop)
+      end)
+
+      assert_receive :registered
+
+      dispatch(~s(EITS-CMD: dm --to #{receiver.uuid} --message "hello live worker"), sender.id)
+
+      assert_receive {:agent_manager_send_message, session_id, body, opts}, 1_000
+      assert session_id == receiver.id
+      assert body =~ "DM from:"
+      assert body =~ "(session:#{sender.uuid})"
+      assert body =~ "hello live worker"
+      assert opts[:dm_metadata].from_session_uuid == sender.uuid
+    end
+
     test "accepts a numeric session id target" do
       sender = new_session()
       receiver = new_session()

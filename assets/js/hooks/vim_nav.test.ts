@@ -140,6 +140,27 @@ describe("VimNav.buildPath", () => {
 describe("VimNav mode transitions", () => {
   beforeEach(() => { document.body.innerHTML = "" })
 
+  it("resets navigation state on Phoenix page-loading-stop and unregisters on destroy", () => {
+    const h = makeHook()
+    h._recordSessionVisit = vi.fn()
+    h.mounted()
+    try {
+      h.listFocusIndex = 3
+      h._recentSessionIdx = 2
+
+      window.dispatchEvent(new CustomEvent("phx:page-loading-stop"))
+
+      expect(h.listFocusIndex).toBe(-1)
+      expect(h._recentSessionIdx).toBe(-1)
+      expect(h._recordSessionVisit).toHaveBeenCalledOnce()
+    } finally {
+      h.destroyed()
+    }
+
+    window.dispatchEvent(new CustomEvent("phx:page-loading-stop"))
+    expect(h._recordSessionVisit).toHaveBeenCalledOnce()
+  })
+
   it("focusin on non-editable element does NOT switch to insert", () => {
     const h = makeHook()
     h.mode = "normal"

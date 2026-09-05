@@ -70,6 +70,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       project_path: state.project_path,
       full_auto: true,
       bypass_sandbox: context[:bypass_sandbox] != false,
+      entrypoint: "sdk-cli",
       eits_session_uuid: state.eits_session_uuid,
       eits_session_id: state.session_id,
       eits_agent_uuid: state.agent_id,

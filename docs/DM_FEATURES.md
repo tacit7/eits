@@ -1007,7 +1007,14 @@ Agent DMs now use a structured format with a sender chip that shows agent name a
 
 **Message format:**
 
-New format (bracketed header):
+Current format (compact, commit f6d3609f):
+```
+DM from:<agent_name> (session:<uuid_or_id>) <message body>
+```
+
+Where the session reference is `from_session.uuid` with `from_session.id` as fallback. `DmHandler` delegates to `DMDelivery.deliver_or_persist/4` for live delivery into active workers.
+
+Legacy format (bracketed header, no longer generated):
 ```
 [DM from agent: <agent_name>]
 <message body>
@@ -1015,14 +1022,9 @@ New format (bracketed header):
 Reply: eits dm --to <session_id> --message ""
 ```
 
-Legacy format (still supported):
-```
-DM from:<agent_name> (session:<uuid>) <message body>
-```
-
 **DM parsing and stripping:**
 - `strip_dm_prefix/1`: Removes the DM header and reply footer, returning just the body content
-  - Handles both new bracketed format and legacy "DM from:" format
+  - Handles both current compact format and legacy bracketed format
   - Regex updated (commit 6edecd7e) to use `(.*)` capture to handle header-only DMs where the message body is empty
   - Regex tolerates no space after session UUID in legacy format
 
@@ -2775,9 +2777,9 @@ Two dead-code wrappers were removed from `MessagingController`:
 
 ## DMDelivery: deliver_or_persist and persist
 
-**Commit:** `ee5b42e0`
+**Commits:** `ee5b42e0`, `e51b7d53`
 
-Two new public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions whose status cannot accept live delivery.
+Two public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions that may or may not have a live worker.
 
 ### deliver_or_persist/4
 
@@ -2785,12 +2787,28 @@ Two new public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to ses
 def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{})
 ```
 
-Routes a DM based on the target session's current status:
+Routes a DM based on the target session's current status and whether a live in-process worker exists (commit `e51b7d53`):
 
-- **Terminal session (`completed` or `failed`):** Calls `persist/4` directly. There is no live worker to accept the message, so it is stored straight to the durable inbox without attempting live delivery.
-- **Non-terminal session (or session not found):** Falls through to `deliver_and_persist/4`, which delivers to the live worker and persists as before.
+```elixir
+cond do
+  session.status in Sessions.terminated_statuses() ->
+    persist(...)
 
-This replaces the previous behavior where DMs to terminated sessions were rejected outright at the API layer. Completed/failed sessions are still valid DM recipients — their messages are stored for later polling or inspection.
+  Sessions.app_managed?(session) or live_worker?(session_id) ->
+    deliver_and_persist(...)
+
+  true ->
+    persist(...)
+end
+```
+
+- **Terminated session (`completed` or `failed`):** Persists directly — no live worker possible.
+- **App-managed session OR live worker present:** Delivers to the in-process worker and persists. The `live_worker?/1` check allows non-app-managed sessions (e.g. Codex sdk-cli agents) that still have a registered `AgentRegistry` pid to receive live delivery.
+- **Otherwise:** Persists directly to the durable inbox for later polling.
+
+**`live_worker?/1` (private):** Looks up `Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session_id})` and checks `Process.alive?(pid)`. Rescues `ArgumentError` (uninitialized registry in test) → `false`.
+
+This replaces the previous two-branch `if` that denied live delivery to any non-app-managed session, which caused Codex sdk-cli agents to miss DMs while their worker was still running.
 
 ### persist/4
 
@@ -2803,7 +2821,9 @@ Persists a DM directly to the messages table and broadcasts a `session_new_dm` P
 Previously this logic was inlined inside `deliver_and_persist/4`; it is now a named public function so `deliver_or_persist/4` can call it independently.
 
 **Files:**
-- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4` and `persist/4`
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4`, `persist/4`, `live_worker?/1`
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` — now passes `entrypoint: "sdk-cli"` in spawn context so hooks correctly classify Codex sessions
+- `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — delegates to `DMDelivery.deliver_or_persist/4` instead of hand-building a message row
 
 ---
 

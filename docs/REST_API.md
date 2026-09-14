@@ -2011,6 +2011,7 @@ List teams with optional filtering by status and result limit.
 |-------|------|----------|-------------|
 | `status` | string | no | Filter by status: `"active"` (default, excludes archived), `"all"` (includes archived teams). Returns 400 on invalid input |
 | `limit` | integer | no | Max results per page. Must be positive; returns 400 on negative or zero values |
+| `member_agent_uuid` | string | no | Filter to teams that have a member matching this agent identity. Accepts either an agent UUID or a numeric agent ID (as a string). An identity that resolves to no agent returns an empty list rather than an error |
 
 **Response:** `200 OK`
 
@@ -2033,6 +2034,7 @@ List teams with optional filtering by status and result limit.
 ```bash
 curl 'localhost:5001/api/v1/teams?status=active&limit=20'
 curl 'localhost:5001/api/v1/teams?status=all'
+curl 'localhost:5001/api/v1/teams?member_agent_uuid=42'
 eits teams list
 eits teams list --limit 50
 ```

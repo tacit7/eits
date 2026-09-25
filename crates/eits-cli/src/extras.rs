@@ -67,6 +67,10 @@ fn which_on_path(name: &str) -> Option<PathBuf> {
 }
 
 pub fn exec_extras(path: &std::path::Path, args: &[OsString]) -> std::io::Error {
+    use std::io::Write;
     use std::os::unix::process::CommandExt;
+    // Keep arguments and paths private, and never let a diagnostic prevent delegation.
+    let _ = std::io::stderr()
+        .write_all(b"[eits] delegating to legacy eits-extras; output format may differ\n");
     std::process::Command::new(path).args(args).exec()
 }

@@ -38,7 +38,7 @@ fn quiet_outputs_only_uuid_and_preserves_payload() {
             .assert()
             .success()
             .stdout(format!("{UUID}\n"))
-            .stderr("");
+            .stderr("[eits] delegating to legacy eits-extras; output format may differ\n");
         let requests = server.finish();
         assert_eq!(requests.len(), 1);
         assert_eq!(requests[0].method, "POST");

@@ -160,6 +160,9 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionController do
       params["process_owner"] == "terminal" ->
         Map.put(attrs, :managed_by_app, false)
 
+      params["entrypoint"] == "sdk-cli" ->
+        Map.put(attrs, :managed_by_app, true)
+
       params["entrypoint"] == "cli" ->
         Map.put(attrs, :managed_by_app, false)
 

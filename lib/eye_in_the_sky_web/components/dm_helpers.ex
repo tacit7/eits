@@ -92,18 +92,11 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
         end
 
       # Legacy format: DM from:<name> (session:<uuid>) <body>
-      match = Regex.run(~r/^DM from:([^\(]+)\(session:([^\)]+)\)\s*(.*)/s, body) ->
-        [_, sender, session_id, rest] = match
+      match = Regex.run(~r/^DM from:([^\(]+)\(session:[^\)]+\)\s*(.*)/s, body) ->
+        [_, sender, rest] = match
         rest = String.trim(rest)
         {status, url} = extract_dm_status_and_url(rest)
-
-        %{
-          sender: String.trim(sender),
-          status: status,
-          url: url,
-          session_id: String.trim(session_id),
-          format: :legacy
-        }
+        %{sender: String.trim(sender), status: status, url: url, session_id: nil, format: :legacy}
 
       true ->
         nil

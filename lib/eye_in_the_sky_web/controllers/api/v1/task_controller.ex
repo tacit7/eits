@@ -206,12 +206,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   @doc """
   PATCH /api/v1/tasks/:id - Update a task.
   Body: state_id, priority, state (shorthand: "done", "start")
+  project_id is not supported on updates; project reassignment is rejected.
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
       {:error, :not_found} -> {:error, :not_found, "Task not found"}
       {:ok, task} -> do_update_task(conn, task, params)
     end
+  end
+
+  defp do_update_task(_conn, _task, %{"project_id" => _}) do
+    {:error, "project_id cannot be updated; task project reassignment is not supported"}
   end
 
   defp do_update_task(conn, task, params) do

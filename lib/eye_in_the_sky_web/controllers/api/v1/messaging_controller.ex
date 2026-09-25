@@ -87,12 +87,14 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def wait_dm(conn, params) do
     session_raw = params["session"] || params["session_id"]
+    caller_session_raw = conn |> get_req_header("x-eits-session") |> List.first()
     timeout_ms = min(parse_int(params["timeout"], 25), 55) * 1000
 
     if is_nil(session_raw) or session_raw == "" do
       {:error, :bad_request, "session is required"}
     else
       with {:ok, session} <- SessionResolver.resolve(session_raw),
+           :ok <- authorize_session_recipient(caller_session_raw, session.id),
            {:ok, since_dt} <- parse_since(params["since"]) do
         # Subscribe before the initial DB check so a DM delivered in the gap
         # between the check and subscribing is still caught by the broadcast.
@@ -103,6 +105,7 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
           [] -> wait_for_dm(conn, session, System.monotonic_time(:millisecond) + timeout_ms)
         end
       else
+        {:error, :forbidden} -> {:error, :forbidden, "You are not the recipient of this message"}
         {:error, :not_found} -> {:error, :not_found, "session not found"}
         {:error, :bad_request, reason} -> {:error, :bad_request, reason}
       end

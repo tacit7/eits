@@ -510,7 +510,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
           "already here"
         )
 
-      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+        |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+
       resp = json_response(conn, 200)
 
       assert resp["count"] == 1
@@ -526,7 +530,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       test_pid = self()
 
       spawn(fn ->
-        conn = get(api_conn(), ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=5")
+        conn =
+          api_conn()
+          |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+          |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=5")
+
         send(test_pid, {:wait_result, json_response(conn, 200)})
       end)
 
@@ -549,7 +557,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       agent = create_agent()
       session = create_session(agent)
 
-      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+        |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+
       resp = json_response(conn, 200)
 
       assert resp["count"] == 0

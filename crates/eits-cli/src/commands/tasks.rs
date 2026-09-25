@@ -11,6 +11,10 @@ pub enum TasksCmd {
     List {
         #[arg(short = 's', long)]
         session: Option<String>,
+        /// Filter by API state ID (1=To Do, 2=In Progress, 3=Done, 4=In Review)
+        /// or alias (e.g. in_progress); see `eits tasks states` for all aliases.
+        #[arg(long, value_parser = parse_list_state)]
+        state: Option<i64>,
         #[arg(short = 'p', long)]
         project: Option<String>,
         #[arg(short = 'l', long)]
@@ -152,15 +156,29 @@ use super::{is_numeric, items_and_count, uri_encode};
 /// `apply_update_state` (the `update`/`begin`/`claim` alias resolver) and the
 /// `states` command derive from this table so they cannot drift apart.
 const STATE_ALIAS_TABLE: &[(i64, &str, &[&str])] = &[
-    (1, "To Do", &["todo", "to-do", "to do"]),
+    (1, "To Do", &["todo", "to-do", "to do", "to_do"]),
     (
         2,
         "In Progress",
-        &["start", "in-progress", "progress", "in progress"],
+        &["start", "in-progress", "progress", "in progress", "in_progress"],
     ),
     (3, "Done", &["done", "complete", "completed"]),
-    (4, "In Review", &["in-review", "review", "in review"]),
+    (4, "In Review", &["in-review", "review", "in review", "in_review"]),
 ];
+
+// Listing takes API IDs, not the legacy update command's workflow positions.
+fn parse_list_state(value: &str) -> Result<i64, String> {
+    let lower = value.to_lowercase();
+    STATE_ALIAS_TABLE
+        .iter()
+        .find(|(id, _, aliases)| {
+            value.parse::<i64>().ok() == Some(*id) || aliases.contains(&lower.as_str())
+        })
+        .map(|(id, _, _)| *id)
+        .ok_or_else(|| {
+            "expected API state ID 1=To Do, 2=In Progress, 3=Done, 4=In Review or an alias from `eits tasks states`".into()
+        })
+}
 
 /// Port of bash `update`'s `_resolve_state`: numeric input remaps workflow
 /// position (1-4) to the actual DB state_id (3 and 4 are swapped); named
@@ -238,6 +256,7 @@ pub fn run(
 
         TasksCmd::List {
             session,
+            state,
             project,
             limit,
             query,
@@ -253,6 +272,9 @@ pub fn run(
                 ));
             }
             let mut qs: Vec<(String, String)> = Vec::new();
+            if let Some(state_id) = state {
+                qs.push(("state_id".into(), state_id.to_string()));
+            }
             let project_flag = project.is_some();
             if let Some(p) = &project {
                 qs.push(("project_id".into(), p.clone()));

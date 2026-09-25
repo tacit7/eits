@@ -29,11 +29,19 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
     # missing Pi/Ollama rows for anyone who never separately opened the New
     # Agent drawer (the only other host still warming the cache).
     ModelDiscoveryCache.refresh_async()
+    model = Settings.get("default_model") |> normalize_model_alias()
+
+    provider =
+      cond do
+        ModelConfig.valid_model?("codex", model) -> "codex"
+        ModelConfig.valid_model?("pi", model) -> "pi"
+        true -> "claude"
+      end
 
     {:ok,
      assign(socket,
-       selected_model: default_claude_model(),
-       selected_provider: "claude",
+       selected_model: model,
+       selected_provider: provider,
        selected_prompt_id: nil,
        prefill_text: "",
        available_agents: [],
@@ -617,10 +625,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
       </button>
     </div>
     """
-  end
-
-  defp default_claude_model do
-    Settings.get("default_model") |> normalize_model_alias()
   end
 
   defp list_agents(project_path) do

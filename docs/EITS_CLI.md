@@ -59,7 +59,7 @@ With `--quiet`, only the ID:
 
 1. **JSON-only stdout for Rust-owned commands** — all Rust-owned responses are JSON (even errors); never plain text tables or shell-friendly output. Legacy extras may still emit their historical formats until ported.
 
-2. **Strict config validation** — missing or malformed `EITS_URL` exits immediately with a usage error (exit 2) instead of defaulting silently.
+2. **Config validation** — a selected `EITS_URL` with an invalid scheme or spaces exits with a configuration error (exit 2). An unset variable uses the configuration sources below; it is not an error.
 
 3. **Compact JSON default** — responses are one-line JSON unless `--pretty` or `EITS_PRETTY=1`. Bash eits pretty-prints by default.
 
@@ -83,10 +83,55 @@ EITS_SESSION_ID          # Numeric session ID
 EITS_AGENT_UUID          # Agent UUID
 EITS_PROJECT_ID          # Project context
 EITS_PRETTY=1            # Pretty-print JSON (same as --pretty flag)
-EITS_COMPACT=1           # Single-line JSON (default)
+EITS_RETRY=0             # Disable HTTP retries (other values keep retries enabled)
+EITS_RETRY_BASE_MS       # Retry base delay in milliseconds (default: 2000)
 EITS_EXTRAS              # Optional path to legacy extras executable
 EITS_CODEX_ENV_FILE      # Optional Codex session env file
 ```
+
+### API URL selection (Rust CLI)
+
+`EITS_API_URL` is unused by the Rust CLI: it is neither an alias for `EITS_URL`
+nor a backup endpoint. URL selection follows these branches, without probing
+server availability:
+
+1. Process `EITS_URL` wins, including when it is empty or invalid (which fails
+   validation rather than falling through).
+2. Otherwise, if `desktop.json` exists in the EITS configuration directory,
+   an integer `port` from 1024 through 49151 selects
+   `http://localhost:<port>/api/v1`. Unreadable or malformed JSON fails with exit 2.
+   A missing, non-integer, or out-of-range port proceeds directly to step 4,
+   **skipping the Codex env file URL**.
+3. Only when `desktop.json` does not exist, the selected Codex env file's
+   `EITS_URL` is used if present.
+4. The first line starting exactly `EITS_URL=` in the configuration directory's
+   `.env` supplies the URL. Use an unquoted value, without `export`. If the file
+   cannot be read or has no matching line, use `http://localhost:5001/api/v1`.
+
+The configuration directory is `$XDG_CONFIG_HOME/eits`, or `$HOME/.config/eits`
+when `XDG_CONFIG_HOME` is unset. The Codex file is selected by
+`EITS_CODEX_ENV_FILE`, otherwise by the first set variable among
+`EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, and `CODEX_SESSION_ID`, giving
+`$HOME/.eits/codex/sessions/<session>.env`. Characters outside ASCII letters,
+digits, `_`, `.`, and `-` in that session identifier become `_`. An unreadable
+Codex file provides no fallback values. Codex files accept `export` and quoted
+values; they are parsed, not executed.
+
+Supply the full base URL including `/api/v1`; the CLI removes trailing slashes
+but does not append the API path. Connection failure does not switch servers.
+To explicitly retry against a remote server, set `EITS_URL` for the command:
+
+```bash
+EITS_URL=https://eits.dev/api/v1 eits tasks link-session <task_id> <session_uuid>
+```
+
+`tasks link-session` reports connection failures as JSON on stdout with
+`code: "connection_failed"`, the attempted endpoint, and a hint to check the
+server or `EITS_URL`; it exits 3. This also applies with `--quiet`. Configuration
+validation failures emit `code: "config_invalid"` and exit 2. HTTP errors exit 1
+and include an HTTP `status`; connection/configuration errors omit that field.
+`EITS_RETRY=0` disables retries when diagnosing a failed connection; it does not
+change URL selection. `EITS_API_KEY` controls authentication, not routing.
 
 ### Opt-In / Cutover Strategy
 

@@ -334,4 +334,65 @@ mod tests {
         .unwrap();
         assert_eq!(c.session_identity(), Some("u-1"));
     }
+
+    #[test]
+    fn url_precedence_preserves_desktop_branch_and_ignores_api_url() {
+        let cfg = tempfile::tempdir().unwrap();
+        let codex = cfg.path().join("codex.env");
+        std::fs::write(&codex, "export EITS_URL='https://codex.example/api/v1'\n").unwrap();
+        let codex_path = codex.to_str().unwrap();
+        let pairs = [
+            ("EITS_CODEX_ENV_FILE", codex_path),
+            ("EITS_API_URL", "https://unused.example/api/v1"),
+        ];
+        let resolve = || {
+            Config::resolve_from(&env(&pairs), cfg.path())
+                .unwrap()
+                .base_url
+        };
+
+        std::fs::write(
+            cfg.path().join(".env"),
+            "EITS_URL=https://config.example/api/v1\n",
+        )
+        .unwrap();
+        assert_eq!(resolve(), "https://codex.example/api/v1");
+
+        let desktop = cfg.path().join("desktop.json");
+        std::fs::write(&desktop, r#"{"port":34877}"#).unwrap();
+        assert_eq!(resolve(), "http://localhost:34877/api/v1");
+        for raw in [r#"{}"#, r#"{"port":"34877"}"#, r#"{"port":70000}"#] {
+            std::fs::write(&desktop, raw).unwrap();
+            assert_eq!(resolve(), "https://config.example/api/v1");
+        }
+
+        std::fs::write(&desktop, "{invalid").unwrap();
+        let mut explicit = pairs.to_vec();
+        explicit.push(("EITS_URL", "https://process.example/api/v1/"));
+        assert_eq!(
+            Config::resolve_from(&env(&explicit), cfg.path())
+                .unwrap()
+                .base_url,
+            "https://process.example/api/v1"
+        );
+        explicit.pop();
+        explicit.push(("EITS_URL", ""));
+        assert_eq!(
+            Config::resolve_from(&env(&explicit), cfg.path())
+                .unwrap_err()
+                .exit_code(),
+            2
+        );
+
+        let empty = tempfile::tempdir().unwrap();
+        assert_eq!(
+            Config::resolve_from(
+                &env(&[("EITS_API_URL", "https://unused.example/api/v1")]),
+                empty.path()
+            )
+            .unwrap()
+            .base_url,
+            "http://localhost:5001/api/v1"
+        );
+    }
 }

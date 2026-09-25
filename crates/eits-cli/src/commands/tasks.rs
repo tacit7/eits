@@ -215,6 +215,31 @@ fn states_payload() -> Value {
     json!({ "items": items, "count": count })
 }
 
+fn create_project_from_cwd(client: &Client) -> Option<String> {
+    let project_id = (|| {
+        let cwd = std::env::current_dir().ok()?.canonicalize().ok()?;
+        let resp = client
+            .get(&format!(
+                "/projects?path={}",
+                uri_encode(&cwd.to_string_lossy())
+            ))
+            .ok()?;
+        let projects = resp.get("projects")?.as_array()?;
+        let [project] = projects.as_slice() else {
+            return None;
+        };
+        match project.get("id")? {
+            Value::Number(id) => id.as_i64().filter(|id| *id > 0).map(|id| id.to_string()),
+            Value::String(id) if id.parse::<i64>().is_ok_and(|id| id > 0) => Some(id.clone()),
+            _ => None,
+        }
+    })();
+    if project_id.is_none() {
+        eprintln!("warning: could not infer a project from cwd; creating a global/unscoped task. Use --project or EITS_PROJECT_ID to select a project.");
+    }
+    project_id
+}
+
 pub fn run(
     client: &Client,
     cfg: &Config,
@@ -624,7 +649,9 @@ pub fn run(
             priority,
         } => {
             let identity = cfg.session_identity().unwrap_or("").to_string();
-            let project_id = project.or_else(|| cfg.project_id.clone());
+            let project_id = project
+                .or_else(|| cfg.project_id.clone())
+                .or_else(|| create_project_from_cwd(client));
             let body = json!({
                 "title": title,
                 "description": description.unwrap_or_default(),

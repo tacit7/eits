@@ -43,11 +43,14 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
         Some(_) => match whoami::resolve(client, cfg) {
             Ok(snapshot) => Some(snapshot),
             Err(err) => {
-                warnings.push(format!("session lookup unavailable: {}", err.message));
+                warnings.push(lookup_error("session", &err));
                 None
             }
         },
-        None => None,
+        None => {
+            warnings.push("session lookup unavailable: missing session identity".into());
+            None
+        }
     };
 
     if let Some(snapshot) = &session_snapshot {
@@ -66,6 +69,11 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
             .get("worktree_path")
             .cloned()
             .unwrap_or(Value::Null);
+        identity["started_at"] = snapshot
+            .session
+            .get("started_at")
+            .cloned()
+            .unwrap_or(Value::Null);
         identity["status"] = snapshot
             .session
             .get("status")
@@ -82,6 +90,15 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
             "agent_uuid": cfg.agent_uuid.is_some(),
             "project_id": cfg.project_id.is_some(),
             "session_resolved": session_snapshot.is_some(),
+            "registration": match &session_snapshot {
+                Some(snapshot) => match snapshot.session.get("initialized").and_then(Value::as_bool) {
+                    Some(true) => "registered",
+                    Some(false) => "not_initialized",
+                    None => "unknown",
+                },
+                None if cfg.session_identity().is_none() => "missing_identity",
+                None => "unavailable",
+            },
         }),
     );
 
@@ -89,26 +106,35 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
     let mut active_tasks: Vec<Value> = Vec::new();
     let mut tasks_ok = false;
     if let Some(identity) = cfg.session_identity() {
-        let mut qs = format!("session_id={identity}&limit=200");
+        let mut qs = format!("session_id={}&limit=200", super::uri_encode(identity));
         if let Some(pid) = cfg.project_id.as_deref() {
-            qs.push_str(&format!("&project_id={pid}"));
+            qs.push_str(&format!("&project_id={}", super::uri_encode(pid)));
         }
         match client.get(&format!("/tasks?{qs}")) {
             Ok(resp) => {
-                task_items = collection_items(&resp, &["tasks", "results"]);
+                task_items = checked_items(&resp, &["tasks", "results"], "task", &mut warnings)
+                    .map(|items| {
+                        tasks_ok = true;
+                        items
+                    })
+                    .unwrap_or_default();
                 active_tasks = task_items
                     .iter()
                     .filter(|task| matches!(task_state_id(task), Some(2 | 4)))
                     .cloned()
                     .collect();
-                tasks_ok = true;
             }
-            Err(err) => warnings.push(format!("task lookup unavailable: {}", err.message)),
+            Err(err) => warnings.push(lookup_error("task", &err)),
         }
     }
     report.insert(
         "tasks".into(),
         json!({
+            "available": tasks_ok,
+            "limit": 200,
+            "possibly_truncated": task_items.len() == 200,
+            "in_progress_count": task_items.iter().filter(|task| task_state_id(task) == Some(2)).count(),
+            "in_progress_items": task_items.iter().filter(|task| task_state_id(task) == Some(2)).collect::<Vec<_>>(),
             "count": task_items.len(),
             "active_count": active_tasks.len(),
             "items": task_items,
@@ -129,15 +155,20 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
             super::uri_encode(&agent_uuid)
         )) {
             Ok(resp) => {
-                team_items = collection_items(&resp, &["teams"]);
-                teams_ok = true;
+                team_items = checked_items(&resp, &["teams"], "team", &mut warnings)
+                    .map(|items| {
+                        teams_ok = true;
+                        items
+                    })
+                    .unwrap_or_default();
             }
-            Err(err) => warnings.push(format!("team lookup unavailable: {}", err.message)),
+            Err(err) => warnings.push(lookup_error("team", &err)),
         }
     }
     report.insert(
         "team_memberships".into(),
         json!({
+            "available": teams_ok,
             "count": team_items.len(),
             "items": team_items,
         }),
@@ -148,15 +179,22 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
     let mut inbox_ok = false;
     if let Some(identity) = cfg.session_identity() {
         let mut qs: Vec<(String, String)> = vec![
-            ("session".into(), identity.to_string()),
+            ("session".into(), super::uri_encode(identity)),
             ("limit".into(), "20".into()),
         ];
         if let Some(created_at) = session_snapshot
             .as_ref()
-            .and_then(|snapshot| snapshot.session.get("created_at"))
+            .and_then(|snapshot| {
+                snapshot
+                    .session
+                    .get("started_at")
+                    .or_else(|| snapshot.session.get("created_at"))
+            })
             .and_then(Value::as_str)
         {
             qs.push(("since".into(), super::uri_encode(created_at)));
+        } else {
+            warnings.push("dm cutoff unavailable: missing session started_at; showing recent inbound messages".into());
         }
         let query_string = qs
             .iter()
@@ -165,15 +203,24 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
             .join("&");
         match client.get(&format!("/dm?{query_string}")) {
             Ok(resp) => {
-                inbox_items = collection_items(&resp, &["messages"]);
-                inbox_ok = true;
+                inbox_items = checked_items(&resp, &["messages"], "dm", &mut warnings)
+                    .map(|items| {
+                        inbox_ok = true;
+                        items
+                    })
+                    .unwrap_or_default();
             }
-            Err(err) => warnings.push(format!("dm lookup unavailable: {}", err.message)),
+            Err(err) => warnings.push(lookup_error("dm", &err)),
         }
     }
     report.insert(
         "inbox".into(),
         json!({
+            "available": inbox_ok,
+            "limit": 20,
+            "possibly_truncated": inbox_items.len() == 20,
+            "unread_count": Value::Null,
+            "unread_status": "unsupported_by_api",
             "count": inbox_items.len(),
             "items": inbox_items,
         }),
@@ -219,7 +266,7 @@ pub fn status_report(client: &Client, cfg: &Config) -> Value {
                 });
                 commits_ok = true;
             }
-            Err(err) => warnings.push(format!("commit tracking unavailable: {}", err.message)),
+            Err(err) => warnings.push(lookup_error("commit tracking", &err)),
         }
     } else if cfg.session_identity().is_none() {
         warnings.push("commit tracking unavailable: missing session identity".into());
@@ -266,6 +313,32 @@ fn update_health(report: &mut serde_json::Map<String, Value>, key: &str, ok: boo
     if let Some(health) = report.get_mut("health").and_then(Value::as_object_mut) {
         health.insert(key.to_string(), json!(ok));
     }
+}
+
+// Never include API error bodies or request URLs: either may contain credentials.
+fn lookup_error(section: &str, err: &EitsError) -> String {
+    format!(
+        "{section} lookup unavailable: {}",
+        json!({"code": err.code, "status": err.status})
+    )
+}
+
+fn checked_items(
+    resp: &Value,
+    keys: &[&str],
+    section: &str,
+    warnings: &mut Vec<String>,
+) -> Option<Vec<Value>> {
+    let items = keys
+        .iter()
+        .find_map(|key| resp.get(key).and_then(Value::as_array))
+        .cloned();
+    if items.is_none() {
+        warnings.push(format!(
+            "{section} lookup unavailable: invalid response (expected collection)"
+        ));
+    }
+    items
 }
 
 fn collection_items(resp: &Value, keys: &[&str]) -> Vec<Value> {

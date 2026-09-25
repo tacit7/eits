@@ -76,7 +76,10 @@ enum Cmd {
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
     /// Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
-    Doctor,
+    Doctor {
+        #[command(subcommand)]
+        cmd: Option<commands::doctor::DoctorCmd>,
+    },
     /// Report current work/session checkpoint status
     Work {
         #[command(subcommand)]
@@ -193,9 +196,10 @@ fn main() {
                 error::exit_with(err, pretty);
             }
         }
-        Cmd::Doctor => {
-            commands::doctor::run(pretty);
-        }
+        Cmd::Doctor { cmd } => match cmd {
+            Some(commands::doctor::DoctorCmd::Cli) => commands::doctor::run_cli(pretty),
+            None => commands::doctor::run(pretty),
+        },
         Cmd::Work { cmd } => {
             let cfg = match config::Config::resolve() {
                 Ok(cfg) => cfg,

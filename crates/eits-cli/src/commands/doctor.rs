@@ -5,6 +5,64 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
 
+#[derive(clap::Subcommand)]
+pub enum DoctorCmd {
+    /// Report local CLI build, executable, and migration routing without network access
+    Cli,
+}
+
+/// Local migration diagnostics deliberately bypass Config and never run a subprocess.
+pub fn run_cli(pretty: bool) {
+    use clap::CommandFactory;
+
+    let fallback = match crate::extras::find_extras_with_source() {
+        Ok((path, source)) => json!({
+            "available": true,
+            "path": path,
+            "source": source,
+            "executed": false,
+            "error": null,
+        }),
+        Err(_) => json!({
+            "available": false,
+            "path": null,
+            "source": null,
+            "executed": false,
+            // Resolver errors can contain raw environment values; do not print them.
+            "error": "extras_not_found",
+        }),
+    };
+    let command = crate::Cli::command();
+    let rust: Vec<&str> = command
+        .get_subcommands()
+        .map(|cmd| cmd.get_name())
+        .collect();
+    output::print_json(
+        &json!({
+            "schema_version": 1,
+            "implementation": "rust",
+            "executable": std::env::current_exe().ok(),
+            "version": env!("CARGO_PKG_VERSION"),
+            "build": {
+                "os": std::env::consts::OS,
+                "arch": std::env::consts::ARCH,
+                "debug_assertions": cfg!(debug_assertions),
+            },
+            "fallback": fallback,
+            "fallback_discovery_order": ["EITS_EXTRAS", "libexec", "sibling", "PATH"],
+            "command_families": {
+                "rust": rust,
+                // Known bundled legacy families, not a claim about an arbitrary override.
+                "legacy": ["projects", "agents", "tags", "jobs", "channels", "notifications",
+                    "prompts", "teams", "timer", "worktree", "hooks", "skills", "install",
+                    "uninstall", "queue", "search", "messages", "codex", "standup", "webhooks", "me"],
+                "unknown": "delegated_to_extras",
+            },
+        }),
+        pretty,
+    );
+}
+
 pub fn run(pretty: bool) {
     let mut warnings: Vec<String> = Vec::new();
     let cfg_result = Config::resolve();

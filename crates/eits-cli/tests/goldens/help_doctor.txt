@@ -1,6 +1,10 @@
 Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
 
-Usage: eits doctor [OPTIONS]
+Usage: eits doctor [OPTIONS] [COMMAND]
+
+Commands:
+  cli   Report local CLI build, executable, and migration routing without network access
+  help  Print this message or the help of the given subcommand(s)
 
 Options:
       --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)

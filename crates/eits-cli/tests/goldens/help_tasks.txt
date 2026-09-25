@@ -15,6 +15,8 @@ Commands:
   states        Show workflow state ids, names, and accepted aliases
   create        Create a task without claiming it
   claim         Claim an existing task (link session + set In Progress)
+  release       Release your task back to To Do and remove ownership
+  handoff       Transfer your task to another session (UUID or integer ID)
   delete        Delete a task
   active        In Progress + In Review tasks for the current session
   bulk-update   Apply the same update to multiple tasks at once

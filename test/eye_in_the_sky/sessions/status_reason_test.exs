@@ -16,6 +16,7 @@ defmodule EyeInTheSky.Sessions.StatusReasonTest do
         "rate_limit_error",
         "watchdog_timeout",
         "retry_exhausted",
+        "cli_exit_error",
         "session_ended",
         "sdk_completed",
         "zombie_swept"

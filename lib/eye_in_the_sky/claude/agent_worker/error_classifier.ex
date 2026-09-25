@@ -4,10 +4,10 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
 
   `classify/1` is the single source of truth: it maps a reason term to a
   category atom (`:billing_error`, `:authentication_error`, `:rate_limit_error`,
-  `:watchdog_timeout`, `:retry_exhausted`, `:transient`).
+  `:watchdog_timeout`, `:retry_exhausted`, `:cli_exit_error`, `:transient`).
 
   `systemic?/1` derives from `classify/1` — anything other than `:transient`
-  is systemic and should not be retried.
+  or `:rate_limit_error` is systemic and should not be retried.
 
   `status_reason/1` returns the string value persisted to
   `sessions.status_reason` so the LiveView badge layer can distinguish a
@@ -29,6 +29,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
           | :retry_exhausted
           | :user_canceled
           | :model_not_found
+          | :cli_exit_error
           | :transient
 
   # Rate-limit (429) is CATEGORIZED so the UI can surface a distinct badge, but
@@ -42,10 +43,13 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   def systemic?(reason), do: classify(reason) not in @non_systemic_categories
 
   @doc """
-  Map a reason term to a category atom. Unknown or retryable reasons return
-  `:transient`.
+  Map a reason term to a category atom. Unexplained non-zero process exits
+  are terminal; other unknown or retryable reasons return `:transient`.
   """
   @spec classify(term()) :: category()
+  # All CLI providers use this shape for abnormal exits without a richer error.
+  # An exit status alone is not evidence of a recoverable provider failure.
+  def classify({:exit_code, code}) when is_integer(code) and code != 0, do: :cli_exit_error
   def classify({:watchdog_timeout, _timeout_ms}), do: :watchdog_timeout
   def classify({:billing_error, _}), do: :billing_error
   def classify({:authentication_error, _}), do: :authentication_error

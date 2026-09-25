@@ -3,6 +3,27 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
 
+  describe "provider process exits" do
+    test "unexplained non-zero exits are terminal and have a persistent reason" do
+      for code <- [1, 2, 42, 127, 137, 255] do
+        reason = EyeInTheSky.SDK.MessageHandler.default_exit_reason(code)
+
+        assert reason == {:exit_code, code}
+        assert ErrorClassifier.classify(reason) == :cli_exit_error
+        assert ErrorClassifier.systemic?(reason)
+        assert ErrorClassifier.status_reason(reason) == "cli_exit_error"
+      end
+    end
+
+    test "timeouts and malformed exit tuples retain the fallback policy" do
+      for reason <- [:timeout, {:exit_code, 0}, {:exit_code, "1"}, {:exit_code, nil}] do
+        assert ErrorClassifier.classify(reason) == :transient
+        refute ErrorClassifier.systemic?(reason)
+        assert ErrorClassifier.status_reason(reason) == nil
+      end
+    end
+  end
+
   describe "systemic?/1 — atom-tagged billing/auth errors" do
     test "billing_error tuple is systemic" do
       assert ErrorClassifier.systemic?({:billing_error, "Credit balance is too low"})

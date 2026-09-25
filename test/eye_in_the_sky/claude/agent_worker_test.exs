@@ -859,8 +859,8 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     # Queue a second message
     assert {:ok, _} = AgentManager.send_message(session.id, "msg-2")
 
-    # Simulate transient error (non-systemic) — just exit with error code
-    send(mock_port, {:exit, 1})
+    # A transport timeout is retryable; an unexplained non-zero exit is terminal.
+    send(mock_port, {:exit, :timeout})
 
     # Should receive agent_stopped from error
     assert_receive {:agent_stopped, %{id: ^session_id}}, 5_000
@@ -1478,19 +1478,23 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
       assert state.queue == []
     end
 
-    test "non-systemic error (exit_code) does not enter :failed state", %{track: track} do
+    test "unknown non-zero provider exit fails the session and drains queued jobs", %{
+      track: track
+    } do
       {_agent, session} = create_test_agent_and_session(%{}, %{track: track})
       {worker_pid, sdk_ref} = start_worker_with_active_sdk(session, track)
 
-      send(worker_pid, {:claude_error, sdk_ref, {:exit_code, 1}})
-
-      Process.sleep(200)
+      send(worker_pid, {:claude_error, sdk_ref, {:exit_code, 42}})
 
       state = :sys.get_state(worker_pid)
-      # Non-systemic: worker does not enter :failed.
-      # process_next_job fires immediately, starting the queued job,
-      # so status is :running (or :retry_wait if SDK start failed).
-      assert state.status != :failed
+      assert state.status == :failed
+      assert state.queue == []
+      assert state.current_job == nil
+      assert state.sdk_ref == nil
+
+      updated = Sessions.get_session!(session.id)
+      assert updated.status == "failed"
+      assert updated.status_reason == "cli_exit_error"
     end
   end
 

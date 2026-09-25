@@ -701,8 +701,8 @@ The app spawns Codex CLI processes (Rust binary) as Erlang Ports via `EyeInTheSk
 - **Blocked variables**: `SECRET_KEY_BASE`, `DATABASE_URL`, `ANTHROPIC_API_KEY`, `BINDIR`, `ROOTDIR`, `EMU`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `ENTRYPOINT`
 - **Blocked prefixes**: `RELEASE_*`
 - **Exception**: `OPENAI_API_KEY` is intentionally NOT blocked — Codex requires it for operation.
-- `ENTRYPOINT` is stripped from inherited process env and reinjected as `cli` for app-spawned Codex runs.
-- Terminal-owned Codex sessions also use `ENTRYPOINT=cli`, but are marked `sessions.managed_by_app=false`; the app records DMs for them without spawning a Codex subprocess.
+- `ENTRYPOINT` is stripped from inherited process env and reinjected from the resolved Codex entrypoint (`sdk-cli` for EITS-managed startup unless explicitly overridden).
+- Terminal-owned Codex sessions use `ENTRYPOINT=cli` and are marked `sessions.managed_by_app=false`; the app records DMs for them without spawning a Codex subprocess.
 - All other environment variables are passed through to the spawned process.
 
 **Rationale**: Same as Claude CLI — prevents database credentials and internal binaries from leaking to spawned subprocesses.

@@ -156,13 +156,13 @@ assert_contains "env file includes session int id" "EITS_SESSION_ID=123" "$(cat 
 assert_contains "env file includes agent uuid" "EITS_AGENT_UUID=agent-uuid" "$(cat "$env_file")"
 assert_contains "env file includes agent int id" "EITS_AGENT_ID=456" "$(cat "$env_file")"
 assert_contains "env file includes project id" "EITS_PROJECT_ID=1" "$(cat "$env_file")"
-assert_contains "env file includes default codex entrypoint marker" "ENTRYPOINT=cli" "$(cat "$env_file")"
+assert_contains "env file includes default codex entrypoint marker" "ENTRYPOINT=sdk-cli" "$(cat "$env_file")"
 assert_contains "does not treat error JSON as found" "sessions create --session-id codex-test-session" "$(cat "$CALL_LOG")"
-assert_contains "auto-created terminal session persists cli entrypoint" "--entrypoint cli" "$(cat "$CALL_LOG")"
+assert_contains "auto-created EITS Codex session persists sdk-cli entrypoint" "--entrypoint sdk-cli" "$(cat "$CALL_LOG")"
 
 existing_payload='{"session_id":"codex-existing-session","model":"gpt-5.5","source":"startup"}'
 printf '%s' "$existing_payload" | HOME="$TEST_HOME" PATH="$FAKE_BIN:$PATH" EITS_URL="http://127.0.0.1:$TEST_PORT/api/v1" bash "$SCRIPT" >/dev/null 2>&1
-assert_file_eventually_contains "existing terminal session is patched with cli entrypoint" "sessions update codex-existing-session --status idle --project-id 1 --model gpt-5.5 --entrypoint cli" "$CALL_LOG"
+assert_file_eventually_contains "existing EITS Codex session is patched with sdk-cli entrypoint" "sessions update codex-existing-session --status idle --project-id 1 --model gpt-5.5 --entrypoint sdk-cli" "$CALL_LOG"
 
 rm -f "$env_file"
 ENTRYPOINT="custom-entrypoint" printf '%s' "$payload" | HOME="$TEST_HOME" PATH="$FAKE_BIN:$PATH" EITS_URL="http://127.0.0.1:$TEST_PORT/api/v1" ENTRYPOINT="custom-entrypoint" bash "$SCRIPT" >/dev/null 2>&1
@@ -170,7 +170,7 @@ assert_contains "env file preserves hook ENTRYPOINT when present" "ENTRYPOINT=cu
 
 printf 'export ENTRYPOINT=stale-saved-value\n' > "$env_file"
 printf '%s' "$payload" | HOME="$TEST_HOME" PATH="$FAKE_BIN:$PATH" EITS_URL="http://127.0.0.1:$TEST_PORT/api/v1" bash "$SCRIPT" >/dev/null 2>&1
-assert_contains "env file ignores previously saved ENTRYPOINT when hook omits it" "ENTRYPOINT=cli" "$(cat "$env_file")"
+assert_contains "env file ignores previously saved ENTRYPOINT when hook omits it" "ENTRYPOINT=sdk-cli" "$(cat "$env_file")"
 
 if [ "$FAIL" -gt 0 ]; then
   printf "\nFAILED: %s\n" "${ERRORS[*]}"

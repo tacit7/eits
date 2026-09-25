@@ -554,7 +554,8 @@ payload with `model: "gpt-5"` and no explicit `provider` now correctly registers
 **Process ownership:** `sessions.managed_by_app` controls whether the Phoenix app
 may start an `AgentWorker` for a session. Hook payloads with `entrypoint=cli`
 default to `managed_by_app=false`, making terminal sessions inbox-only from the
-app's perspective. App-created sessions set `managed_by_app=true`.
+app's perspective. EITS Codex startup defaults to `entrypoint=sdk-cli`, and
+app-created sessions set `managed_by_app=true`.
 
 Ownership applies to both message delivery and lifecycle automation:
 - `managed_by_app=true` means Phoenix owns the worker lifecycle and may start or
@@ -562,8 +563,8 @@ Ownership applies to both message delivery and lifecycle automation:
 - `managed_by_app=false` means the process is owned by an external terminal.
   Phoenix may persist messages and status updates, but it must not start a
   replacement process for that session.
-- `entrypoint=cli` is the terminal default for Codex startup hooks. Use
-  `managed_by_app=true` or `process_owner=app` only for sessions intentionally
+- `entrypoint=cli` is the explicit terminal-owned marker for Codex startup hooks.
+  Use `managed_by_app=true` or `process_owner=app` only for sessions intentionally
   spawned and controlled by the app.
 
 ---

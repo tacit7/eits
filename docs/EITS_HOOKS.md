@@ -166,9 +166,9 @@ terminal-launched Codex sessions.
 | `EITS_AGENT_UUID` | Agent UUID, when resolved |
 | `EITS_AGENT_ID` | Integer agent ID, when resolved |
 | `EITS_PROJECT_ID` | Integer project ID, when resolved |
-| `ENTRYPOINT` | Codex runtime-origin marker for later hook/tool env loading. Preserves the hook `ENTRYPOINT` value when present; otherwise defaults to `cli`. App-spawned Codex processes also use `cli`. |
+| `ENTRYPOINT` | Codex runtime-origin marker for later hook/tool env loading. Preserves the hook `ENTRYPOINT` value when present; otherwise defaults to `sdk-cli` for EITS Codex startup. Explicit `cli` marks terminal-owned sessions. |
 
-Terminal-launched sessions are not app-managed. When the startup hook creates or
+Terminal-owned sessions are not app-managed. When the startup hook creates or
 patches a session with `entrypoint=cli`, the API records `managed_by_app=false`
 unless the caller explicitly sends `managed_by_app=true` or `process_owner=app`.
 The app may display and store DMs for those sessions, but must not start a Codex

@@ -99,18 +99,27 @@ defmodule EyeInTheSky.Messages.Listings do
         query
       end
 
-    query =
-      if since do
-        where(query, [m], m.inserted_at > ^since)
-      else
+    case Keyword.get(opts, :watch_cursor) do
+      {%DateTime{} = timestamp, after_id} when is_integer(after_id) and after_id >= 0 ->
         query
-      end
+        |> where(
+          [m],
+          m.inserted_at > ^timestamp or
+            (m.inserted_at == ^timestamp and m.id > ^after_id)
+        )
+        |> order_by([m], asc: m.inserted_at, asc: m.id)
+        |> limit(^limit)
+        |> Repo.all()
 
-    query
-    |> order_by([m], desc: m.inserted_at, desc: m.id)
-    |> limit(^limit)
-    |> Repo.all()
-    |> Enum.reverse()
+      nil ->
+        query = if since, do: where(query, [m], m.inserted_at > ^since), else: query
+
+        query
+        |> order_by([m], desc: m.inserted_at, desc: m.id)
+        |> limit(^limit)
+        |> Repo.all()
+        |> Enum.reverse()
+    end
   end
 
   def list_pending_messages(session_id, opts \\ []) do

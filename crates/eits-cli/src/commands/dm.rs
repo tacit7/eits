@@ -21,6 +21,9 @@ pub enum DmCmd {
         since: Option<String>,
         #[arg(long = "since-session")]
         since_session: bool,
+        /// Fail instead of fetching DMs when the session start cannot be resolved.
+        #[arg(long, requires = "since_session")]
+        strict: bool,
         #[arg(long = "team-only")]
         team_only: bool,
         /// Accepted for muscle-memory parity with bash; Rust output is always JSON.
@@ -46,6 +49,12 @@ pub enum DmCmd {
         session: Option<String>,
         #[arg(long)]
         since: Option<String>,
+        /// Fetch DMs since the selected session's actual started_at timestamp.
+        #[arg(long = "since-session")]
+        since_session: bool,
+        /// Fail instead of fetching DMs when the session start cannot be resolved.
+        #[arg(long, requires = "since_session")]
+        strict: bool,
         /// Only keep DMs from sessions that share a team with the current agent.
         #[arg(long = "team-only")]
         team_only: bool,
@@ -128,6 +137,7 @@ pub fn run(
             limit,
             since,
             since_session,
+            strict,
             team_only,
             json_flag: _,
         }) => {
@@ -139,31 +149,7 @@ pub fn run(
                     )
                 })?;
 
-            let mut since = since;
-            if since_session {
-                match client.get(&format!("/sessions/{session}")) {
-                    Ok(v) => {
-                        let ts = v
-                            .get("created_at")
-                            .and_then(|t| t.as_str())
-                            .or_else(|| {
-                                v.get("session")
-                                    .and_then(|s| s.get("created_at"))
-                                    .and_then(|t| t.as_str())
-                            })
-                            .map(String::from);
-                        match ts {
-                            Some(ts) => since = Some(ts),
-                            None => eprintln!(
-                                "warning: --since-session: could not resolve session created_at; showing all DMs"
-                            ),
-                        }
-                    }
-                    Err(_) => eprintln!(
-                        "warning: --since-session: could not resolve session created_at; showing all DMs"
-                    ),
-                }
-            }
+            let (since, warning) = resolve_since(client, &session, since, since_session, strict)?;
 
             let mut qs: Vec<(String, String)> = vec![
                 ("session".into(), session),
@@ -188,7 +174,9 @@ pub fn run(
                 }
             }
 
-            output::print_json(&items_and_count(&resp, &["messages"]), pretty);
+            let mut result = items_and_count(&resp, &["messages"]);
+            attach_warning(&mut result, warning);
+            output::print_json(&result, pretty);
             Ok(())
         }
 
@@ -205,6 +193,8 @@ pub fn run(
         Some(DmCmd::Wait {
             session,
             since,
+            since_session,
+            strict,
             team_only,
             timeout,
         }) => {
@@ -216,6 +206,8 @@ pub fn run(
                     )
                 })?;
 
+            let (mut since, warning) =
+                resolve_since(client, &session, since, since_session, strict)?;
             let allowed = if team_only {
                 team_allowlist(client, cfg)
             } else {
@@ -223,9 +215,7 @@ pub fn run(
             };
 
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout);
-            let mut since = since;
-
-            let resp = loop {
+            let mut resp = loop {
                 let remaining = deadline.saturating_duration_since(std::time::Instant::now());
                 if remaining.is_zero() {
                     break json!({ "items": [], "count": 0 });
@@ -282,6 +272,7 @@ pub fn run(
                     break resp;
                 }
             };
+            attach_warning(&mut resp, warning);
             output::print_json(&resp, pretty);
             Ok(())
         }
@@ -313,6 +304,55 @@ pub fn run(
                 Ok(())
             }
         }
+    }
+}
+
+/// Resolve from session data, never agent creation or turn/activity timestamps.
+/// Keep an explicit --since on best-effort failure, matching inbox's existing behavior.
+fn resolve_since(
+    client: &Client,
+    session: &str,
+    since: Option<String>,
+    since_session: bool,
+    strict: bool,
+) -> Result<(Option<String>, Option<Value>), EitsError> {
+    if !since_session {
+        return Ok((since, None));
+    }
+    let response = client.get(&format!("/sessions/{}", uri_encode(session)));
+    let timestamp = response.as_ref().ok().and_then(|v| {
+        v.get("session")
+            .unwrap_or(v)
+            .get("started_at")
+            .and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .map(String::from)
+    });
+    if let Some(timestamp) = timestamp {
+        return Ok((Some(timestamp), None));
+    }
+    let message = "--since-session: could not resolve session start timestamp (started_at)";
+    if strict {
+        return Err(EitsError::config(message)
+            .with_hint("ensure the session API exposes started_at, or use an explicit --since without --since-session"));
+    }
+    let reason = match response {
+        Ok(_) => json!("missing_started_at"),
+        Err(err) => json!(err.code),
+    };
+    let warning = json!({
+        "code": "session_start_unresolved",
+        "message": message,
+        "session": session,
+        "reason": reason,
+        "effective_since": since,
+    });
+    Ok((since, Some(warning)))
+}
+
+fn attach_warning(response: &mut Value, warning: Option<Value>) {
+    if let Some(warning) = warning {
+        response["warnings"] = json!([warning]);
     }
 }
 

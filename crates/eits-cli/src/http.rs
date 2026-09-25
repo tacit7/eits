@@ -49,8 +49,14 @@ impl Client {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(2000);
+        // Only the explicit opt-out changes the existing retry policy.
+        let max_attempts = if std::env::var("EITS_RETRY").as_deref() == Ok("0") {
+            1
+        } else {
+            4
+        };
         let mut delay_ms = base_ms;
-        for attempt in 0..4 {
+        for attempt in 0..max_attempts {
             let mut req = self.http.request(method.clone(), &url);
             if let Some(k) = &self.cfg.api_key {
                 req = req.bearer_auth(k);
@@ -66,7 +72,7 @@ impl Client {
             match req.send() {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
-                    if matches!(status, 429 | 502 | 503 | 504) && attempt < 3 {
+                    if matches!(status, 429 | 502 | 503 | 504) && attempt + 1 < max_attempts {
                         eprintln!("[eits] {status}, retrying in {}ms...", jitter(delay_ms));
                         std::thread::sleep(Duration::from_millis(jitter(delay_ms)));
                         delay_ms = (delay_ms * 2).min(30_000);
@@ -87,7 +93,7 @@ impl Client {
                         )
                     });
                 }
-                Err(e) if (e.is_connect() || e.is_timeout()) && attempt < 3 => {
+                Err(e) if (e.is_connect() || e.is_timeout()) && attempt + 1 < max_attempts => {
                     eprintln!(
                         "[eits] connection error, retrying in {}ms... (server restarting?)",
                         jitter(delay_ms)
@@ -106,7 +112,7 @@ impl Client {
             }
         }
         Err(EitsError::api(
-            format!("cannot reach {url} after 4 attempts"),
+            format!("cannot reach {url} after {max_attempts} attempts"),
             crate::error::Code::ConnectionFailed,
             None,
         )

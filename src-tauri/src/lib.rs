@@ -48,6 +48,9 @@ static WINDOW_COUNTER: AtomicU32 = AtomicU32::new(2);
 /// Always-on-top state — persisted in memory, toggled via menu/tray.
 static ALWAYS_ON_TOP: AtomicBool = AtomicBool::new(false);
 
+/// Retain the tray item separately: AppHandle::menu() only exposes the app menu.
+struct TrayAlwaysOnTop(CheckMenuItem<tauri::Wry>);
+
 /// Pending navigation path set when a notification fires while the app is in the
 /// background. Drained on the next window-focus event so that clicking a
 /// notification navigates to the right session.
@@ -263,6 +266,7 @@ pub fn run() {
             // --- System tray ---
             let show_item = MenuItem::with_id(app, "show", "Show EITS", true, None::<&str>)?;
             let always_on_top_item = CheckMenuItem::with_id(app, "always_on_top", "Always on Top", true, false, None::<&str>)?;
+            app.manage(TrayAlwaysOnTop(always_on_top_item.clone()));
             let sep1 = PredefinedMenuItem::separator(app)?;
             let nav_dashboard = MenuItem::with_id(app, "nav_dashboard", "Dashboard", true, None::<&str>)?;
             let nav_sessions = MenuItem::with_id(app, "nav_sessions", "Sessions", true, None::<&str>)?;
@@ -739,10 +743,14 @@ fn toggle_always_on_top(app_handle: &tauri::AppHandle) {
         let _ = window.set_always_on_top(next);
     }
 
-    // Sync checkmark on the menu-bar item.
+    sync_always_on_top_checkmarks(app_handle, next);
+}
+
+fn sync_always_on_top_checkmarks(app_handle: &tauri::AppHandle, on: bool) {
+    let _ = app_handle.state::<TrayAlwaysOnTop>().0.set_checked(on);
     if let Some(menu) = app_handle.menu() {
         if let Some(tauri::menu::MenuItemKind::Check(item)) = menu.get("menu_always_on_top") {
-            let _ = item.set_checked(next);
+            let _ = item.set_checked(on);
         }
     }
 }
@@ -1258,18 +1266,13 @@ fn get_always_on_top() -> bool {
 
 /// Sets always-on-top explicitly (vsbar pin). Returns the applied state.
 /// Shares the ALWAYS_ON_TOP static with the menu/tray toggles and syncs the
-/// menu-bar checkmark, matching toggle_always_on_top's behavior.
+/// tray and menu-bar checkmarks, matching toggle_always_on_top's behavior.
 #[tauri::command]
 fn set_always_on_top(app: tauri::AppHandle, on: bool) -> bool {
     ALWAYS_ON_TOP.store(on, Ordering::Relaxed);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_always_on_top(on);
     }
-    if let Some(menu) = app.menu() {
-        if let Some(tauri::menu::MenuItemKind::Check(item)) = menu.get("menu_always_on_top") {
-            let _ = item.set_checked(on);
-        }
-    }
+    sync_always_on_top_checkmarks(&app, on);
     on
 }
-

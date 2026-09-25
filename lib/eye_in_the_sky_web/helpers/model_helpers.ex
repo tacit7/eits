@@ -62,7 +62,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
       {"gpt-5.6-sol", "GPT-5.6 Sol"},
       {"gpt-5.6-terra", "GPT-5.6 Terra"},
       {"gpt-5.6-luna", "GPT-5.6 Luna"},
-      {"gpt-5.5", "GPT-5.5"},
       {"gpt-5.2", "GPT-5.2"}
     ]
   end
@@ -77,8 +76,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
       {"gpt-5.6-terra", "GPT-5.6 Terra", "Balanced agentic coding model for everyday work",
        "text-warning"},
       {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model", "text-info"},
-      {"gpt-5.5", "GPT-5.5", "Frontier model for complex coding, research, and real-world work",
-       "text-info"},
       {"gpt-5.2", "GPT-5.2", "Optimized for professional work and long-running agents",
        "text-info"}
     ]
@@ -272,5 +269,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   defp short_alias_display("sonnet[1m]"), do: "Sonnet (1M)"
   defp short_alias_display("haiku"), do: "Haiku 4.5"
   defp short_alias_display("claude-opus-4-6"), do: "Opus 4.6"
+  defp short_alias_display("gpt-5.5"), do: "GPT-5.5"
   defp short_alias_display(other), do: other
 end

@@ -141,12 +141,14 @@ Session status is driven by Claude Code hooks and explicit commands:
 
 ## EITS Command Protocol
 
-All agents — interactive (`cli`) and headless (`sdk-cli`) — use the `eits` CLI script directly. EITS-CMD directives are deprecated.
+All agents — interactive (`cli`) and headless (`sdk-cli`) — use the Rust-primary `eits` CLI directly. EITS-CMD directives are deprecated.
+
+Use the existing installed `eits` when available. See [EITS CLI setup](docs/EITS_CLI_SETUP.md) for PATH checks and repo-local builds, and read [the Rust migration guide](docs/EITS_RUST_CLI_MIGRATION.md) before changing CLI commands, hooks, installers, skills, or release packaging.
 
 ```bash
 # Start a task
 eits tasks begin --title "Task name"       # create + start in one shot
-eits tasks begin --id <task_id>            # claim a pre-created task (orchestrator-assigned)
+eits tasks claim <task_id>                # claim a pre-created task (orchestrator-assigned)
 
 # Close a task (atomic: annotates + marks Done)
 eits tasks complete <id> --message "..."   # CANONICAL close path — one round-trip
@@ -166,7 +168,7 @@ eits commits create --hash <hash>
 
 **DM targets support both UUID and numeric session ID.** Pass either format to `dm --to`.
 
-(See `~/.claude/CLAUDE.md` for `eitsr` — the Rust CLI rewrite — usage; that's now the single source of truth for it, not duplicated here.)
+`eitsr` is a temporary compatibility alias, not a setup prerequisite. New commands and examples must use `eits`; do not invoke the Rust binary with `bash`. Unported command families automatically delegate to `eits-extras`.
 
 ## eits CLI Gotchas
 

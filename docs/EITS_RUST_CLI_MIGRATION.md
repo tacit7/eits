@@ -5,7 +5,7 @@ This document records the current state of the migration from the legacy Bash
 
 ## Current State
 
-- `eits` is intended to be the primary CLI command for agents and humans.
+- `eits` is the primary CLI command for agents and humans.
 - The Rust crate is `crates/eits-cli`.
 - The Rust binary target `eits` is the primary binary.
 - The Rust binary target `eitsr` still exists as a temporary compatibility
@@ -18,6 +18,10 @@ This document records the current state of the migration from the legacy Bash
   Rust release binary and `~/.local/bin/eits-extras` installed as the legacy
   fallback.
 
+See [EITS CLI setup](EITS_CLI_SETUP.md) for installed-command verification,
+PATH troubleshooting, and repo-local builds. A working installed `eits` is
+sufficient; no `eitsr` installation or shell alias is required.
+
 ## Rust-Owned Command Families
 
 These command families are owned by Rust today:
@@ -28,6 +32,9 @@ These command families are owned by Rust today:
 - `commits`
 - `notes`
 - `whoami`
+- `doctor`
+- `work`
+- `workflow`
 
 Agents should call `eits`, not `eitsr` and not `eits-extras`. The fallback is an
 implementation detail for unported command families.
@@ -90,7 +97,7 @@ Known full-project status:
 
 ## Next Steps
 
-1. Commit the current Rust-first baseline.
+1. Preserve the committed Rust-first baseline (`f49d0c1f` documents the cutover).
 2. Audit every installer, release workflow, app bundle path, hook, skill, and
    doc reference that still assumes Bash is `eits`.
 3. Port remaining command families from `scripts/eits-extras` into Rust one

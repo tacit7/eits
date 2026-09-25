@@ -1859,14 +1859,24 @@ USAGE
         fi
       fi
 
-      # Warn about stale worktrees before creating a new one — dangling entries cause name conflicts.
+      # Only the requested path or branch can conflict; unrelated worktrees are normal.
       if [[ -n "$worktree" ]]; then
-        local _wt_count
-        _wt_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
-        # git worktree list always includes the main worktree; >1 means additional worktrees exist
-        if [[ "${_wt_count:-0}" -gt 1 ]]; then
-          printf 'warning: %d additional worktrees registered.\n' "$((_wt_count - 1))" >&2
-          printf '         Merged branches may conflict with --worktree "%s". Run: git worktree prune\n' "$worktree" >&2
+        local _wt_project _wt_path _wt_entry _wt_conflict=false
+        _wt_project=$(cd "$project_path" 2>/dev/null && pwd -P) || _wt_project="$project_path"
+        _wt_path="${_wt_project%/}/.claude/worktrees/$worktree"
+        if [[ -e "$_wt_path" || -L "$_wt_path" ]]; then
+          _wt_conflict=true
+        else
+          while IFS= read -r -d '' _wt_entry; do
+            if [[ "$_wt_entry" == "worktree $_wt_path" || "$_wt_entry" == "branch refs/heads/worktree-$worktree" ]]; then
+              _wt_conflict=true
+              break
+            fi
+          done < <(git -C "$project_path" worktree list --porcelain -z 2>/dev/null || true)
+        fi
+        if [[ "$_wt_conflict" == true ]]; then
+          printf 'warning: worktree "%s" already has an existing path or registered worktree branch.\n' "$worktree" >&2
+          printf '         Inspect: git -C "%s" worktree list; prune only stale entries before retrying.\n' "$project_path" >&2
         fi
       fi
 

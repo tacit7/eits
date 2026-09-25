@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
 
   def action_menu(assigns) do
     ~H"""
-    <div class="relative " id={@wrapper_id}>
+    <div class="eits-dropdown" id={@wrapper_id}>
       <button
         tabindex="0"
         class={@button_class}

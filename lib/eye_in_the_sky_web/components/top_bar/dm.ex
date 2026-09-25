@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
       class="w-48"
     />
     <%!-- ... menu --%>
-    <div class="relative ">
+    <div class="eits-dropdown">
       <button
         tabindex="0"
         class="focus-ring flex h-7 w-7 items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"

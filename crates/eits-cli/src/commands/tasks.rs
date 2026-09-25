@@ -531,11 +531,24 @@ pub fn run(
                 if let Some(agent_uuid) = cfg.agent_uuid.as_deref() {
                     payload["agent_id"] = json!(agent_uuid);
                 }
-                if let Err(e) = client.post("/commits", payload) {
-                    eprintln!(
+                match client.post("/commits", payload) {
+                    Ok(result) => {
+                        for (field, action) in
+                            [("errors", "tracked"), ("link_errors", "linked to task")]
+                        {
+                            if let Some(errors) = result.get(field).and_then(Value::as_array) {
+                                for error in errors {
+                                    eprintln!(
+                                        "warning: task closed but commit {hash} could not be {action}: {error}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!(
                         "warning: task closed but commit {hash} could not be tracked: {}",
                         e.message
-                    );
+                    ),
                 }
             }
 

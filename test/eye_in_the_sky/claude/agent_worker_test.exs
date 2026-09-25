@@ -16,22 +16,26 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     Agent.start(fn -> [] end, name: :"test_sessions_#{inspect(test_pid)}")
 
     on_exit(fn ->
-      session_ids = Agent.get(:"test_sessions_#{inspect(test_pid)}", & &1)
-
-      Enum.each(session_ids, fn session_id ->
-        case Registry.lookup(AgentRegistry, {:session, session_id}) do
-          [{pid, _}] when is_pid(pid) ->
-            DynamicSupervisor.terminate_child(AgentSupervisor, pid)
-
-          _ ->
-            :ok
-        end
-      end)
+      stop_test_workers(:"test_sessions_#{inspect(test_pid)}")
 
       Agent.stop(:"test_sessions_#{inspect(test_pid)}", :normal, 1000)
     end)
 
     {:ok, track: :"test_sessions_#{inspect(test_pid)}"}
+  end
+
+  defp stop_test_workers(track) do
+    session_ids = Agent.get(track, & &1)
+
+    Enum.each(session_ids, fn session_id ->
+      case Registry.lookup(AgentRegistry, {:session, session_id}) do
+        [{pid, _}] when is_pid(pid) ->
+          DynamicSupervisor.terminate_child(AgentSupervisor, pid)
+
+        _ ->
+          :ok
+      end
+    end)
   end
 
   # Helper to create an agent + session pair for tests
@@ -55,11 +59,27 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
 
     {:ok, session} = Sessions.create_session(session_attrs)
 
-    if track = ctx[:track] do
-      Agent.update(track, fn ids -> [session.id | ids] end)
-    end
+    track = Map.get(ctx, :track, :"test_sessions_#{inspect(self())}")
+    Agent.update(track, fn ids -> [session.id | ids] end)
 
     {agent, session}
+  end
+
+  test "default session fixtures stop their workers before sandbox cleanup", %{track: track} do
+    {_agent, session} = create_test_agent_and_session()
+    assert {:ok, :started} = AgentManager.send_message(session.id, "cleanup regression")
+    assert is_pid(wait_for_mock_port(session.id))
+    [{worker, _}] = Registry.lookup(AgentRegistry, {:session, session.id})
+    ref = Process.monitor(worker)
+
+    # Also clean up on the red run, where the fixture is not tracked yet.
+    on_exit(fn ->
+      if Process.alive?(worker), do: DynamicSupervisor.terminate_child(AgentSupervisor, worker)
+    end)
+
+    stop_test_workers(track)
+    assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1_000
+    assert_eventually(fn -> Registry.lookup(AgentRegistry, {:session, session.id}) == [] end)
   end
 
   test "AgentWorker saves result via SDK and broadcasts to PubSub" do

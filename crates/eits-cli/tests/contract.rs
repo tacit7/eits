@@ -908,7 +908,7 @@ fn dm_inbox_normalizes_messages_key_and_sends_from_and_limit_params() {
         .unwrap()
         .env("EITS_URL", &srv.url)
         .env("EITS_SESSION_UUID", "s-1")
-        .args(["dm", "inbox", "--from", "2", "--limit", "5"])
+        .args(["dm", "inbox", "--all-time", "--from", "2", "--limit", "5"])
         .assert()
         .success();
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();

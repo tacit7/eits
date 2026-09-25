@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
@@ -401,8 +401,9 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "entries_for_provider/1 — pi" do
     test "preserves sub_provider from discovery and marks non-ollama as premium" do
+      previous_control = Application.fetch_env!(:eye_in_the_sky, :pi_control_module)
       Application.put_env(:eye_in_the_sky, :pi_control_module, __MODULE__.FakeControl)
-      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :pi_control_module) end)
+      on_exit(fn -> Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control) end)
       {:ok, _} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
 
       entries = ModelHelpers.entries_for_provider("pi")

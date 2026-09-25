@@ -128,6 +128,14 @@ pub enum TasksCmd {
         #[arg(long)]
         team: Option<String>,
     },
+    /// Release your task back to To Do and remove ownership
+    Release { id: String },
+    /// Transfer your task to another session (UUID or integer ID)
+    Handoff {
+        id: String,
+        #[arg(long)]
+        to: String,
+    },
     /// Delete a task
     Delete { id: String },
     /// In Progress + In Review tasks for the current session
@@ -697,6 +705,14 @@ pub fn run(
             Ok(())
         }
 
+        TasksCmd::Release { id } => {
+            ownership_change(client, cfg, &id, "release", None, quiet, pretty)
+        }
+
+        TasksCmd::Handoff { id, to } => {
+            ownership_change(client, cfg, &id, "handoff", Some(&to), quiet, pretty)
+        }
+
         TasksCmd::Delete { id } => {
             let resp = client.delete(&format!("/tasks/{id}"))?;
             if quiet {
@@ -818,6 +834,37 @@ pub fn run(
             Ok(())
         }
     }
+}
+
+
+fn ownership_change(
+    client: &Client,
+    cfg: &Config,
+    id: &str,
+    action: &str,
+    target: Option<&str>,
+    quiet: bool,
+    pretty: bool,
+) -> Result<(), EitsError> {
+    let identity = cfg
+        .session_identity()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            EitsError::usage(format!(
+                "{action}: EITS_SESSION_UUID or EITS_SESSION_ID is required"
+            ))
+        })?;
+    let mut body = json!({"session_id": identity});
+    if let Some(to) = target {
+        body["to"] = json!(to);
+    }
+    let resp = client.post(&format!("/tasks/{id}/{action}"), body)?;
+    if quiet {
+        println!("{id}");
+    } else {
+        output::print_json(&resp, pretty);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

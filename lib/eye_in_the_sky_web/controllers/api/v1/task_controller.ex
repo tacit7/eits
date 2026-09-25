@@ -376,15 +376,55 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
+  @doc "POST /api/v1/tasks/:id/release — owner-only release to To Do."
+  def release(conn, params), do: ownership_change(conn, params, :release)
+
+  @doc "POST /api/v1/tasks/:id/handoff — owner-only transfer to the `to` session."
+  def handoff(conn, params), do: ownership_change(conn, params, :handoff)
+
+  defp ownership_change(conn, %{"id" => task_id} = params, action) do
+    with {:ok, actor_id} <- resolve_claimer_session(params["session_id"]),
+         {:ok, target_id} <- resolve_ownership_target(action, params["to"]),
+         {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, updated} <- apply_ownership_change(action, task, actor_id, target_id) do
+      json(conn, %{success: true, task: ApiPresenter.present_task(updated)})
+    else
+      {:error, :no_session} -> {:error, :bad_request, "session_id is required"}
+      {:error, :invalid_session} -> {:error, :bad_request, "session_id is invalid"}
+      {:error, :invalid_target} -> {:error, :bad_request, "to must identify an existing session"}
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :task_not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :not_owner} -> {:error, :forbidden, "Only the task owner may change ownership"}
+      {:error, :task_not_active} -> {:error, :conflict, "Task is not active"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp resolve_ownership_target(:release, _), do: {:ok, nil}
+
+  defp resolve_ownership_target(:handoff, target) do
+    case resolve_claimer_session(target) do
+      {:ok, id} -> {:ok, id}
+      _ -> {:error, :invalid_target}
+    end
+  end
+
+  defp apply_ownership_change(:release, task, actor, _), do: Tasks.release_task(task, actor)
+
+  defp apply_ownership_change(:handoff, task, actor, target),
+    do: Tasks.handoff_task(task, actor, target)
+
   defp resolve_claimer_session(sid) when is_nil(sid) or sid == "",
     do: {:error, :no_session}
 
-  defp resolve_claimer_session(session_id) do
+  defp resolve_claimer_session(session_id) when is_binary(session_id) or is_integer(session_id) do
     case Helpers.resolve_session_int_id(session_id) do
       {:ok, int_id} -> {:ok, int_id}
       {:error, _msg} -> {:error, :invalid_session}
     end
   end
+
+  defp resolve_claimer_session(_), do: {:error, :invalid_session}
 
   @doc """
   POST /api/v1/tasks/:id/sessions - Link a session to a task.

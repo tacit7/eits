@@ -275,70 +275,156 @@ defmodule EyeInTheSky.Tasks do
     end
   end
 
-  @doc """
-  Atomically claims a task for the given session in a single transaction:
-    1. Acquires a row-level lock on the task (FOR UPDATE) to serialize concurrent claims
-    2. Clears all existing task_sessions links
-    3. Inserts the claimer's session link
-    4. Transitions the task state to In Progress
-
-  Returns `{:ok, updated_task}` or `{:error, reason}`.
-  The PubSub broadcast fires after the transaction commits.
-  """
+  @doc "Claims a To Do task atomically; a retry by its sole owner is a no-op."
   def claim_task(%Task{} = task, session_int_id) when is_integer(session_int_id) do
-    in_progress_id = WorkflowState.in_progress_id()
-    todo_id = WorkflowState.todo_id()
-    now = DateTime.utc_now()
+    ownership_transaction(task.id, fn locked, owners ->
+      cond do
+        locked.archived ->
+          Repo.rollback(:task_not_claimable)
 
-    result =
-      Ecto.Multi.new()
-      |> Ecto.Multi.run(:validate_task, fn repo, _changes ->
-        locked_state =
-          from(t in "tasks", where: t.id == ^task.id, select: t.state_id, lock: "FOR UPDATE")
-          |> repo.one()
+        locked.state_id == WorkflowState.in_progress_id() and owners == [session_int_id] ->
+          {locked, false}
 
-        cond do
-          is_nil(locked_state) -> {:error, :task_not_found}
-          locked_state == in_progress_id -> {:error, :already_claimed}
-          locked_state != todo_id -> {:error, :task_not_claimable}
-          true -> {:ok, locked_state}
-        end
-      end)
-      |> Ecto.Multi.run(:delete_old_sessions, fn repo, _changes ->
-        {count, _} = repo.delete_all(from(ts in "task_sessions", where: ts.task_id == ^task.id))
-        {:ok, count}
-      end)
-      |> Ecto.Multi.run(:add_new_session, fn repo, _changes ->
-        {count, _} =
-          repo.insert_all("task_sessions", [%{task_id: task.id, session_id: session_int_id}])
+        locked.state_id == WorkflowState.in_progress_id() ->
+          Repo.rollback(:already_claimed)
 
-        {:ok, count}
-      end)
-      |> Ecto.Multi.update(
-        :update_task,
-        Task.changeset(task, %{state_id: in_progress_id, updated_at: now})
-      )
-      |> Ecto.Multi.run(:clear_session_intent, fn repo, _changes ->
-        # Clear intent on the claiming session in the same transaction.
-        # This prevents stale "done" intent from a prior task from appearing valid
-        # while new work has been assigned.
-        repo.update_all(
-          from(s in EyeInTheSky.Sessions.Session, where: s.id == ^session_int_id),
-          set: [intent: nil, intent_set_at: nil]
-        )
+        locked.state_id != WorkflowState.todo_id() ->
+          Repo.rollback(:task_not_claimable)
 
-        {:ok, :cleared}
-      end)
-      |> Repo.transaction()
+        true ->
+          validate_ownership_session!(session_int_id)
+          updated = replace_task_owner!(locked, session_int_id, WorkflowState.in_progress_id())
+          {updated, true}
+      end
+    end)
+  end
 
-    case result do
-      {:ok, %{update_task: updated}} ->
-        EyeInTheSky.Events.task_updated(updated)
+  @doc "Returns an active task to To Do and removes ownership. Only its owner may release it."
+  def release_task(%Task{} = task, session_int_id) when is_integer(session_int_id) do
+    change_task_owner(task.id, session_int_id, nil, "release")
+  end
+
+  @doc "Transfers an active task to one target session without changing its workflow state."
+  def handoff_task(%Task{} = task, session_int_id, target_id)
+      when is_integer(session_int_id) and is_integer(target_id) do
+    change_task_owner(task.id, session_int_id, target_id, "handoff")
+  end
+
+  defp change_task_owner(task_id, actor_id, target_id, action) do
+    ownership_transaction(task_id, fn locked, owners ->
+      active? = locked.state_id in [WorkflowState.in_progress_id(), WorkflowState.in_review_id()]
+      expected_owners = if target_id, do: [target_id], else: []
+
+      expected_state? =
+        if target_id, do: active?, else: locked.state_id == WorkflowState.todo_id()
+
+      cond do
+        locked.archived or locked.state_id == WorkflowState.done_id() ->
+          Repo.rollback(:task_not_active)
+
+        owners == expected_owners and expected_state? and
+            ownership_retry?(locked, actor_id, target_id, action) ->
+          {locked, false}
+
+        owners != [actor_id] ->
+          Repo.rollback(:not_owner)
+
+        not active? ->
+          Repo.rollback(:task_not_active)
+
+        target_id == actor_id ->
+          {locked, false}
+
+        true ->
+          if target_id, do: validate_ownership_session!(target_id)
+          state_id = if target_id, do: locked.state_id, else: WorkflowState.todo_id()
+          updated = replace_task_owner!(locked, target_id, state_id)
+
+          # Bind retry receipts to this exact task revision. A later claim, release,
+          # handoff or edit invalidates them; a former owner cannot steal new work.
+          Notes.note_changeset(%{
+            parent_type: "task",
+            parent_id: to_string(task_id),
+            title: "Task ownership #{action}",
+            body: ownership_receipt(updated, actor_id, target_id, action)
+          })
+          |> Repo.insert!()
+
+          {updated, true}
+      end
+    end)
+  end
+
+  defp ownership_transaction(task_id, operation) do
+    Repo.transaction(fn ->
+      locked = Repo.one(from t in Task, where: t.id == ^task_id, lock: "FOR UPDATE")
+      if is_nil(locked), do: Repo.rollback(:task_not_found)
+
+      owners =
+        Repo.all(from ts in "task_sessions", where: ts.task_id == ^task_id, select: ts.session_id)
+
+      operation.(locked, owners)
+    end)
+    |> case do
+      {:ok, {updated, changed?}} ->
+        if changed?, do: EyeInTheSky.Events.task_updated(updated)
         {:ok, Repo.preload(updated, @full_task_preloads, force: true)}
 
-      {:error, _key, reason, _changes} ->
+      {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  defp validate_ownership_session!(session_id) do
+    # Keep the referenced session alive until the ownership transaction commits.
+    unless Repo.one(
+             from s in EyeInTheSky.Sessions.Session,
+               where: s.id == ^session_id,
+               select: s.id,
+               lock: "FOR KEY SHARE"
+           ) do
+      Repo.rollback(:invalid_session)
+    end
+  end
+
+  defp replace_task_owner!(task, target_id, state_id) do
+    Repo.delete_all(from ts in "task_sessions", where: ts.task_id == ^task.id)
+
+    if target_id do
+      Repo.insert_all("task_sessions", [%{task_id: task.id, session_id: target_id}])
+
+      Repo.update_all(from(s in EyeInTheSky.Sessions.Session, where: s.id == ^target_id),
+        set: [intent: nil, intent_set_at: nil]
+      )
+    end
+
+    task
+    |> Task.changeset(%{state_id: state_id, updated_at: DateTime.utc_now()})
+    |> Repo.update!()
+  end
+
+  defp ownership_receipt(task, actor_id, target_id, action) do
+    Jason.encode!(%{
+      action: action,
+      from: actor_id,
+      to: target_id,
+      revision: DateTime.to_iso8601(task.updated_at)
+    })
+  end
+
+  defp ownership_retry?(%{updated_at: nil}, _, _, _), do: false
+
+  defp ownership_retry?(task, actor_id, target_id, action) do
+    receipt = ownership_receipt(task, actor_id, target_id, action)
+    parent_id = to_string(task.id)
+    title = "Task ownership #{action}"
+
+    Repo.exists?(
+      from n in EyeInTheSky.Notes.Note,
+        where:
+          n.parent_type == "task" and n.parent_id == ^parent_id and
+            n.title == ^title and n.body == ^receipt
+    )
   end
 
   @doc """

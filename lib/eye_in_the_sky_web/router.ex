@@ -220,6 +220,8 @@ defmodule EyeInTheSkyWeb.Router do
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/complete", TaskController, :complete
     post "/tasks/:id/claim", TaskController, :claim
+    post "/tasks/:id/release", TaskController, :release
+    post "/tasks/:id/handoff", TaskController, :handoff
     post "/tasks/:id/sessions", TaskController, :link_session
     get "/tasks/:id/sessions", TaskController, :list_sessions
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session

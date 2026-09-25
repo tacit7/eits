@@ -19,8 +19,12 @@ pub enum DmCmd {
         limit: Option<String>,
         #[arg(long)]
         since: Option<String>,
+        /// Fetch DMs since the session's actual started_at (default unless --since is set).
         #[arg(long = "since-session")]
         since_session: bool,
+        /// Fetch all available history without a session-start cutoff.
+        #[arg(long, conflicts_with_all = ["since", "since_session", "strict"])]
+        all_time: bool,
         /// Fail instead of fetching DMs when the session start cannot be resolved.
         #[arg(long, requires = "since_session")]
         strict: bool,
@@ -137,6 +141,7 @@ pub fn run(
             limit,
             since,
             since_session,
+            all_time,
             strict,
             team_only,
             json_flag: _,
@@ -149,7 +154,9 @@ pub fn run(
                     )
                 })?;
 
-            let (since, warning) = resolve_since(client, &session, since, since_session, strict)?;
+            let use_session_start = since_session || (!all_time && since.is_none());
+            let (since, warning) =
+                resolve_since(client, &session, since, use_session_start, strict)?;
 
             let mut qs: Vec<(String, String)> = vec![
                 ("session".into(), session),

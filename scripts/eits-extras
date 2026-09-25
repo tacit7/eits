@@ -1684,6 +1684,8 @@ Options:
   --name <n>                   Session name
   --yolo                       Bypass sandbox restrictions
   --dry-run                    Validate inputs without hitting spawn endpoint; print the curl command
+  --quiet, -q                  Print only the spawned session UUID; diagnostics go to stderr
+                               With --dry-run, print diagnostics to stderr and no UUID
 
 Valid models (--provider claude, default):
   Shorthand (recommended): sonnet, opus, haiku, opus[1m], sonnet[1m]
@@ -1726,6 +1728,7 @@ USAGE
       local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" team_id="" member_name="" agent_name="" session_name="" bypass_sandbox="false" dry_run="false"
+      local quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
@@ -1747,6 +1750,7 @@ USAGE
           --name)              session_name="$2";       shift 2 ;;
           --yolo)              bypass_sandbox="true";   shift ;;
           --dry-run)           dry_run="true";          shift ;;
+          --quiet|-q)          quiet=1;                  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1910,18 +1914,21 @@ USAGE
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
       # Dry-run: print the curl command and exit without making the request
       if [[ "$dry_run" == "true" ]]; then
-        echo "Dry-run validation passed. Curl command that would execute:"
-        echo ""
-        echo "curl -sk -X POST \\"
-        echo "  -H 'Content-Type: application/json' \\"
-        if [[ -n "${EITS_API_KEY:-}" ]]; then
-          echo "  -H 'Authorization: Bearer <EITS_API_KEY>' \\"
-        fi
-        echo "  -d '$payload' \\"
-        echo "  '$BASE_URL/agents'"
-        echo ""
-        echo "Request payload:"
-        echo "$payload" | _jq .
+        (
+          [[ $quiet -eq 0 ]] || exec 1>&2
+          echo "Dry-run validation passed. Curl command that would execute:"
+          echo ""
+          echo "curl -sk -X POST \\"
+          echo "  -H 'Content-Type: application/json' \\"
+          if [[ -n "${EITS_API_KEY:-}" ]]; then
+            echo "  -H 'Authorization: Bearer <EITS_API_KEY>' \\"
+          fi
+          echo "  -d '$payload' \\"
+          echo "  '$BASE_URL/agents'"
+          echo ""
+          echo "Request payload:"
+          echo "$payload" | _jq .
+        )
         return 0
       fi
 
@@ -1956,6 +1963,15 @@ USAGE
         printf '%s rc=%s cmd=agents/spawn %s\n' "$_ts" "$_sp_status" "$_sp_resp_body" >> "$spawn_log"
         printf 'spawn failed (HTTP %s): %s\n' "$_sp_status" "$_sp_resp_body" >&2
         return 1
+      fi
+      if [[ $quiet -eq 1 ]]; then
+        local _sp_uuid
+        if ! _sp_uuid=$(printf '%s\n' "$_sp_resp_body" | jq -er '.session_uuid | select(type == "string" and length > 0)' 2>/dev/null); then
+          printf 'spawn failed: response did not contain a non-empty session_uuid\n' >&2
+          return 1
+        fi
+        printf '%s\n' "$_sp_uuid"
+        return 0
       fi
       printf '%s\n' "$_sp_resp_body" | _jq .
       # Final compact summary line — allows: eits agents spawn ... | tail -1 | jq .session_uuid

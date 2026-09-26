@@ -352,6 +352,9 @@ eits tasks complete <id> --message <text>
 eits tasks complete <id> --message <text> --commit <sha> [--commit <sha>] ...
 # --commit: track commits and link them to the task after a successful close
 #           (repeatable; eliminates separate eits commits create round-trips)
+#           Tracking failures never undo the close: a request error, or per-hash `errors` /
+#           `link_errors` in the /commits response, print "warning: task closed but commit <hash>
+#           could not be tracked|linked to task" to stderr
 # --notify <session_uuid_or_id>: DM a session after successful close (logs "Task <id> completed")
 
 # Delete
@@ -667,14 +670,17 @@ eits jobs delete <id>
 **Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
-eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session [--strict]] [--all-time] [--team-only] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session [--strict]] [--all-time] [--team-only] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
 # The table lists an ID column first — copy it into `eits dm read <id>`
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
 # --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
+#                  This is now the DEFAULT unless --since or --all-time is given
+# --strict: with --since-session, fail instead of fetching when the session start cannot be resolved
+# --all-time: fetch full history with no session-start cutoff (conflicts with --since, --since-session, --strict)
 # --team-only: keep only messages from sessions that share a team with the current agent
 
 eits dm read <id> [--json]
@@ -699,7 +705,7 @@ Both `--from` and `--to` accept either an integer session ID or a session UUID. 
 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
 
-`--since-session` automatically filters to DMs received since the current session started (resolves the session's `created_at` timestamp from the API). This suppresses stale DMs from prior sessions that may replay when resuming. If the session's creation timestamp cannot be resolved, a warning is printed to stderr and all DMs are returned.
+`dm list` / `dm inbox` default to `--since-session`: only DMs received since the current session started (its `started_at`, resolved from the API) are returned. This suppresses stale DMs from prior sessions that may replay when resuming. Pass `--all-time` for the full history, or `--since <iso8601>` for an explicit cutoff. If the session start cannot be resolved, a warning is printed to stderr and all DMs are returned, unless `--strict` is set, which fails instead.
 
 ---
 
@@ -822,9 +828,14 @@ eits teams join <team_id> --name <alias> [--role <member|admin>] \
 eits teams status <id> [--wait] [--json] [--summary]
 # Default: formatted summary with member status, session state, and current task
 # On bare invocation (no flags), prints a hint to stderr suggesting --wait for blocking until members are done
-# --wait: block until all members reach done or spawn_failed (polls every 5s)
+# --wait: block until all members reach done or spawn_failed (polls every 5s; progress on stderr)
+#         Prints one JSON result to stdout on completion or hung detection:
+#         {team_id, team_name, status: done|spawn_failed|hung, results[], hung_members?}
+#         results[]: member_id, name, role, session_id, session_uuid, status, session_status,
+#         branch (null if unknown), task_ids (includes completed tasks), metadata_error (if session lookup failed)
+#         Status is lifecycle only, not a review verdict. Exits 0 all done, 1 spawn_failed, 2 hung
 # --summary: print concise member counts by state (working, idle, done, failed, spawn_failed)
-# --json / --raw: output raw JSON instead of formatted text (useful for scripting)
+# --json / --raw: output raw JSON instead of formatted text (useful for scripting); with --wait, waits and emits the final results JSON
 
 eits teams update-member <team_id> <member_id> --status <s>
 
@@ -924,6 +935,14 @@ Reports the current checkpoint for the active session. The JSON output includes 
 - **Team block**: Teams the current agent belongs to
 - **Inbox block**: Recent inbound DMs for the current session
 - **Git block**: Repository root, branch, HEAD, dirty paths, and unlogged commits where available
+
+Availability is explicit. A partial report still exits 0, so check `health`, each section's `available` flag, and `warnings` before treating an empty list as "no work":
+- `tasks` / `team_memberships` / `inbox` carry `available`; failed or malformed lookups set it false, add a warning, and leave counts at 0. Lookup warnings include only the error `code` and HTTP `status`, never bodies or URLs.
+- `tasks` adds `limit` (200), `possibly_truncated`, `in_progress_count`, and `in_progress_items` (state 2 only).
+- `inbox` adds `limit` (20) and `possibly_truncated`. It is scoped by session `started_at` (falls back to `created_at`; a warning is added if neither exists). `unread_count` is always null with `unread_status: "unsupported_by_api"` — the DM API has no read markers.
+- `current_session` includes `started_at`; `health.registration` is `registered`, `not_initialized`, `unknown`, `missing_identity`, or `unavailable`.
+
+See [CLI_WORK_STATUS.md](CLI_WORK_STATUS.md) for field details.
 
 ---
 

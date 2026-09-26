@@ -1543,6 +1543,7 @@ eits dm inbox                    # List DMs in table format
 eits dm inbox --json            # Raw JSON output
 eits dm inbox --from <uuid>     # Filter by sender
 eits dm inbox --since <iso8601> # Only messages after timestamp (commit dcfd4508)
+eits dm inbox --all-time        # Full history, no session-start cutoff (commit f69b8f7d)
 eits dm inbox --team-only       # Filter to team members only
 eits dm inbox --help            # Show command help
 ```
@@ -1553,6 +1554,13 @@ eits dm inbox --help            # Show command help
 - Enables incremental polling: orchestrators can fetch new replies without diffing the full inbox client-side
 - Wired through both REST API (`GET /api/v1/dm?since=...`) and CLI
 - API returns `filter_since` in response metadata
+
+**Default cutoff (commit f69b8f7d):**
+- With no `--since`, `--since-session`, or `--all-time`, `dm inbox`/`dm list` resolve the session's `started_at` (via `GET /api/v1/sessions/<id>`, using `--session`, else the env session) and pass it as `since`
+- `--all-time` skips the lookup and fetches full history; it conflicts with `--since`, `--since-session`, and `--strict` (usage error, exit 2)
+- An explicit `--since` also skips the lookup
+- If `started_at` can't be resolved (missing field or 404), the inbox is fetched without a cutoff and the response includes a `session_start_unresolved` warning (`reason`: `missing_started_at` or `not_found`); `--strict` fails instead
+- `dm wait` is unchanged (no default `since`)
 
 **Table Output (_tbl_dm renderer):**
 | Column | Description |
@@ -2654,6 +2662,8 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 2. **Pause/Resume timer** — Control timer state (if overlay_data.active_timer is set)
 3. **Schedule task** — (if applicable)
 4. **Reload check modal** — Explicitly trigger reload confirmation dialog
+
+**Closed by default (commit b21f58f4):** The menu wrapper (and the top-bar `...` overflow wrapper in `TopBar.DM`) uses the `eits-dropdown` class instead of `relative`, so the menu stays hidden until its trigger is activated.
 
 **Attributes:**
 - `session_uuid` — optional; if present, adds the "Copy UUID" menu item

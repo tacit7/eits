@@ -705,7 +705,7 @@ Both `--from` and `--to` accept either an integer session ID or a session UUID. 
 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
 
-`dm list` / `dm inbox` default to `--since-session`: only DMs received since the current session started (its `started_at`, resolved from the API) are returned. This suppresses stale DMs from prior sessions that may replay when resuming. Pass `--all-time` for the full history, or `--since <iso8601>` for an explicit cutoff. If the session start cannot be resolved, a warning is printed to stderr and all DMs are returned, unless `--strict` is set, which fails instead.
+`dm list` / `dm inbox` default to `--since-session`: only DMs received since the current session started (its `started_at`, resolved from the API) are returned. This suppresses stale DMs from prior sessions that may replay when resuming. Pass `--all-time` for the full history, or `--since <iso8601>` for an explicit cutoff (`--all-time` conflicts with `--since`, `--since-session`, and `--strict`). If the session start cannot be resolved, a `warnings` array (`code: "session_start_unresolved"`, `reason`, `session`, `effective_since`) is attached to the JSON response on stdout and all DMs are returned, unless `--strict` is set, which fails instead.
 
 ---
 
@@ -856,7 +856,7 @@ eits teams my-teams                            # List teams where current agent 
 
 `teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
 
-`--wait` blocks until all members reach a terminal state (done or spawn_failed), polling every 5 seconds. Exits 0 on success, 1 if any spawn_failed.
+`--wait` blocks until all members reach a terminal state (done or spawn_failed), polling every 5 seconds. Exits 0 if all done, 1 if any spawn_failed, 2 if any member is detected as hung. In every case it prints one structured JSON result document to stdout (see field list above); progress ticks go to stderr.
 
 ### Status Fields Explained
 

@@ -2663,7 +2663,11 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 3. **Schedule task** — (if applicable)
 4. **Reload check modal** — Explicitly trigger reload confirmation dialog
 
-**Closed by default (commit b21f58f4):** The menu wrapper (and the top-bar `...` overflow wrapper in `TopBar.DM`) uses the `eits-dropdown` class instead of `relative`, so the menu stays hidden until its trigger is activated.
+**Closed by default (commit b21f58f4):** The menu wrapper (and the top-bar `...` overflow wrapper in `TopBar.DM`) uses the `eits-dropdown` class instead of `relative`, so the menu stays hidden until its trigger is activated. `eits-dropdown` (defined in `assets/css/app.css`) only reveals its nested `.eits-menu` on `:hover`/`:focus-within`, whereas plain `relative` had no such gating — the menu could render open before interaction.
+
+**Regression tests (commit b21f58f4):**
+- `test/eye_in_the_sky_web/components/dm_page/action_menu_test.exs` — asserts the `#dm-actions-menu` wrapper carries the `eits-dropdown` class
+- `test/eye_in_the_sky_web/components/top_bar/dm_test.exs` — asserts the top-bar `#dm-topbar-relative-menu` wrapper's parent carries the `eits-dropdown` class
 
 **Attributes:**
 - `session_uuid` — optional; if present, adds the "Copy UUID" menu item

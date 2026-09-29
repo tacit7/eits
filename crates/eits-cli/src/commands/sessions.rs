@@ -38,6 +38,8 @@ pub enum SessionsCmd {
     },
     /// Fetch a single session by uuid or id ('self' resolves to EITS_SESSION_UUID)
     Get { id: String },
+    /// Diagnose session metadata and local file discovery without changing anything
+    Doctor { id: String },
     /// Create a session
     Create {
         #[arg(long = "session-id")]
@@ -263,6 +265,14 @@ pub fn run(
             let v = client.get(&format!("/sessions/{id}"))?;
             let session = v.get("session").cloned().unwrap_or(v);
             output::print_json(&session, pretty);
+            Ok(())
+        }
+
+        SessionsCmd::Doctor { id } => {
+            let id = resolve_self(cfg, &id)?;
+            let response = client.get(&format!("/sessions/{}", uri_encode(&id)))?;
+            let session = response.get("session").unwrap_or(&response);
+            output::print_json(&session_diagnostics(session), pretty);
             Ok(())
         }
 
@@ -565,4 +575,171 @@ pub fn run(
             }
         }
     }
+}
+
+// Keep diagnostics allowlisted: session detail and local files can contain secrets.
+fn unavailable(reason: &str) -> Value {
+    json!({"status": "unavailable", "reason": reason})
+}
+
+fn file_status(path: &std::path::Path) -> Value {
+    match std::fs::metadata(path) {
+        Ok(meta) if meta.is_file() => json!({"status": "present"}),
+        Ok(_) => unavailable("not_a_regular_file"),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => json!({"status": "missing"}),
+        Err(_) => unavailable("metadata_failed"),
+    }
+}
+
+// Mirrors Config's process-local Codex env discovery. Do not read or print contents
+// or paths, and do not imply that this env file belongs to the queried session.
+fn local_env_file() -> Value {
+    let path = std::env::var_os("EITS_CODEX_ENV_FILE")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            let id = [
+                "EITS_CODEX_SESSION_ID",
+                "CODEX_THREAD_ID",
+                "CODEX_SESSION_ID",
+            ]
+            .iter()
+            .find_map(|key| std::env::var(key).ok())?;
+            let safe: String = id
+                .chars()
+                .map(|c| {
+                    if c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-') {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
+                .collect();
+            Some(
+                std::path::PathBuf::from(std::env::var_os("HOME")?)
+                    .join(".eits/codex/sessions")
+                    .join(format!("{safe}.env")),
+            )
+        });
+    match path {
+        Some(path) => file_status(&path),
+        None => unavailable("no_process_env_file_selected"),
+    }
+}
+
+fn safe_file_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+}
+
+// Bounded, metadata-only discovery. Skip symlink entries and never parse JSONL.
+// A failed/incomplete scan cannot establish that a file is missing.
+fn codex_file_present(root: &std::path::Path, suffix: &str) -> Result<bool, ()> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut remaining = 100_000usize;
+    let mut skipped_symlink = false;
+    while let Some(dir) = pending.pop() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(e) if dir == root && e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(_) => return Err(()),
+        };
+        for entry in entries {
+            remaining = remaining.checked_sub(1).ok_or(())?;
+            let entry = entry.map_err(|_| ())?;
+            let kind = entry.file_type().map_err(|_| ())?;
+            if kind.is_symlink() {
+                skipped_symlink = true;
+            } else if kind.is_dir() {
+                pending.push(entry.path());
+            } else if kind.is_file() && entry.file_name().to_string_lossy().ends_with(suffix) {
+                return Ok(true);
+            }
+        }
+    }
+    if skipped_symlink {
+        Err(())
+    } else {
+        Ok(false)
+    }
+}
+
+fn local_message_file(session: &Value, reader: Option<&str>) -> Value {
+    let Some(reader) = reader else {
+        return unavailable("reader_routing_unavailable");
+    };
+    let Some(home) = std::env::var_os("HOME").filter(|s| !s.is_empty()) else {
+        return unavailable("home_not_set");
+    };
+    let Some(uuid) = session
+        .get("uuid")
+        .and_then(Value::as_str)
+        .filter(|id| safe_file_id(id))
+    else {
+        return unavailable("session_uuid_missing_or_unsupported");
+    };
+    let home = std::path::PathBuf::from(home);
+    if reader == "codex" {
+        match codex_file_present(&home.join(".codex/sessions"), &format!("{uuid}.jsonl")) {
+            Ok(found) => json!({"status": if found { "found" } else { "missing" }}),
+            Err(()) => unavailable("scan_incomplete"),
+        }
+    } else {
+        // The app also falls back to agent/project paths, absent from session detail.
+        let Some(path) = session
+            .get("worktree_path")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+        else {
+            return unavailable("resolved_project_path_not_exposed_by_api");
+        };
+        let escaped = path.replace(['/', '.'], "-");
+        let mut result = file_status(
+            &home
+                .join(".claude/projects")
+                .join(escaped)
+                .join(format!("{uuid}.jsonl")),
+        );
+        if result["status"] == "present" {
+            result["status"] = json!("found");
+        }
+        result
+    }
+}
+
+fn session_diagnostics(session: &Value) -> Value {
+    let mut metadata = serde_json::Map::new();
+    for key in ["provider", "entrypoint", "project_id", "archived"] {
+        let field = match session.get(key) {
+            Some(value) => {
+                json!({"status": "available", "source": "session_detail_api", "value": value})
+            }
+            None => unavailable("not_exposed_by_session_detail_api"),
+        };
+        metadata.insert(key.to_string(), field);
+    }
+    // DmLive.MessageHandlers routes exactly provider == "codex" to Codex;
+    // explicit null and other provider strings use Claude. Omission is unknown.
+    let reader = match session.get("provider") {
+        Some(Value::String(provider)) if provider == "codex" => Some("codex"),
+        Some(Value::String(_)) | Some(Value::Null) => Some("claude"),
+        _ => None,
+    };
+    let routing = match reader {
+        Some(reader) => json!({"status": "available", "reader": reader,
+            "basis": "api_provider_and_dm_live_sync_rule", "server_execution_verified": false}),
+        None => unavailable("provider_not_exposed_or_invalid"),
+    };
+    json!({
+        "read_only": true,
+        "metadata": metadata,
+        "reader_routing": routing,
+        "local": {
+            "scope": "cli_host_only",
+            "env_file_scope": "current_process_not_queried_session",
+            "env_file": local_env_file(),
+            "message_file": local_message_file(session, reader)
+        }
+    })
 }

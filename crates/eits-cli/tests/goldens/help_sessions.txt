@@ -5,6 +5,7 @@ Usage: eits sessions [OPTIONS] <COMMAND>
 Commands:
   list        List sessions (project-scoped by default; see mutual-exclusion rules below)
   get         Fetch a single session by uuid or id ('self' resolves to EITS_SESSION_UUID)
+  doctor      Diagnose session metadata and local file discovery without changing anything
   create      Create a session
   update      Patch session fields ('self' resolves to EITS_SESSION_UUID)
   end         End a session (defaults uuid to the current session identity)

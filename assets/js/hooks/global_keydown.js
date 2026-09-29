@@ -5,11 +5,11 @@ export const GlobalKeydown = {
     this._leaderTimeoutMs = 900
 
     this._keydownHandler = (event) => this.handleKeydown(event)
-    window.addEventListener("keydown", this._keydownHandler)
+    window.addEventListener("keydown", this._keydownHandler, true)
   },
 
   destroyed() {
-    window.removeEventListener("keydown", this._keydownHandler)
+    window.removeEventListener("keydown", this._keydownHandler, true)
     this.clearLeader()
   },
 
@@ -35,9 +35,14 @@ export const GlobalKeydown = {
     this._leaderKeys.push(key)
     this.armLeader()
 
-    if (["p p", "t p"].includes(this._leaderKeys.join(" "))) {
+    const sequence = this._leaderKeys.join(" ")
+
+    if (["p p", "t p"].includes(sequence)) {
       this.clearLeader()
       this.openPaletteCommand("list-projects")
+    } else if (sequence === "g t") {
+      this.clearLeader()
+      this.goToTasks()
     } else if (this._leaderKeys.length >= 2) {
       this.clearLeader()
     }
@@ -67,6 +72,27 @@ export const GlobalKeydown = {
     document.querySelector("#command-palette")?.dispatchEvent(
       new CustomEvent("palette:open-command", { detail: { commandId } })
     )
+  },
+
+  goToTasks() {
+    const projectId = this.currentProjectId() || this.savedProjectId()
+    const href = projectId ? `/projects/${projectId}/tasks` : "/tasks"
+    window.location.assign(href)
+  },
+
+  currentProjectId() {
+    const match = window.location.pathname.match(/^\/projects\/(\d+)(?:\/|$)/)
+    return match ? Number(match[1]) : null
+  },
+
+  savedProjectId() {
+    try {
+      const state = JSON.parse(localStorage.getItem("rail_state") || "{}")
+      const projectId = Number(state.project_id)
+      return Number.isFinite(projectId) && projectId > 0 ? projectId : null
+    } catch (_) {
+      return null
+    }
   },
 
   inEditableTarget(target) {

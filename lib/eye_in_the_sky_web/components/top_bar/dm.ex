@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
       <ul
         id="dm-topbar-relative-menu"
         tabindex="0"
-        class="eits-menu absolute eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
+        class="eits-menu absolute right-0 eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @session_uuid do %>
           <li id="dm-topbar-li-uuid">

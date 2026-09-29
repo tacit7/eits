@@ -15,4 +15,21 @@ defmodule EyeInTheSkyWeb.TopBar.DMTest do
     assert "eits-dropdown" in LazyHTML.attribute(wrapper, "class"),
            "the top-bar overflow wrapper must use the closed-by-default dropdown primitive"
   end
+
+  test "anchors the overflow menu inside the right edge of the viewport" do
+    html = render_component(&DM.toolbar/1, %{})
+    document = LazyHTML.from_fragment(html)
+
+    menu = LazyHTML.query_by_id(document, "dm-topbar-relative-menu")
+    menu_class_tokens = class_tokens(menu)
+
+    assert "right-0" in menu_class_tokens,
+           "the right-edge menu must expand leftward so its text remains visible"
+  end
+
+  defp class_tokens(element) do
+    element
+    |> LazyHTML.attribute("class")
+    |> Enum.flat_map(&String.split/1)
+  end
 end

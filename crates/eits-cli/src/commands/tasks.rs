@@ -168,10 +168,20 @@ const STATE_ALIAS_TABLE: &[(i64, &str, &[&str])] = &[
     (
         2,
         "In Progress",
-        &["start", "in-progress", "progress", "in progress", "in_progress"],
+        &[
+            "start",
+            "in-progress",
+            "progress",
+            "in progress",
+            "in_progress",
+        ],
     ),
     (3, "Done", &["done", "complete", "completed"]),
-    (4, "In Review", &["in-review", "review", "in review", "in_review"]),
+    (
+        4,
+        "In Review",
+        &["in-review", "review", "in review", "in_review"],
+    ),
 ];
 
 // Listing takes API IDs, not the legacy update command's workflow positions.
@@ -246,6 +256,49 @@ fn create_project_from_cwd(client: &Client) -> Option<String> {
         eprintln!("warning: could not infer a project from cwd; creating a global/unscoped task. Use --project or EITS_PROJECT_ID to select a project.");
     }
     project_id
+}
+
+/// Add a common mutation summary without discarding the API envelope. Only
+/// successful HTTP responses reach this helper; explicit API success is retained.
+/// Context comes from the response, never the caller's environment or requested
+/// state (which may differ from the persisted task).
+fn mutation_response(response: &Value, target_id: Option<&str>) -> Value {
+    let mut result = response.as_object().cloned().unwrap_or_default();
+    result.entry("success").or_insert(json!(true));
+    let id = response
+        .get("id")
+        .or_else(|| response.get("task_id"))
+        .or_else(|| response.pointer("/task/id"))
+        .cloned()
+        .or_else(|| {
+            target_id.map(|id| {
+                id.parse::<i64>()
+                    .map(Value::from)
+                    .unwrap_or_else(|_| json!(id))
+            })
+        })
+        .unwrap_or(Value::Null);
+    result.entry("id").or_insert(id.clone());
+    for key in ["state", "session_id", "project_id"] {
+        result.entry(key).or_insert_with(|| {
+            response
+                .get("task")
+                .and_then(|task| task.get(key))
+                .cloned()
+                .unwrap_or(Value::Null)
+        });
+    }
+    // Suggest a read-only follow-up. Accept only positive numeric task IDs so
+    // API-provided strings cannot become shell syntax in a suggested command.
+    let numeric_id = id
+        .as_i64()
+        .or_else(|| id.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let next = match numeric_id.filter(|id| *id > 0) {
+        Some(id) => json!([format!("eits tasks get {id}")]),
+        None => json!([]),
+    };
+    result.entry("next").or_insert(next);
+    Value::Object(result)
 }
 
 pub fn run(
@@ -426,7 +479,7 @@ pub fn run(
                 if quiet {
                     println!("{task_id}");
                 } else {
-                    output::print_json(&resp, pretty);
+                    output::print_json(&mutation_response(&resp, Some(&task_id)), pretty);
                 }
                 return Ok(());
             }
@@ -478,12 +531,18 @@ pub fn run(
             } else {
                 let full = client.get(&format!("/tasks/{task_id}"))?;
                 let task = full.get("task").cloned().unwrap_or_else(|| json!({}));
+                let normalized = mutation_response(&full, Some(&task_id.to_string()));
                 output::print_json(
                     &json!({
                         "task_id": task.get("id").cloned().unwrap_or(json!(task_id)),
                         "title": task.get("title").cloned().unwrap_or(Value::Null),
-                        "state": task.get("state").cloned().unwrap_or(Value::Null),
-                        "state_id": task.get("state_id").cloned().unwrap_or(Value::Null),
+                        "success": normalized["success"],
+                        "id": normalized["id"],
+                        "state": normalized["state"],
+                        "state_id": task.get("state_id").or_else(|| full.get("state_id")).cloned().unwrap_or(Value::Null),
+                        "session_id": normalized["session_id"],
+                        "project_id": normalized["project_id"],
+                        "next": normalized["next"],
                         "message": "Task created",
                     }),
                     pretty,
@@ -514,14 +573,15 @@ pub fn run(
                     .parse::<i64>()
                     .map(Value::from)
                     .unwrap_or_else(|_| Value::String(id.clone()));
-                output::print_json(
-                    &json!({
-                        "status": "already_closed",
-                        "message": "task is already Done — no change made",
-                        "task_id": task_id_val,
-                    }),
-                    pretty,
-                );
+                if quiet {
+                    println!("{id}");
+                } else {
+                    let mut summary = mutation_response(&check, Some(&id));
+                    summary["status"] = json!("already_closed");
+                    summary["message"] = json!("task is already Done — no change made");
+                    summary["task_id"] = task_id_val;
+                    output::print_json(&summary, pretty);
+                }
                 return Ok(());
             }
 
@@ -572,7 +632,7 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
         }
@@ -631,7 +691,7 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
         }
@@ -685,7 +745,7 @@ pub fn run(
             if quiet {
                 output::print_quiet_id(&resp, "/task_id")?;
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, None), pretty);
             }
             Ok(())
         }
@@ -700,7 +760,7 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
         }
@@ -835,7 +895,6 @@ pub fn run(
         }
     }
 }
-
 
 fn ownership_change(
     client: &Client,

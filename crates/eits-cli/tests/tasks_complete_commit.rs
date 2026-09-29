@@ -70,7 +70,12 @@ fn http_failure_warns_and_still_tracks_remaining_commits() {
         .success()
         .stderr(contains("task closed but commit bad could not be tracked"));
     let output: Value = serde_json::from_slice(&result.get_output().stdout).unwrap();
-    assert_eq!(output, json!({"success": true, "task_id": 42}));
+    assert_eq!(
+        output,
+        json!({"success": true, "task_id": 42, "id": 42,
+        "state": null, "session_id": null, "project_id": null,
+        "next": ["eits tasks get 42"]})
+    );
     assert_eq!(srv.finish().len(), 4);
 }
 

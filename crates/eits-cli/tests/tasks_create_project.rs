@@ -4,6 +4,11 @@ use serde_json::{json, Value};
 
 const CREATED: &str = r#"{"success":true,"task_id":42}"#;
 
+fn normalized_created() -> Value {
+    json!({"success": true, "task_id": 42, "id": 42, "state": null,
+        "session_id": null, "project_id": null, "next": ["eits tasks get 42"]})
+}
+
 fn command(url: &str, cwd: &std::path::Path) -> Command {
     let mut cmd = Command::cargo_bin("eits").unwrap();
     cmd.env_clear()
@@ -33,7 +38,7 @@ fn explicit_project_wins_over_environment_without_lookup() {
         .assert()
         .success()
         .stderr("")
-        .stdout(format!("{CREATED}\n"));
+        .stdout(format!("{}\n", normalized_created()));
     let requests = srv.finish();
     assert_eq!(requests.len(), 1);
     assert_eq!(requests[0].method, "POST");
@@ -71,7 +76,7 @@ fn check_lookup(cwd: &std::path::Path, status: u16, response: &'static str, expe
     let out = command(&srv.url, cwd).assert().success();
     assert_eq!(
         serde_json::from_slice::<Value>(&out.get_output().stdout).unwrap(),
-        json!({"success":true,"task_id":42})
+        normalized_created()
     );
     let stderr = String::from_utf8_lossy(&out.get_output().stderr);
     if expected.is_null() {

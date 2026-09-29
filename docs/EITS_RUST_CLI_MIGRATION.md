@@ -66,6 +66,34 @@ Do not change these without updating hooks, skills, and tests:
   as CLI process-local fallback config when direct `EITS_*` env vars are not set.
 - Explicit process env vars win over Codex env-file values.
 
+## Task Mutation JSON Summary
+
+`tasks create`, `begin` (new task or `--id`), `claim`, `update`, and
+`complete` add these top-level fields to their JSON output:
+
+- `success`: defaults to `true` after a successful HTTP response; an explicit
+  API value is preserved.
+- `id`: the API task ID, falling back to the addressed task ID when available.
+  API number/string representations are preserved.
+- `state`, `session_id`, `project_id`: API-provided values, or explicit `null`
+  when unavailable. The CLI does not infer persisted context from environment
+  defaults, requested state, or a pre-mutation read.
+- `next`: an array of suggested commands. Currently this is the read-only
+  `eits tasks get <id>` for positive numeric task IDs, otherwise `[]`.
+
+Existing fields remain available, including `task_id`, nested `task`, messages,
+and `complete`'s `status: "already_closed"`. Top-level API fields take precedence
+(including explicit nulls); missing fields are filled from the nested task.
+`begin` retains its existing summary and reads context from its existing final
+GET, including envelope-level fields. No extra API requests are introduced.
+`--quiet` still prints only the task ID, including an already-closed `complete`.
+
+This first pass targets the core task lifecycle, whose create/claim/begin shapes
+previously differed. Annotation, ownership, bulk, session, note, and DM mutations
+remain unchanged. Commit creation retains its distinct batch/partial-success
+contract; applying a single-resource success summary there would hide useful
+semantics. Errors and read responses (especially `sessions get`) are unchanged.
+
 ## Installer State
 
 `priv/scripts/install-hooks.sh` installs:

@@ -1124,6 +1124,33 @@ defmodule EyeInTheSky.Claude.AgentWorkerTest do
     send(mock_port, {:exit, 0})
   end
 
+  test "Codex exit without a completed turn persists an actionable failure", %{track: track} do
+    {_agent, session} =
+      create_test_agent_and_session(%{provider: "codex"}, %{track: track})
+
+    Phoenix.PubSub.subscribe(PubSub, "session:#{session.id}")
+
+    assert {:ok, :started} =
+             AgentManager.send_message(session.id, "complete the assigned task",
+               eits_workflow: "0"
+             )
+
+    send(wait_for_mock_port(session.id), {:exit, 0})
+
+    assert_receive {:new_message, %{body: body}}, 5_000
+    assert body =~ "[provider error]"
+    assert body =~ "turn.completed"
+
+    assert Enum.any?(Messages.list_messages_for_session(session.id), fn message ->
+             message.provider == "system" and message.body == body
+           end)
+
+    assert_eventually(fn -> Sessions.get_session!(session.id).status == "failed" end)
+    assert Sessions.get_session!(session.id).status_reason == "cli_exit_error"
+    [{worker, _}] = Registry.lookup(AgentRegistry, {:session, session.id})
+    assert :sys.get_state(worker).status == :failed
+  end
+
   # --- Registry Invariant Tests ---
   # Invariant: exactly one AgentWorker per session, keyed by {:session, session_id}
 

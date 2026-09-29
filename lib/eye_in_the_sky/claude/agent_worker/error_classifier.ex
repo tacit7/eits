@@ -50,6 +50,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # All CLI providers use this shape for abnormal exits without a richer error.
   # An exit status alone is not evidence of a recoverable provider failure.
   def classify({:exit_code, code}) when is_integer(code) and code != 0, do: :cli_exit_error
+  def classify({:codex_incomplete_turn, _message}), do: :cli_exit_error
   def classify({:watchdog_timeout, _timeout_ms}), do: :watchdog_timeout
   def classify({:billing_error, _}), do: :billing_error
   def classify({:authentication_error, _}), do: :authentication_error

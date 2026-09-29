@@ -609,6 +609,15 @@ defmodule EyeInTheSky.Codex.SDK do
     do: {:error, MessageHandler.default_exit_reason(status)}
 
   @impl MessageHandler
+  def on_clean_exit(_state) do
+    # turn.completed is handled by handle_result/2, which finalizes the handler.
+    # Reaching the receive loop's exit path means that terminal event was absent.
+    {:error,
+     {:codex_incomplete_turn,
+      "Codex exited before emitting turn.completed; the task may be incomplete. Check the provider logs before retrying."}}
+  end
+
+  @impl MessageHandler
   def resolve_exit_session_id(state) do
     state[:session_id] || state[:eits_session_id] || ""
   end

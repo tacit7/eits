@@ -339,7 +339,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     ~H"""
     <div
       class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
-      phx-hook="GlobalKeydown"
       id="project-tasks-page"
     >
       <div class="w-full max-w-3xl mx-auto">

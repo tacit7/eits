@@ -1,5 +1,6 @@
 <div
   id="app-shell"
+  phx-hook="GlobalKeydown"
   class="flex flex-col h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
   data-allow-split={if assigns[:allow_split], do: "true", else: "false"}

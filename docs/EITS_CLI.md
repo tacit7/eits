@@ -14,7 +14,7 @@ The `eits` command is the Rust CLI. It provides better performance, JSON-native 
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
 - `doctor` — read-only CLI diagnostics for config, identity, server, git, hooks, and capabilities
 - `work` — current work checkpoint, task/team/inbox/git health, and commit tracking status
-- `workflow` — agent-facing status and checked task closeout helper
+- `workflow` — agent-facing status plus explicit start-bug and finish presets
 
 Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
@@ -962,6 +962,37 @@ Availability is explicit. A partial report still exits 0, so check `health`, eac
 - `current_session` includes `started_at`; `health.registration` is `registered`, `not_initialized`, `unknown`, `missing_identity`, or `unavailable`.
 
 See [CLI_WORK_STATUS.md](CLI_WORK_STATUS.md) for field details.
+
+---
+
+## Workflow presets
+
+`eits workflow start-bug --task 9022` checks the current session inbox, claims
+an existing bug task (links the session and sets In Progress), then checks the
+inbox again. It wraps `eits dm inbox --since-session`, `eits tasks claim 9022`,
+and `eits dm inbox --since-session`. Create a task separately with `eits tasks
+begin --title 'Bug description'` if no task exists. No bug tag is inferred.
+
+Session identity and a nonblank `--task` are required. Inbox polls use the
+session's `started_at` (falling back to `created_at`), include all senders, and
+fetch at most 200 messages. Review instructions before invoking the preset;
+it prints the first checkpoint to stderr but does not pause for review.
+
+Success stdout is one JSON object with `status: "started"`, `task_id`, the
+underlying `claim` response, `checkpoint`, `final_inbox`, `completed_steps`,
+and `operations` naming the lower-level commands. Each inbox contains `items`,
+`count`, and `possibly_truncated`. Like finish, this preset always returns JSON,
+including with global `--quiet`. Review the returned messages before editing.
+
+A failed request or malformed confirmation returns a nonzero JSON error with
+its step and recovery hint. A final inbox failure can occur after the claim
+succeeds; a lost response can also hide a successful claim. Inspect with
+`eits tasks get 9022`, then recover with `eits tasks claim` or `eits dm inbox`.
+The sequence is not transactional. It creates no tasks, sends no DMs, spawns no
+agents, and does not modify session status or execute tests.
+
+For closeout, see [workflow finish](CLI_WORKFLOW_FINISH.md). All lower-level
+commands and their JSON contracts remain available unchanged.
 
 ---
 

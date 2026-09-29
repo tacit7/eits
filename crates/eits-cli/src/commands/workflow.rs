@@ -9,6 +9,12 @@ use serde_json::{json, Value};
 pub enum WorkflowCmd {
     /// Concise current session workflow status
     Status,
+    /// Check the inbox, claim an existing bug task, then check the inbox again
+    StartBug {
+        /// Existing task to claim (equivalent to eits tasks claim)
+        #[arg(long, value_parser = nonblank)]
+        task: String,
+    },
     /// Log commits, close a task, notify its parent, and check the inbox
     Finish {
         #[arg(long, value_parser = nonblank)]
@@ -44,6 +50,7 @@ pub fn run(client: &Client, cfg: &Config, cmd: WorkflowCmd, pretty: bool) -> Res
             output::print_json(&work::status_report(client, cfg), pretty);
             Ok(())
         }
+        WorkflowCmd::StartBug { task } => start_bug(client, cfg, &task, pretty),
         WorkflowCmd::Finish {
             task,
             result,
@@ -166,4 +173,49 @@ fn inbox(client: &Client, path: &str) -> Result<Value, EitsError> {
     Ok(
         json!({"items": messages, "count": messages.len(), "possibly_truncated": messages.len() >= 200}),
     )
+}
+
+fn start_bug(client: &Client, cfg: &Config, task: &str, pretty: bool) -> Result<(), EitsError> {
+    let session = cfg
+        .session_identity()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or_else(|| EitsError::config("workflow start-bug requires a session identity"))?;
+    let mut completed = Vec::new();
+    let mut step = "session";
+    let operation = (|| {
+        let response = client.get(&format!("/sessions/{}", uri_encode(session)))?;
+        let session_record = response.get("session").unwrap_or(&response);
+        let started = ["started_at", "created_at"]
+            .iter()
+            .filter_map(|key| session_record.get(key).and_then(Value::as_str))
+            .find(|value| !value.trim().is_empty())
+            .ok_or_else(|| EitsError::config("missing session start timestamp"))?;
+        let path = format!(
+            "/dm?session={}&limit=200&since={}",
+            uri_encode(session),
+            uri_encode(started)
+        );
+        step = "checkpoint";
+        let checkpoint = inbox(client, &path)?;
+        eprintln!("workflow start-bug checkpoint (eits dm inbox --since-session): {checkpoint}");
+        step = "task_claim";
+        let claim = client.post(
+            &format!("/tasks/{}/claim", uri_encode(task)),
+            json!({"session_id": session}),
+        )?;
+        if claim.get("success").and_then(Value::as_bool) != Some(true) {
+            return Err(EitsError::config("task claim was not confirmed"));
+        }
+        completed.push("task_claim");
+        step = "final_inbox";
+        let final_inbox = inbox(client, &path)?;
+        Ok(json!({"status": "started", "task_id": task, "claim": claim,
+            "checkpoint": checkpoint, "final_inbox": final_inbox, "completed_steps": completed,
+            "operations": ["eits dm inbox --since-session", "eits tasks claim", "eits dm inbox --since-session"]}))
+    })();
+    match operation {
+        Ok(report) => { output::print_json(&report, pretty); Ok(()) }
+        Err(error) => Err(EitsError::api(format!("workflow start-bug failed at {step}: {}", error.message), error.code, error.status)
+            .with_hint(format!("Confirmed steps: {}. The failed request may have taken effect. Inspect remote state with eits tasks get and recover with eits tasks claim or eits dm inbox; do not blindly repeat start-bug.", completed.join(", ")))),
+    }
 }

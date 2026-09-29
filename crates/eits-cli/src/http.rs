@@ -80,7 +80,7 @@ impl Client {
                     }
                     let text = resp.text().unwrap_or_default();
                     if status >= 400 {
-                        return Err(status_error(status, &text));
+                        return Err(status_error(status, &text, &method, path));
                     }
                     return serde_json::from_str(&text).map_err(|_| {
                         EitsError::api(
@@ -130,7 +130,7 @@ impl Client {
         timeout: Duration,
     ) -> Result<Value, EitsError> {
         let url = format!("{}{}", self.cfg.base_url, path);
-        let mut req = self.http.request(method, &url).timeout(timeout);
+        let mut req = self.http.request(method.clone(), &url).timeout(timeout);
         if let Some(k) = &self.cfg.api_key {
             req = req.bearer_auth(k);
         }
@@ -147,7 +147,7 @@ impl Client {
                 let status = resp.status().as_u16();
                 let text = resp.text().unwrap_or_default();
                 if status >= 400 {
-                    return Err(status_error(status, &text));
+                    return Err(status_error(status, &text, &method, path));
                 }
                 serde_json::from_str(&text).map_err(|_| {
                     EitsError::api(
@@ -176,7 +176,7 @@ fn jitter(ms: u64) -> u64 {
     ((ms as i64) + (ms as i64) * pct / 100).max(1) as u64
 }
 
-fn status_error(status: u16, body: &str) -> EitsError {
+fn status_error(status: u16, body: &str, method: &reqwest::Method, path: &str) -> EitsError {
     let code = code_for_status(status);
     let msg = serde_json::from_str::<Value>(body)
         .ok()
@@ -188,7 +188,10 @@ fn status_error(status: u16, body: &str) -> EitsError {
         })
         .unwrap_or_else(|| {
             if body.contains("<html") || body.contains("<!DOCTYPE") {
-                "server returned HTML — check server logs".into()
+                format!(
+                    "server returned HTML for {method} {} — verify EITS_URL and check server logs",
+                    path.split('?').next().unwrap_or(path)
+                )
             } else {
                 body.chars().take(300).collect()
             }

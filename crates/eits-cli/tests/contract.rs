@@ -687,7 +687,10 @@ fn commits_create_html_error_reports_json_with_commit_hint() {
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
     assert_eq!(v["code"], "validation");
     assert_eq!(v["status"], 400);
-    assert_eq!(v["error"], "server returned HTML — check server logs");
+    assert_eq!(
+        v["error"],
+        "server returned HTML for POST /commits — verify EITS_URL and check server logs"
+    );
     assert!(v["hint"]
         .as_str()
         .unwrap()

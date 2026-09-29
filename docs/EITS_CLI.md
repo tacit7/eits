@@ -14,7 +14,7 @@ The `eits` command is the Rust CLI. It provides better performance, JSON-native 
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
 - `doctor` — read-only CLI diagnostics for config, identity, server, git, hooks, and capabilities
 - `work` — current work checkpoint, task/team/inbox/git health, and commit tracking status
-- `workflow` — agent-facing status alias with suggested next command
+- `workflow` — agent-facing status and checked task closeout helper
 
 Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
@@ -269,6 +269,16 @@ eits sessions reopen [<uuid|self>]
 
 `sessions get <uuid>` returns a rich response that includes the session, linked tasks, notes (last 5, body truncated), and commits (last 5) in a single call.
 
+To finish a session, prefer `eits sessions complete` (defaults to the current
+session). `eits sessions update self --status completed` is an explicit field
+patch; `update` requires a UUID or `self`, and uses a different API route from
+`complete`. A missing identifier is a usage error, not a server outage.
+
+HTML API failures are emitted as JSON errors identifying the HTTP method and
+route, with query values and the HTML body omitted. Check `EITS_URL` and server
+logs for a 400/404/502 response; changing commands does not diagnose a transient
+proxy or API failure.
+
 `sessions update` model flags: `--model` sets the raw model string as reported by the CLI (e.g. `claude-opus-4-5`). `--model-name` is the authoritative structured name used for display. `--model-provider` sets the provider (e.g. `anthropic`, `openai`). `--model-version` sets the version string. All four map directly to the corresponding fields in the REST PATCH body.
 
 ---
@@ -418,18 +428,25 @@ API JSON response includes both `session_id` (from first linked session) and `ag
 ```bash
 eits tasks begin --title "Implement X"              # create + start in one shot
 eits tasks update 42 --state-name in-review        # move to review when ready
-eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
+eits tasks complete 42 --message "Implemented feature X"  # annotate + mark Done
 eits tasks complete 42 --message "done" --commit $SHA  # close + track commit atomically
 eits tasks complete 42 --message "done" --commit $SHA1 --commit $SHA2  # track multiple commits (--commit is repeatable)
 ```
 
 **Option 2: Claim pre-created task (orchestrator-assigned)**
 ```bash
-eits tasks begin --id 42                           # claim task 42 (no title required); links to current session
-                                                   # conflict: shows holding session ID, UUID, name
+eits tasks claim 42                               # preferred for an assigned task; links to current session
 eits tasks update 42 --state-name in-review        # move to review when ready
-eits tasks complete 42 "Implemented feature X"     # CANONICAL close
+eits tasks complete 42 --message "Implemented feature X"
+eits dm --to <parent-session> --message "done task=42 result=Implemented X branch=<branch> commit=<sha>"
+eits dm inbox --since-session --team-only --json
 ```
+
+For assigned work, use `tasks claim <id>`; `tasks begin --id <id>` remains a
+supported alternative. Reserve `tasks begin --title ...` for new work to avoid
+duplicate tasks. Claim before editing and send the parent an explicit completion
+DM. For combined commit logging, task completion, parent DM, and final inbox
+polling, see [workflow finish](CLI_WORKFLOW_FINISH.md).
 
 **Manual close (two round-trips, avoid if possible)**
 ```bash
@@ -925,6 +942,8 @@ eits work status
 eits work checkpoint   # alias for status
 eits workflow status   # agent-facing alias for status
 ```
+
+For task closeout, use [`eits workflow finish`](CLI_WORKFLOW_FINISH.md). It logs existing commits, completes the task, DMs the parent, and polls the inbox. It does not run checks, claim work, validate a branch, push, open a PR, or complete the session. For a separately authorized Gitea PR, `tea --repo` expects `owner/name` (for example, `claude/eits-web`).
 
 Reports the current checkpoint for the active session. The JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, worktree and git health, commit-tracking status where feasible, and a suggested next command.
 

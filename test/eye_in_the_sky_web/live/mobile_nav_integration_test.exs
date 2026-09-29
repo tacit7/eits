@@ -45,9 +45,7 @@ defmodule EyeInTheSkyWeb.Live.MobileNavIntegrationTest do
       assert active_nav_tab(view) == :sessions
     end
 
-    @tag :skip
     test "Tasks tab active on /tasks", %{conn: conn} do
-      # /tasks is a REST controller, not a LiveView — no global tasks LiveView exists
       {:ok, view, _html} = live(conn, ~p"/tasks")
       assert active_nav_tab(view) == :tasks
     end

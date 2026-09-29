@@ -295,7 +295,7 @@
         class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
         aria-label="Main navigation"
       >
-        <div class={["grid gap-1", if(sidebar_project, do: "grid-cols-4", else: "grid-cols-2")]}>
+        <div class={["grid gap-1", if(sidebar_project, do: "grid-cols-4", else: "grid-cols-3")]}>
           <.link
             navigate={~p"/"}
             aria-label="Sessions"
@@ -354,6 +354,20 @@
               <.icon name="hero-folder" class="size-5 mb-0.5" /> Project
             </.link>
           <% else %>
+            <.link
+              navigate={~p"/tasks"}
+              aria-label="Tasks"
+              aria-current={if mobile_nav_tab == :tasks, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :tasks,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-clipboard-document-list" class="size-5 mb-0.5" /> Tasks
+            </.link>
             <.link
               navigate={~p"/notifications"}
               aria-label="Notifications"

@@ -22,6 +22,7 @@ defmodule EyeInTheSky.Codex.SDK do
   alias EyeInTheSky.Claude.{Message, Utils}
   alias EyeInTheSky.Claude.SDK.Registry
   alias EyeInTheSky.Codex.{AppServer, Parser, ToolMapper}
+  alias EyeInTheSky.Redaction
   alias EyeInTheSky.SDK.MessageHandler
   alias EyeInTheSky.Settings
 
@@ -419,6 +420,7 @@ defmodule EyeInTheSky.Codex.SDK do
               session_id: nil,
               accumulated_text: "",
               accumulated_parts: [],
+              provider_diagnostics: [],
               eits_session_id: eits_session_id
             }
 
@@ -558,6 +560,53 @@ defmodule EyeInTheSky.Codex.SDK do
     send(state.caller_pid, {:codex_session_id, state.sdk_ref, sid})
     %{state | session_id: sid}
   end
+
+  @impl MessageHandler
+  def handle_protocol_event(%{type: :provider_diagnostic, message: message}, state)
+      when is_binary(message) do
+    diagnostic = message |> Redaction.redact() |> String.slice(0, 1_000)
+
+    diagnostics =
+      [diagnostic | Map.get(state, :provider_diagnostics, [])]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.take(5)
+
+    {:continue, Map.put(state, :provider_diagnostics, diagnostics)}
+  end
+
+  def handle_protocol_event(_data, state), do: {:continue, state}
+
+  @impl MessageHandler
+  def on_abnormal_exit(status, state) when is_integer(status) do
+    diagnostics =
+      state
+      |> Map.get(:provider_diagnostics, [])
+      |> Enum.reverse()
+      |> Enum.join("\n")
+
+    message =
+      if diagnostics == "" do
+        "Codex process exited with status #{status}. No provider diagnostic output was captured."
+      else
+        "Codex process exited with status #{status}. Provider output:\n#{diagnostics}"
+      end
+
+    Logger.error(
+      "[telemetry] codex.sdk.provider_exit session_id=#{state[:eits_session_id]} " <>
+        "exit_code=#{status} detail=#{inspect(message, limit: 2_000)}"
+    )
+
+    {:error,
+     {:codex_error,
+      %{
+        "type" => "cli_exit_error",
+        "status" => status,
+        "message" => message
+      }}}
+  end
+
+  def on_abnormal_exit(status, _state),
+    do: {:error, MessageHandler.default_exit_reason(status)}
 
   @impl MessageHandler
   def resolve_exit_session_id(state) do

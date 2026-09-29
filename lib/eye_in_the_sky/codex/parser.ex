@@ -40,13 +40,15 @@ defmodule EyeInTheSky.Codex.Parser do
   - `{:session_id, thread_id}` - extracted thread/session ID
   - `{:result, map}` - turn completed with usage metadata
   - `{:error, reason}` - parse error or Codex error
-  - `:skip` - line should be ignored (non-JSON, turn.started, etc.)
+  - `{:protocol, map}` - non-JSON provider diagnostic for exit-error context
+  - `:skip` - recognized JSON event should be ignored (turn.started, etc.)
   """
   @spec parse_stream_line(String.t()) ::
           {:ok, Message.t()}
           | {:session_id, String.t()}
           | {:result, map()}
           | {:error, term()}
+          | {:protocol, map()}
           | :skip
   def parse_stream_line(line) when is_binary(line) do
     line = String.trim(line)
@@ -59,8 +61,9 @@ defmodule EyeInTheSky.Codex.Parser do
           parse_event(json)
 
         {:error, _reason} ->
-          # Non-JSON lines (stderr, tracing output) are expected; skip them
-          :skip
+          # stderr is merged into stdout by the Port. Retain it in bounded SDK
+          # state so a later non-zero exit can explain what the provider reported.
+          {:protocol, %{type: :provider_diagnostic, message: line}}
       end
     end
   end

@@ -144,6 +144,9 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
     message = normalized.message || ""
 
     cond do
+      normalized.error_type == "cli_exit_error" ->
+        :cli_exit_error
+
       normalized.status == 429 or message =~ ~r/rate.?limit|overloaded|too many requests/iu ->
         :rate_limit_error
 

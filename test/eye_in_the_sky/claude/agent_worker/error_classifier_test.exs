@@ -251,6 +251,18 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
   end
 
   describe "codex error content mapping" do
+    test "structured Codex CLI exits stay terminal" do
+      payload = %{
+        "type" => "cli_exit_error",
+        "status" => 1,
+        "message" => "Codex process exited with status 1. Provider output: connection reset"
+      }
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :cli_exit_error
+      assert ErrorClassifier.systemic?({:codex_error, payload})
+      assert ErrorClassifier.status_reason({:codex_error, payload}) == "cli_exit_error"
+    end
+
     test "unsupported ChatGPT account model is model_not_found and systemic" do
       payload =
         Jason.encode!(%{

@@ -19,6 +19,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   end
 
   describe "New Session feature" do
+    test "redirects stale project session routes to global sessions", %{conn: conn} do
+      missing_project_id = 9_999_999_999
+
+      assert {:error, {:redirect, %{to: "/sessions", flash: %{"error" => "Project not found"}}}} =
+               live(conn, ~p"/projects/#{missing_project_id}/sessions")
+    end
+
     test "renders New Session button", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 

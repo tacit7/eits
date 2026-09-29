@@ -18,11 +18,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
   # ---------------------------------------------------------------------------
 
   @impl true
-  def mount(%{"id" => _} = params, _session, socket) do
-    socket = mount_project(socket, params, sidebar_tab: :sessions, page_title_prefix: "Sessions")
-    if connected?(socket), do: Events.broadcast_rail_context(socket)
+  def mount(%{"id" => id} = params, _session, socket) do
+    if load_project_for_socket(socket, parse_id(id), []) do
+      socket =
+        mount_project(socket, params, sidebar_tab: :sessions, page_title_prefix: "Sessions")
 
-    if socket.assigns.project do
+      if connected?(socket), do: Events.broadcast_rail_context(socket)
+
       if connected?(socket) do
         subscribe_agents()
         subscribe_agent_working()
@@ -31,7 +33,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions do
       socket = assign(socket, :scope, socket.assigns.project_id)
       {:ok, State.init(socket)}
     else
-      {:ok, socket}
+      {:ok,
+       socket
+       |> put_flash(:error, "Project not found")
+       |> redirect(to: ~p"/sessions")}
     end
   end
 

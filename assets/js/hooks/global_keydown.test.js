@@ -43,6 +43,18 @@ describe('GlobalKeydown leader shortcuts', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
   }
 
+  it('registers after capture-phase vim navigation so Space can show shortcuts first', () => {
+    const addSpy = vi.spyOn(window, 'addEventListener')
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const hook = mountHook()
+
+    expect(addSpy).toHaveBeenCalledWith('keydown', hook._keydownHandler)
+
+    hook.destroyed()
+
+    expect(removeSpy).toHaveBeenCalledWith('keydown', hook._keydownHandler)
+  })
+
   it('opens the project picker for Space p p', () => {
     const hook = mountHook()
     const palette = document.querySelector('#command-palette')

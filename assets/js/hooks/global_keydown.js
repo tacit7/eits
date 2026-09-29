@@ -5,11 +5,11 @@ export const GlobalKeydown = {
     this._leaderTimeoutMs = 900
 
     this._keydownHandler = (event) => this.handleKeydown(event)
-    window.addEventListener("keydown", this._keydownHandler, true)
+    window.addEventListener("keydown", this._keydownHandler)
   },
 
   destroyed() {
-    window.removeEventListener("keydown", this._keydownHandler, true)
+    window.removeEventListener("keydown", this._keydownHandler)
     this.clearLeader()
   },
 

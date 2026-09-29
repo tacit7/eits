@@ -354,7 +354,10 @@ export const VimNav = {
     const m = window.location.pathname.match(/^(\/projects\/\d+)/)
     if (m) return m[1]
     const railId = (document.getElementById("rail-root") as HTMLElement | null)?.dataset.projectId
-    return railId ? `/projects/${railId}` : null
+    if (railId) return `/projects/${railId}`
+
+    const projectLink = document.querySelector<HTMLAnchorElement>('#rail-root a[href^="/projects/"]')
+    return projectLink?.getAttribute("href")?.match(/^(\/projects\/\d+)(?:\/|$)/)?.[1] ?? null
   },
 
   buildPath(path: string, relative?: boolean): string | null {

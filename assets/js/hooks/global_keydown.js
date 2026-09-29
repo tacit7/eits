@@ -75,13 +75,25 @@ export const GlobalKeydown = {
   },
 
   goToTasks() {
-    const projectId = this.currentProjectId() || this.savedProjectId()
+    const projectId = this.currentProjectId() || this.railProjectId() || this.savedProjectId()
     const href = projectId ? `/projects/${projectId}/tasks` : "/tasks"
     window.location.assign(href)
   },
 
   currentProjectId() {
-    const match = window.location.pathname.match(/^\/projects\/(\d+)(?:\/|$)/)
+    return this.projectIdFromPath(window.location.pathname)
+  },
+
+  railProjectId() {
+    const projectId = Number(document.querySelector("#rail-root")?.dataset?.projectId)
+    if (Number.isFinite(projectId) && projectId > 0) return projectId
+
+    const projectLink = document.querySelector('#rail-root a[href^="/projects/"]')
+    return this.projectIdFromPath(projectLink?.getAttribute("href") || "")
+  },
+
+  projectIdFromPath(path) {
+    const match = path.match(/^\/projects\/(\d+)(?:\/|$)/)
     return match ? Number(match[1]) : null
   },
 

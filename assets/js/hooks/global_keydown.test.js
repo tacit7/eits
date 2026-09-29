@@ -92,7 +92,7 @@ describe('GlobalKeydown leader shortcuts', () => {
   it('opens selected project tasks for Space g t from workspace routes', () => {
     const hook = mountHook()
     window.location.pathname = '/sessions'
-    localStorage.setItem('rail_state', JSON.stringify({ project_id: 7 }))
+    document.body.insertAdjacentHTML('beforeend', '<div id="rail-root" data-project-id="7"></div>')
 
     keydown(' ')
     keydown('g')
@@ -100,6 +100,39 @@ describe('GlobalKeydown leader shortcuts', () => {
 
     expect(window.location.assign).toHaveBeenCalledOnce()
     expect(window.location.assign).toHaveBeenCalledWith('/projects/7/tasks')
+
+    hook.destroyed()
+  })
+
+  it('uses rail project links when the rail data attribute is absent', () => {
+    const hook = mountHook()
+    window.location.pathname = '/sessions'
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      '<div id="rail-root"><a href="/projects/9/sessions">Sessions</a></div>'
+    )
+
+    keydown(' ')
+    keydown('g')
+    keydown('t')
+
+    expect(window.location.assign).toHaveBeenCalledOnce()
+    expect(window.location.assign).toHaveBeenCalledWith('/projects/9/tasks')
+
+    hook.destroyed()
+  })
+
+  it('falls back to saved project tasks for Space g t when rail project is absent', () => {
+    const hook = mountHook()
+    window.location.pathname = '/sessions'
+    localStorage.setItem('rail_state', JSON.stringify({ project_id: 8 }))
+
+    keydown(' ')
+    keydown('g')
+    keydown('t')
+
+    expect(window.location.assign).toHaveBeenCalledOnce()
+    expect(window.location.assign).toHaveBeenCalledWith('/projects/8/tasks')
 
     hook.destroyed()
   })

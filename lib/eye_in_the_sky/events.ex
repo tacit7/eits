@@ -556,7 +556,7 @@ defmodule EyeInTheSky.Events do
 
           _ ->
             case Map.get(assigns, :current_user) || Map.get(assigns, "current_user") do
-              nil -> nil
+              nil -> default_workspace_for_auth_bypass()
               user -> Workspaces.default_workspace_for_user(user)
             end
         end
@@ -568,6 +568,12 @@ defmodule EyeInTheSky.Events do
     case workspace_for_assigns(assigns) do
       %Workspace{id: id} -> id
       _ -> nil
+    end
+  end
+
+  defp default_workspace_for_auth_bypass do
+    if Application.get_env(:eye_in_the_sky, :disable_auth, false) do
+      Workspaces.default_workspace()
     end
   end
 

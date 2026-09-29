@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
     project
   end
 
-  defp create_task(project, overrides \\ %{}) do
+  defp create_task(project, overrides) do
     {:ok, task} =
       Tasks.create_task(
         Map.merge(
@@ -38,6 +38,18 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
   end
 
   describe "Mobile filter bottom sheet — project tasks" do
+    test "loads project tasks in local auth-bypass without a session user", %{user: user} do
+      previous = Application.get_env(:eye_in_the_sky, :disable_auth, false)
+      Application.put_env(:eye_in_the_sky, :disable_auth, true)
+      on_exit(fn -> Application.put_env(:eye_in_the_sky, :disable_auth, previous) end)
+
+      project = create_project(user)
+      conn = Phoenix.ConnTest.build_conn() |> Plug.Test.init_test_session(%{})
+
+      assert {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
+      assert has_element?(view, "#project-tasks-page")
+    end
+
     test "redirects stale project task routes to workspace tasks", %{conn: conn} do
       missing_project_id = 9_999_999_999
 

@@ -75,11 +75,25 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
         maybe_preload_project(socket, project, preload)
 
       {:error, :not_found} ->
-        nil
+        load_unscoped_project_for_auth_bypass(socket, project_id, preload)
     end
   end
 
   def load_project_for_socket(_socket, _project_id, _preload), do: nil
+
+  defp load_unscoped_project_for_auth_bypass(socket, project_id, preload) do
+    if auth_bypass_without_user?(socket) do
+      case Projects.get_project(project_id) do
+        {:ok, project} -> maybe_preload_project(socket, project, preload)
+        {:error, :not_found} -> nil
+      end
+    end
+  end
+
+  defp auth_bypass_without_user?(socket) do
+    Application.get_env(:eye_in_the_sky, :disable_auth, false) &&
+      is_nil(socket.assigns[:current_user])
+  end
 
   defp maybe_preload_project(socket, project, preload) do
     if preload != [] and connected?(socket),

@@ -513,6 +513,10 @@ defmodule EyeInTheSky.Events do
   def broadcast_rail_session_updated(session),
     do: broadcast("rail:session_update", {:rail_session_updated, session})
 
+  @doc "Signal RailLive to reload its filtered sessions list."
+  def broadcast_rail_sessions_refresh,
+    do: broadcast("rail:session_update", :rail_sessions_refresh)
+
   @doc "Subscribe to notification-count refresh signals for the Rail."
   def subscribe_rail_notifications_refresh, do: sub("rail:refresh:notifications")
 

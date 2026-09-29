@@ -82,6 +82,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TasksSection do
   def task_row(assigns) do
     ~H"""
     <button
+      id={"rail-task-#{@task.id}"}
       phx-click="open_task_detail"
       phx-value-task_id={@task.id}
       data-vim-flyout-item

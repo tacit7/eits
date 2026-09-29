@@ -224,6 +224,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.SessionsSection do
   def session_row(assigns) do
     ~H"""
     <.link
+      id={"rail-session-#{@session.id}"}
       navigate={"/dm/#{@session.id}"}
       data-vim-flyout-item
       data-session-id={@session.id}

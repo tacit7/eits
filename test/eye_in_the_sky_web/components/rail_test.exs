@@ -2,6 +2,7 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   use EyeInTheSkyWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
   alias EyeInTheSky.Projects
+  alias EyeInTheSky.{Sessions, Tasks}
   alias EyeInTheSky.Workspaces
 
   # Most interaction tests use projects in the logged-in user's workspace so
@@ -219,6 +220,67 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
         rail
         |> render_hook("restore_rail_state", %{"project_id" => p2.id, "section" => "tasks"})
         |> follow_redirect(conn, ~p"/projects/#{p2.id}/tasks")
+    end
+  end
+
+  describe "live flyout updates" do
+    test "session status changes update the flyout and deletion removes the row", %{
+      conn: conn,
+      user: user
+    } do
+      project = build_project(user)
+      agent = EyeInTheSky.Factory.create_agent(%{project_id: project.id})
+
+      session =
+        EyeInTheSky.Factory.create_session(agent, %{
+          project_id: project.id,
+          name: "Rail live session",
+          status: "working"
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+      rail = get_rail(view)
+      render_click(rail, "open_flyout", %{"section" => "sessions"})
+
+      assert has_element?(rail, "#rail-session-#{session.id} .bg-success")
+
+      {:ok, idle_session} = Sessions.set_session_idle(session)
+      assert has_element?(rail, "#rail-session-#{session.id} .bg-base-content\\/25")
+
+      {:ok, _deleted_session} = Sessions.delete_session(idle_session)
+      refute has_element?(rail, "#rail-session-#{session.id}")
+    end
+
+    test "task state changes and deletion refresh the filtered flyout", %{
+      conn: conn,
+      user: user
+    } do
+      project = build_project(user)
+
+      {:ok, task} =
+        Tasks.create_task(%{
+          title: "Rail live task",
+          project_id: project.id,
+          state_id: 1
+        })
+
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
+      rail = get_rail(view)
+      render_click(rail, "open_flyout", %{"section" => "tasks"})
+      render_click(rail, "set_task_state_filter", %{"state" => "1"})
+
+      assert has_element?(rail, "#rail-task-#{task.id}")
+
+      {:ok, in_progress_task} = Tasks.update_task_state(task, 2)
+
+      refute has_element?(rail, "#rail-task-#{task.id}")
+
+      render_click(rail, "set_task_state_filter", %{"state" => "all"})
+      assert has_element?(rail, "#rail-task-#{task.id}")
+
+      {:ok, _deleted_task} = Tasks.delete_task(in_progress_task)
+
+      refute has_element?(rail, "#rail-task-#{task.id}")
     end
   end
 end

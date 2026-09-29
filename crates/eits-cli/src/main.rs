@@ -95,6 +95,17 @@ enum Cmd {
     External(Vec<OsString>),
 }
 
+fn print_human_and_exit(e: clap::Error) -> ! {
+    let rendered = e.render().to_string();
+    let normalized = rendered
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+    println!("{normalized}");
+    std::process::exit(0);
+}
+
 fn main() {
     // Global flags before an external subcommand are a usage error per spec:
     // detect them by comparing raw argv length against the parsed external args.
@@ -103,7 +114,7 @@ fn main() {
         Ok(cli) => cli,
         Err(e) => match e.kind() {
             // Human-readable text on stdout, exit 0 — these are not errors.
-            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => e.exit(),
+            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => print_human_and_exit(e),
             // Everything else (missing required arg, unknown flag, bare
             // invocation, etc.) is a usage error per the JSON-stdout contract.
             _ => {

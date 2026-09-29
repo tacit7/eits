@@ -12,9 +12,9 @@ Commands:
 Options:
       --pretty               Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
   -q, --quiet                Print only the created/affected ID on success (mutations)
-      --to <TO>              
-      --message <MESSAGE>    
-      --from <FROM>          
-      --metadata <METADATA>  
-      --response-required    
+      --to <TO>
+      --message <MESSAGE>
+      --from <FROM>
+      --metadata <METADATA>
+      --response-required
   -h, --help                 Print help

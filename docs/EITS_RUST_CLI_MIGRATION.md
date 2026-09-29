@@ -88,6 +88,12 @@ and `complete`'s `status: "already_closed"`. Top-level API fields take precedenc
 GET, including envelope-level fields. No extra API requests are introduced.
 `--quiet` still prints only the task ID, including an already-closed `complete`.
 
+Task intent is explicit at the call site: `tasks begin` requires exactly one of
+`--title` (new self-owned work) or `--id` (claim existing work), and `tasks
+create` leaves work unassigned unless `--assign-to <session>` is present. The
+create request carries creator attribution separately from assignment; the API
+continues to accept legacy `session_id`-only requests for compatibility.
+
 This first pass targets the core task lifecycle, whose create/claim/begin shapes
 previously differed. Annotation, ownership, bulk, session, note, and DM mutations
 remain unchanged. Commit creation retains its distinct batch/partial-success

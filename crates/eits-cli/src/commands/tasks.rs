@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::error::{Code, EitsError};
 use crate::http::Client;
 use crate::output;
+use clap::ArgGroup;
 use serde_json::{json, Value};
 use std::io::Write;
 
@@ -39,10 +40,18 @@ pub enum TasksCmd {
     Get { id: String },
     /// Attach an existing tag to a task (tag ids: `eits tags list`)
     Tag { task_id: String, tag_id: String },
-    /// Claim an existing task (--id) or create + claim a new one (-t/--title)
+    /// Claim an existing task with --id or create + claim self-owned work with --title
+    #[command(group(
+        ArgGroup::new("intent")
+            .required(true)
+            .multiple(false)
+            .args(["id", "title"])
+    ))]
     Begin {
+        /// Claim an existing task for the current session.
         #[arg(long)]
         id: Option<String>,
+        /// Create new work owned by the current session.
         #[arg(short = 't', long)]
         title: Option<String>,
         #[arg(short = 'd', long)]
@@ -108,7 +117,7 @@ pub enum TasksCmd {
     },
     /// Show workflow state ids, names, and accepted aliases
     States,
-    /// Create a task without claiming it
+    /// Create a To Do task, optionally assigning it to a session
     Create {
         #[arg(short = 't', long)]
         title: String,
@@ -120,6 +129,9 @@ pub enum TasksCmd {
         description: Option<String>,
         #[arg(long)]
         priority: Option<String>,
+        /// Assign the new task to a session (UUID or integer ID).
+        #[arg(long = "assign-to")]
+        assign_to: Option<String>,
     },
     /// Claim an existing task (link session + set In Progress)
     Claim {
@@ -728,8 +740,9 @@ pub fn run(
             team,
             description,
             priority,
+            assign_to,
         } => {
-            let identity = cfg.session_identity().unwrap_or("").to_string();
+            let creator_identity = cfg.session_identity().unwrap_or("").to_string();
             let project_id = project
                 .or_else(|| cfg.project_id.clone())
                 .or_else(|| create_project_from_cwd(client));
@@ -739,7 +752,8 @@ pub fn run(
                 "project_id": project_id,
                 "team_id": team,
                 "priority": priority,
-                "session_id": identity,
+                "created_by_session_id": creator_identity,
+                "session_id": assign_to,
             });
             let resp = client.post("/tasks", body)?;
             if quiet {

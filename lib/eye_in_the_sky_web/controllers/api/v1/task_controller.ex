@@ -139,17 +139,14 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   def create(conn, params) do
     with {:ok, project_id} <-
            ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
-      creator_session_int_id =
-        case params["session_id"] do
-          sid when is_binary(sid) and sid != "" ->
-            case Helpers.resolve_session_int_id(sid) do
-              {:ok, id} -> id
-              _ -> nil
-            end
+      # Keep accepting session_id as the creator for older clients, while
+      # allowing new clients to assign a different session explicitly.
+      creator_session_id =
+        if Map.has_key?(params, "created_by_session_id"),
+          do: params["created_by_session_id"],
+          else: params["session_id"]
 
-          _ ->
-            nil
-        end
+      creator_session_int_id = resolve_session_id(creator_session_id)
 
       attrs = %{
         uuid: Ecto.UUID.generate(),

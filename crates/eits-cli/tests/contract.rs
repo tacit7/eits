@@ -57,6 +57,8 @@ fn help_output_matches_goldens() {
     let cases: &[(&[&str], &str)] = &[
         (&["--help"], "help_root.txt"),
         (&["tasks", "--help"], "help_tasks.txt"),
+        (&["tasks", "begin", "--help"], "help_tasks_begin.txt"),
+        (&["tasks", "create", "--help"], "help_tasks_create.txt"),
         (&["dm", "--help"], "help_dm.txt"),
         (&["sessions", "--help"], "help_sessions.txt"),
         (&["commits", "--help"], "help_commits.txt"),
@@ -275,7 +277,51 @@ fn create_sends_team_id_when_team_flag_is_present() {
     assert_eq!(body["title"], "Assigned team task");
     assert_eq!(body["team_id"], "720");
     assert_eq!(body["project_id"], "7");
-    assert_eq!(body["session_id"], "99");
+    assert_eq!(body["created_by_session_id"], "99");
+    assert!(body["session_id"].is_null());
+}
+
+#[test]
+fn create_assign_to_links_the_requested_session_and_tracks_the_creator_separately() {
+    let srv = common::serve(vec![(201, r#"{"success":true,"task_id":"42"}"#)]);
+    let mut cmd = Command::cargo_bin("eits").unwrap();
+    scrub_codex_identity(&mut cmd)
+        .env("EITS_URL", &srv.url)
+        .env("EITS_PROJECT_ID", "7")
+        .env("EITS_SESSION_ID", "99")
+        .env_remove("EITS_SESSION_UUID")
+        .args([
+            "tasks",
+            "create",
+            "--title",
+            "Worker task",
+            "--assign-to",
+            "worker-session",
+        ])
+        .assert()
+        .success();
+
+    let reqs = srv.finish();
+    let body: serde_json::Value = serde_json::from_str(&reqs[0].body).unwrap();
+    assert_eq!(body["created_by_session_id"], "99");
+    assert_eq!(body["session_id"], "worker-session");
+}
+
+#[test]
+fn begin_rejects_ambiguous_or_missing_intent_before_sending_a_request() {
+    for args in [
+        vec!["tasks", "begin"],
+        vec!["tasks", "begin", "--id", "42", "--title", "Duplicate"],
+    ] {
+        let out = Command::cargo_bin("eits")
+            .unwrap()
+            .args(args)
+            .assert()
+            .code(2);
+        let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+        assert_eq!(value["code"], "usage");
+    }
 }
 
 #[test]

@@ -47,7 +47,8 @@ fn explicit_project_wins_over_environment_without_lookup() {
         serde_json::from_str::<Value>(&requests[0].body).unwrap(),
         json!({
             "title": "project inference", "description": "details", "priority": "high",
-            "project_id": "6", "team_id": "755", "session_id": "test-session"
+            "project_id": "6", "team_id": "755", "created_by_session_id": "test-session",
+            "session_id": null
         })
     );
 }

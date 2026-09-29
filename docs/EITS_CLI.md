@@ -322,14 +322,14 @@ eits tasks get <id>
 
 # Create
 eits tasks create --title <t> [--description <d>] [--project <id>] \
-  [--priority <p>] [--session <uuid>] [--agent <uuid>] \
-  [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
-# Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID
+  [--priority <p>] [--team <id>] [--assign-to <session_uuid_or_id>]
+# The creator is tracked from the current session, but the task is unassigned unless
+# --assign-to is present. Use --assign-to when creating work for another session.
 
-# Create + start in one shot
+# Create + start self-owned work in one shot (explicit --title intent)
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
   [--team <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
-# Or claim a pre-created task instead of creating new
+# Or claim a pre-created task (explicit --id intent)
 # On conflict (already_claimed), shows the holding session ID, UUID, and name
 eits tasks begin --id <task_id> [--team <id>]
 # --tag: apply one or more tags after creation/claim (repeatable: --tag 1 --tag 2)
@@ -418,7 +418,8 @@ API JSON response includes both `session_id` (from first linked session) and `ag
 ### Agent task workflow (canonical)
 
 **Session Linkage Rules:**
-- `tasks begin` (create or claim), `tasks annotate`, and `tasks complete` automatically link the task to the current session (`$EITS_SESSION_UUID` or `$EITS_SESSION_ID`).
+- `tasks begin --title` creates and links self-owned work; `tasks begin --id` and `tasks claim` claim existing work for the current session.
+- `tasks create` records the current session as creator but leaves the task unassigned unless `--assign-to <session>` is provided.
 - `tasks update` and other state mutations **do not** change session linkage — they operate on existing task state only.
 - `tasks link-session` and `tasks unlink-session` provide explicit session management when needed.
 - **CRITICAL**: When no session context is available, these commands fail with a session-linkage error. Ensure `EITS_SESSION_UUID` or `EITS_SESSION_ID` is set before running task lifecycle commands.

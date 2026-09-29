@@ -5,7 +5,7 @@
 ```bash
 eits tasks begin --title "..." [--description "..."] [-p <project_id>] [--team <team_id>] [--tag <id|name>] [--priority <p>]
 eits tasks claim <id> [--team <team_id>]  # canonical: transfer ownership to current session, set In Progress; --team is accepted but does not mutate the existing task
-eits tasks begin --id <id> [--team <team_id>]  # compatibility alias for claim; --title/--description silently ignored; --tag still applies; --team accepted but ignored
+eits tasks begin --id <id> [--team <team_id>]  # compatibility alias for claim; exactly one of --id/--title is required
 eits tasks start <id>          # DEPRECATED — prints a warning; use claim instead
 eits tasks complete <id> --message "Summary" [--commit <sha>] [--commit <sha2> ...]
 eits tasks annotate <id> --body "..."
@@ -13,7 +13,7 @@ eits tasks update <id> [--state <alias|id>] [--title "..."] [--description "..."
 eits tasks list [--all] [-p <project>] [-s <session>] [-l <limit>] [--tag <id|name>] [--team <team_id>] [-q <query>] [--mine]
 eits tasks status --team <team_id> [-l <limit>] [--json]  # task-centric team view with linked session_ids
 eits tasks get <id>
-eits tasks create --title "..." [--description "..."] [-p <project_id>] [--team <team_id>]
+eits tasks create --title "..." [--description "..."] [-p <project_id>] [--team <team_id>] [--assign-to <session_uuid_or_id>]
 eits tasks active [--json]     # requires session context; visibility helper: In Progress + In Review tasks for current session
 # Use --json when you need task IDs for follow-up. Note: In Review does not satisfy the write hook.
 eits tasks bulk-update --ids <id,...> [--state <alias|id>] [--priority <p>] [--title "..."]
@@ -22,7 +22,7 @@ eits tasks search <query> [-p <project>] [-l <limit>] [--state <id>]
 eits tasks states              # list all state IDs and accepted aliases
 ```
 
-Use `tasks begin` when starting new work immediately — it creates, links, and starts in one shot. Use `tasks create` when creating a task without starting it (write hook still blocks until you `claim` or `begin --id` the task).
+Use `tasks begin --title` when starting self-owned work immediately, and `tasks begin --id` (or canonical `tasks claim`) for an existing task. Exactly one intent flag is required. Use `tasks create` for a To Do task; it is unassigned unless `--assign-to` is explicit, while creator attribution still comes from the current session.
 
 Use `tasks claim <id>` for pre-existing or orchestrator-assigned tasks. It transfers ownership to the current session and sets state to In Progress. `tasks update <id> --state start` changes state only — it does not transfer session ownership.
 

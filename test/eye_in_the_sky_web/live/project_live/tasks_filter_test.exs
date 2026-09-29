@@ -38,6 +38,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
   end
 
   describe "Mobile filter bottom sheet — project tasks" do
+    test "redirects stale project task routes to workspace tasks", %{conn: conn} do
+      missing_project_id = 9_999_999_999
+
+      assert {:error,
+              {:redirect, %{to: "/workspace/tasks", flash: %{"error" => "Project not found"}}}} =
+               live(conn, ~p"/projects/#{missing_project_id}/tasks")
+    end
+
     test "filter sheet is hidden by default", %{conn: conn, user: user} do
       project = create_project(user)
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")

@@ -38,7 +38,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.ShowTest do
       other_workspace = Workspaces.default_workspace_for_user!(user_fixture())
       foreign_project = create_project_in_workspace(other_workspace.id)
 
-      for section <- ~w(tasks kanban notes agents skills teams jobs prompts),
+      for section <- ~w(kanban notes agents skills teams jobs prompts),
           project_id <- [foreign_project.id, -1] do
         assert_raise Ecto.NoResultsError, fn ->
           live(conn, "/projects/#{project_id}/#{section}")
@@ -48,6 +48,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.ShowTest do
       for project_id <- [foreign_project.id, -1] do
         assert {:error, {:redirect, %{to: "/sessions", flash: %{"error" => "Project not found"}}}} =
                  live(conn, "/projects/#{project_id}/sessions")
+      end
+
+      for project_id <- [foreign_project.id, -1] do
+        assert {:error,
+                {:redirect, %{to: "/workspace/tasks", flash: %{"error" => "Project not found"}}}} =
+                 live(conn, "/projects/#{project_id}/tasks")
       end
     end
   end

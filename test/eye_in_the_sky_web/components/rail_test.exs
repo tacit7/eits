@@ -74,11 +74,16 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
       {:ok, view, _html} = live(conn, ~p"/sessions")
 
       project = build_project(user, "late-palette-#{System.unique_integer([:positive])}")
+      foreign_project = build_project(EyeInTheSky.Factory.user_fixture())
+      inactive_project = build_project(user)
+      {:ok, _} = Projects.update_project(inactive_project, %{active: false})
 
       render_hook(view, "palette:projects", %{})
 
       assert_push_event(view, "palette:projects-result", %{projects: projects})
       assert Enum.any?(projects, &(&1.id == project.id))
+      refute Enum.any?(projects, &(&1.id == foreign_project.id))
+      refute Enum.any?(projects, &(&1.id == inactive_project.id))
     end
 
     test "project switcher lists projects from other workspaces", %{conn: conn} do

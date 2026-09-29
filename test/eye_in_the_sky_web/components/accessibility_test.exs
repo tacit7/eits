@@ -298,16 +298,19 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.{Projects, Tasks}
+  alias EyeInTheSky.{Projects, Tasks, Workspaces}
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
+    workspace = Workspaces.default_workspace_for_user!(user)
+
     {:ok, project} =
       Projects.create_project(%{
         name: "a11y-lv-#{uniq()}",
         path: "/tmp/a11y-lv-#{uniq()}",
-        slug: "a11y-lv-#{uniq()}"
+        slug: "a11y-lv-#{uniq()}",
+        workspace_id: workspace.id
       })
 
     project
@@ -332,8 +335,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
   end
 
   describe "Project tasks list - TaskCard accessibility attributes" do
-    test "list row has role=button and aria-label", %{conn: conn} do
-      project = create_project()
+    test "list row has role=button and aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project, %{title: "A11y list task"})
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -342,8 +345,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
       assert html =~ "Open task A11y list task"
     end
 
-    test "delete button has aria-label", %{conn: conn} do
-      project = create_project()
+    test "delete button has aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -351,8 +354,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
       assert html =~ ~s(aria-label="Delete task")
     end
 
-    test "delete button has min-h-[44px] touch target", %{conn: conn} do
-      project = create_project()
+    test "delete button has min-h-[44px] touch target", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -365,8 +368,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
     # Kanban delete is now inside a dropdown (details/summary), not an inline button.
     # The aria-label and focus-visible patterns have changed; these tests are stale.
     @tag :skip
-    test "kanban inline delete button has aria-label", %{conn: conn} do
-      project = create_project()
+    test "kanban inline delete button has aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "Kanban task"})
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -375,8 +378,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
     end
 
     @tag :skip
-    test "kanban inline delete button has focus-visible ring", %{conn: conn} do
-      project = create_project()
+    test "kanban inline delete button has focus-visible ring", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")

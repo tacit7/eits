@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   alias Ecto.Multi
   alias EyeInTheSky.{Agents, Messages, Notes, Projects, Repo, Sessions, Tasks}
   alias EyeInTheSky.Agents.AgentManager
+  alias EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
 
   # ---------------------------------------------------------------------------
   # palette:sessions
@@ -120,11 +121,7 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   # ---------------------------------------------------------------------------
 
   def handle_palette_event("palette:projects", _params, socket) do
-    results =
-      Projects.list_projects_for_sidebar()
-      |> Enum.map(fn p ->
-        %{id: p.id, name: p.name}
-      end)
+    results = ProjectLiveHelpers.palette_projects_for_socket(socket)
 
     {:halt, push_event(socket, "palette:projects-result", %{projects: results})}
   end

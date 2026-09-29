@@ -138,8 +138,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
     end
   end
 
-  describe "workspace switching" do
-    test "opens prompts page for a project in another workspace", %{conn: conn, user: user} do
+  describe "workspace isolation" do
+    test "rejects prompts page for a project in another workspace", %{conn: conn, user: user} do
       other_user = user_fixture()
       other_workspace = Workspaces.default_workspace_for_user!(other_user)
       n = uniq()
@@ -154,10 +154,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptsTest do
 
       assert Workspaces.default_workspace_for_user!(user).id != other_workspace.id
 
-      {:ok, view, html} = live(conn, ~p"/projects/#{foreign_project.id}/prompts")
-
-      assert html =~ foreign_project.name
-      refute has_element?(view, "#flash-error", "Project not found")
+      assert_raise Ecto.NoResultsError, fn ->
+        live(conn, ~p"/projects/#{foreign_project.id}/prompts")
+      end
     end
   end
 end

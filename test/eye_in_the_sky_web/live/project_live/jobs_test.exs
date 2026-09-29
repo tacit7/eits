@@ -6,8 +6,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
   alias EyeInTheSky.ScheduledJobs
 
-  setup do
-    project = project_fixture()
+  setup %{user: user} do
+    {:ok, project} =
+      EyeInTheSky.Projects.create_project(%{
+        name: "Jobs project #{uniq()}",
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id
+      })
+
     %{project: project}
   end
 
@@ -299,10 +304,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
     end
   end
 
-  describe "nil project redirect" do
-    test "redirects to /projects when project ID does not exist", %{conn: conn} do
-      assert {:error, {:redirect, %{to: "/projects"}}} =
-               live(conn, ~p"/projects/99999/jobs")
+  describe "missing project" do
+    test "returns not found when project ID does not exist", %{conn: conn} do
+      assert_raise Ecto.NoResultsError, fn ->
+        live(conn, ~p"/projects/99999/jobs")
+      end
     end
   end
 end

@@ -212,3 +212,40 @@ No `workspace_id` → always allowed (backward-compatible). With a `workspace_id
 3. Use `socket.assigns.workspace` (not a mount-time lookup) for the workspace reference.
 4. Use `socket.assigns.scope` with the canonical query functions above.
 5. For any form that accepts a `project_id`, apply the same pin-match pattern as `Sessions.Actions` — never trust a form-supplied project ID without verifying `workspace_id`.
+
+## Project Route and Command Palette Boundary
+
+`ProjectLiveHelpers.load_project_for_socket/3` resolves the workspace from the
+socket's existing context (via `Events.workspace_id_for_assigns/1`) before calling
+`Projects.get_project_for_workspace/2`. A project URL cannot replace that boundary:
+foreign projects and missing workspace context follow the existing not-found
+behavior. Callers include project overview, files, config, and the pages using
+`mount_project/3`. The latter raises `Ecto.NoResultsError` (404) for rejected
+projects before downstream mounts can interpret a nil project as global scope;
+overview/files/config retain their existing empty/error or redirect behavior.
+
+`ProjectLiveHelpers.palette_projects_for_socket/1` uses the same workspace
+resolution and `Projects.list_projects_for_workspace/1`, filters out inactive
+projects, and returns `%{id: id, name: name}` maps. Without workspace context it
+returns `[]`. NavHook, project mounts, and the `palette:projects` refresh event all
+use this helper, including projects created after the page mounted.
+
+### Remaining migration audit (task 9082)
+
+The route/palette change is a limited migration, not a claim of complete workspace
+isolation. The following independent surfaces still need follow-up:
+
+| Classification | Call sites | Remaining work / existing guard |
+| --- | --- | --- |
+| Workspace UI and actions | `components/rail.ex`, `components/rail/project_actions.ex` | Global project lists, select/rename/delete/bookmark/editor/terminal/window/session actions, and path-based project reuse need scoped lookups. Restore already checks workspace ownership. Rail can still expose foreign project metadata. |
+| Workspace UI and actions | `live/agent_live/index.ex`, `index_actions.ex`; `live/dm_live.ex`, `dm_live/mount_state.ex`, `message_handlers.ex`; `live/nav_hook/palette_agent_handlers.ex` | Project options, URL-supplied project IDs, and agent/session creation must be scoped before resolving paths or creating records. |
+| Workspace UI | `live/chat_live/channel_data_loader.ex`; `live/iam_live/policy_new.ex`, `policy_edit.ex`; `live/project_live/kanban.ex`; `live/project_live/sessions/state.ex`, `loader.ex` | Global dropdown/list data remains. Kanban task-copy target validation in `live/shared/tasks_helpers.ex` also needs ownership enforcement. |
+| Project route action | `live/project_live/sessions/actions.ex` | The current project comes from the scoped mount, but the submitted-ID fallback when no project is assigned remains global. |
+| Guarded workspace action | `live/workspace_live/sessions/actions.ex` | Existing pin match rejects foreign projects; can be simplified to the canonical scoped lookup. |
+| Guarded component / partial migration | `components/new_session_modal.ex`; `components/agent_schedule_section.ex`; `live/shared/agent_schedule_helpers.ex` | Lists are scoped when workspace context is supplied; modal project changes and schedule overrides have allow-list guards. Global fallbacks and schedule prompt-default path resolution still require a caller/context audit. |
+| User-facing system shortcut | `components/ai_job_creator.ex` | Hard-coded `get_project_by_name("EITS Web")` needs an explicit product decision about workspace ownership. |
+| API / authentication semantics | `controllers/api/v1/project_controller.ex`, `project_scope.ex` | Project index/show/path lookup remain global. `ProjectScope` explicitly permits bearer-only access and compares workspaces for session-scoped access. Preserve or change these semantics only with a separate API review and tests. |
+| Internal context (no browser workspace) | `workers/workable_task_worker.ex`; `agents/agent_manager/session_bridge.ex`; `agent_definitions.ex`; `iam/project_identity.ex` | Global lookups resolve persisted task/session/project identities or IAM paths. These are not browser-workspace list queries; callers accepting user input still need boundary checks before reaching them. |
+
+Palette session/task/note queries and mutations also require their own ownership
+review: scoping the project picker does not authorize arbitrary event payloads.

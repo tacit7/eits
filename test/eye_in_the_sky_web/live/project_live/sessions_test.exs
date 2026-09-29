@@ -5,10 +5,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   alias EyeInTheSky.Factory
   alias EyeInTheSky.Projects
 
-  setup do
+  setup %{user: user} do
     # Create a test project
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "test-project",
         path: "/tmp/test-project",
         slug: "test-project"

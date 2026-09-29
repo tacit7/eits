@@ -7,9 +7,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "kanban-test-#{uniq()}",
         path: "/tmp/kanban-test-#{uniq()}",
         slug: "kanban-test-#{uniq()}"
@@ -37,8 +38,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "mount" do
-    test "renders kanban columns for workflow states", %{conn: conn} do
-      project = create_project()
+    test "renders kanban columns for workflow states", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       assert html =~ "To Do"
@@ -46,8 +47,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert html =~ "Done"
     end
 
-    test "renders tasks in correct columns", %{conn: conn} do
-      project = create_project()
+    test "renders tasks in correct columns", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "My Kanban Task", state_id: 1})
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -55,25 +56,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert html =~ task.title
     end
 
-    test "shows New Task button", %{conn: conn} do
-      project = create_project()
+    test "shows New Task button", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       assert has_element?(view, "button", "New Task")
     end
 
     test "handles invalid project id gracefully", %{conn: conn} do
-      # Should not crash — mount completes and renders the empty board
-      {:ok, view, _html} = live(conn, ~p"/projects/notanid/kanban")
-
-      assert has_element?(view, "#kanban-keyboard")
-      refute has_element?(view, "#kanban-columns [data-task-id]")
+      assert_raise Ecto.NoResultsError, fn ->
+        live(conn, ~p"/projects/notanid/kanban")
+      end
     end
   end
 
   describe "quick-add" do
-    test "shows add task input when clicking add task button", %{conn: conn} do
-      project = create_project()
+    test "shows add task input when clicking add task button", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       # click the "Add task" button for state_id 1 (To Do)
@@ -84,8 +83,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert has_element?(view, "input[name='title']")
     end
 
-    test "hides quick-add input via hide_quick_add event", %{conn: conn} do
-      project = create_project()
+    test "hides quick-add input via hide_quick_add event", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
@@ -100,8 +99,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       refute has_element?(view, "#kanban-col-1 input[name='title']")
     end
 
-    test "creates task via quick-add form", %{conn: conn} do
-      project = create_project()
+    test "creates task via quick-add form", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
@@ -115,8 +114,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert render(view) =~ "Quick task"
     end
 
-    test "ignores quick-add with blank title", %{conn: conn} do
-      project = create_project()
+    test "ignores quick-add with blank title", %{conn: conn, user: user} do
+      project = create_project(user)
       task_count_before = length(Tasks.list_tasks())
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -134,8 +133,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "new task drawer" do
-    test "opens drawer on New Task click", %{conn: conn} do
-      project = create_project()
+    test "opens drawer on New Task click", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
@@ -146,8 +145,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert html =~ "state_id"
     end
 
-    test "creates task from drawer form", %{conn: conn} do
-      project = create_project()
+    test "creates task from drawer form", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
       view
@@ -169,8 +168,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "task detail drawer" do
-    test "opens task detail drawer on card click", %{conn: conn} do
-      project = create_project()
+    test "opens task detail drawer on card click", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -182,8 +181,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert render(view) =~ task.title
     end
 
-    test "updates task from detail drawer", %{conn: conn} do
-      project = create_project()
+    test "updates task from detail drawer", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "Original Title"})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -206,8 +205,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert has_element?(view, "#kanban-columns", "Updated Title")
     end
 
-    test "deletes task from detail drawer", %{conn: conn} do
-      project = create_project()
+    test "deletes task from detail drawer", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "Task To Delete"})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -228,9 +227,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "PubSub" do
-    test "ignores :tasks_changed broadcast for a different project", %{conn: conn} do
-      project = create_project()
-      other_project = create_project()
+    test "ignores :tasks_changed broadcast for a different project", %{conn: conn, user: user} do
+      project = create_project(user)
+      other_project = create_project(user)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
@@ -244,8 +243,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       refute render(view) =~ other_task.title
     end
 
-    test "reloads tasks on :tasks_changed for correct project", %{conn: conn} do
-      project = create_project()
+    test "reloads tasks on :tasks_changed for correct project", %{conn: conn, user: user} do
+      project = create_project(user)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
 
@@ -257,8 +256,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert render(view) =~ task.title
     end
 
-    test "refreshes open selected_task when :tasks_changed fires", %{conn: conn} do
-      project = create_project()
+    test "refreshes open selected_task when :tasks_changed fires", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "Before Update"})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -279,8 +278,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "priority filter" do
-    test "does not crash on non-integer priority value like checkbox 'on'", %{conn: conn} do
-      project = create_project()
+    test "does not crash on non-integer priority value like checkbox 'on'", %{
+      conn: conn,
+      user: user
+    } do
+      project = create_project(user)
       _task = create_task(project, %{title: "Priority test task", priority: 2})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -292,8 +294,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       assert render(view) =~ "Priority test task"
     end
 
-    test "filters tasks by valid priority value", %{conn: conn} do
-      project = create_project()
+    test "filters tasks by valid priority value", %{conn: conn, user: user} do
+      project = create_project(user)
       _high = create_task(project, %{title: "High priority task", priority: 3, state_id: 1})
       _low = create_task(project, %{title: "Low priority task", priority: 1, state_id: 1})
 
@@ -305,8 +307,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       refute has_element?(view, "#kanban-columns", "Low priority task")
     end
 
-    test "clears filter when empty string priority is sent", %{conn: conn} do
-      project = create_project()
+    test "clears filter when empty string priority is sent", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project, %{title: "Some task", priority: 1})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -321,8 +323,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
   end
 
   describe "search" do
-    test "filters tasks by title when query >= 4 chars", %{conn: conn} do
-      project = create_project()
+    test "filters tasks by title when query >= 4 chars", %{conn: conn, user: user} do
+      project = create_project(user)
       _task1 = create_task(project, %{title: "Searchable task zzzz"})
       _task2 = create_task(project, %{title: "Different work xxxx"})
 
@@ -336,8 +338,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.KanbanTest do
       refute has_element?(view, "#kanban-columns", "Different work xxxx")
     end
 
-    test "shows all tasks when query is less than 4 chars", %{conn: conn} do
-      project = create_project()
+    test "shows all tasks when query is less than 4 chars", %{conn: conn, user: user} do
+      project = create_project(user)
       _task1 = create_task(project, %{title: "Alpha task"})
       _task2 = create_task(project, %{title: "Beta task"})
 

@@ -37,7 +37,7 @@ export const GlobalKeydown = {
 
     if (["p p", "t p"].includes(this._leaderKeys.join(" "))) {
       this.clearLeader()
-      this.openPaletteCommand("go-project")
+      this.openPaletteCommand("list-projects")
     } else if (this._leaderKeys.length >= 2) {
       this.clearLeader()
     }

@@ -39,7 +39,7 @@ describe('GlobalKeydown leader shortcuts', () => {
     keydown('p')
 
     expect(handler).toHaveBeenCalledOnce()
-    expect(handler.mock.calls[0][0].detail).toEqual({ commandId: 'go-project' })
+    expect(handler.mock.calls[0][0].detail).toEqual({ commandId: 'list-projects' })
 
     hook.destroyed()
   })
@@ -55,7 +55,7 @@ describe('GlobalKeydown leader shortcuts', () => {
     keydown('p')
 
     expect(handler).toHaveBeenCalledOnce()
-    expect(handler.mock.calls[0][0].detail).toEqual({ commandId: 'go-project' })
+    expect(handler.mock.calls[0][0].detail).toEqual({ commandId: 'list-projects' })
 
     hook.destroyed()
   })

@@ -83,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
 
       assert_push_event(view, "palette:projects-result", %{projects: projects})
       assert Enum.any?(projects, &(&1.id == project.id))
-      refute Enum.any?(projects, &(&1.id == foreign_project.id))
+      assert Enum.any?(projects, &(&1.id == foreign_project.id))
       refute Enum.any?(projects, &(&1.id == inactive_project.id))
     end
 

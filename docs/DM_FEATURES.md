@@ -2669,6 +2669,8 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 - `test/eye_in_the_sky_web/components/dm_page/action_menu_test.exs` — asserts the `#dm-actions-menu` wrapper carries the `eits-dropdown` class
 - `test/eye_in_the_sky_web/components/top_bar/dm_test.exs` — asserts the top-bar `#dm-topbar-relative-menu` wrapper's parent carries the `eits-dropdown` class
 
+**Viewport fix (commit `6cf8f7b9`):** Both the action-menu overflow list and the top-bar `...` overflow menu render off-screen to the right when the trigger sits near the right edge. Fixed by adding `right-0` to the `<ul>` panel class so it anchors to the right edge of its trigger instead of the left, keeping the panel inside the viewport. Regression tests added in `action_menu_test.exs` and `top_bar/dm_test.exs`.
+
 **Attributes:**
 - `session_uuid` — optional; if present, adds the "Copy UUID" menu item
 - `wrapper_id` — menu wrapper identifier (used in button ID generation)
@@ -3288,6 +3290,42 @@ HTTP 403 Forbidden
 
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `authorize_session_recipient/2` replaces `authorize_dm_recipient/2`; `show_dm/2` no longer accepts `session` query param
+
+**Proposed follow-on (not yet implemented):** The `x-eits-session` header used above is caller-supplied and only asserts identity — it does not authenticate it. A design for per-session opaque API credentials (`session_api_credentials` table, `SessionApiAuth` plug, `EITS_SESSION_TOKEN`) that would replace header-based recipient checks with a verified principal is written up in [docs/SESSION_API_AUTHORIZATION_DESIGN.md](SESSION_API_AUTHORIZATION_DESIGN.md). It covers `GET /api/v1/dm`, `GET /api/v1/dm/:id`, and `GET /api/v1/dm/wait` and includes a phased rollout plan; see that doc for the full design before implementing.
+
+---
+
+## CLI: eits dm watch — Reconnecting Ordered DM Watch
+
+**Commit:** `43907846`
+
+`eits dm watch` keeps a single long-poll connection open against `GET /api/v1/dm/wait` and streams new inbound messages as they arrive, reconnecting automatically and preserving strict delivery order across reconnects. It's the CLI's answer to running a background listener instead of interval-polling `dm inbox`.
+
+**Usage:**
+```bash
+eits dm watch --since-session --team-only --format jsonl
+```
+
+**Key behavior:**
+- Set `EITS_SESSION_UUID`/`EITS_SESSION_ID` to the *watching* session (not the parent); `--session` overrides the recipient
+- `--team-only` requires `EITS_AGENT_UUID`; team membership is resolved once at startup — restart the watcher after team changes
+- Without `--since`, resolves the session's actual `started_at` as the cutoff (`--since-session` requests this explicitly); failure to resolve stops the command rather than replaying unbounded history
+- `--format jsonl` (default) emits one compact DM object per line; `--format json` emits one `{"items":[...],"count":N}` object per delivered batch — the stream itself is not one JSON array
+- `--timeout` (1–55s, default 25) bounds each individual long poll, not the watcher's lifetime
+
+**Ordering and reconnects:**
+- Uses an opt-in ordered cursor (`watch_cursor: true`) on `/dm/wait`; older servers without support fail immediately with an upgrade error
+- Requests carry `since` + `after_id`; the server returns the oldest messages strictly after `(since, after_id)`, ordered by timestamp then numeric ID, so same-timestamp messages and backlog drains stay in order
+- Reconnects preserve the last handled timestamp and message ID — no duplicate emission or backward cursor movement
+- Connection failures and HTTP 429/500/502/503/504 retry with backoff (1, 2, 4, 8, 16, then 30s, up to 8 consecutive retries); a successful response resets the budget. Other HTTP errors and malformed responses stop the command.
+
+**Delivery limits:** dedup is in-memory for the process lifetime only — no durable consumer ack or exactly-once guarantee. Consumers doing real work should dedupe on message ID themselves.
+
+**Files:**
+- `crates/eits-cli/src/commands/dm.rs` — `dm watch` subcommand
+- `lib/eye_in_the_sky/messages/listings.ex` — ordered cursor query support
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `watch_cursor`/`after_id` handling on `wait/2`
+- Full reference: [docs/CLI_DM_WATCH.md](CLI_DM_WATCH.md)
 
 ---
 

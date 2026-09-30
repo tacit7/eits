@@ -257,6 +257,13 @@ eits sessions reopen [<uuid|self>]
 # 'self' is substituted with $EITS_SESSION_UUID at call time.
 # Use when resume hook fails or when an orchestrator needs to post work
 # against an already-ended session.
+
+eits sessions doctor self [--pretty]
+eits sessions doctor <uuid|id> [--pretty]
+# Read-only visibility diagnostics: one GET of session-detail, plus local
+# discovery of the Codex/Claude message-file and Codex env-file the CLI host
+# would read for that session. Never mutates a session. `self` requires
+# $EITS_SESSION_UUID (no integer-ID fallback). See CLI_SESSIONS_DOCTOR.md.
 ```
 
 `--status` filters by session status: `working`, `idle`, `waiting`, `completed`, `failed`.
@@ -350,6 +357,8 @@ eits tasks bulk-update --session <uuid|id> [--state <id>] [--priority <p>] [--ti
 eits tasks claim <id> [--team <id>]  # → In Progress (state 2), transfers session ownership to claimer (preferred)
                                # Removes all existing task_sessions links, adds claimer's session atomically
                                # --team is accepted for orchestration parity and does not alter the existing task team
+eits tasks release <id>              # In Progress/In Review → To Do, removes all session links
+eits tasks handoff <id> --to <session_uuid_or_id>  # Transfers ownership to exactly one target session, keeps workflow state
 eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 
 # Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
@@ -391,6 +400,18 @@ eits tasks tag <task_id> <tag_id>
 # List workflow states
 eits tasks states
 ```
+
+See [CLI_TASK_OWNERSHIP.md](CLI_TASK_OWNERSHIP.md) for `claim`/`release`/`handoff` details:
+non-owner mutations return 409/403, both `release` and `handoff` require current
+ownership, and `handoff` clears the target's stale intent while preserving
+workflow state. Handoff to yourself is a no-op.
+
+`create`, `begin`, `claim`, `update`, and `complete` return a normalized JSON
+summary: top-level `success`, `id`, `state`, `session_id`, `project_id`, and a
+`next` array of suggested follow-up commands, in addition to existing fields
+(`task_id`, nested `task`, `complete`'s `status: "already_closed"`). See
+"Task Mutation JSON Summary" in `docs/EITS_RUST_CLI_MIGRATION.md` for the exact
+field-precedence rules. `--quiet` still prints only the task ID.
 
 ### Exit codes
 
@@ -717,6 +738,13 @@ eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout 
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session
+
+eits dm watch [--session <uuid|id>] [--since <iso8601>|--since-session] [--team-only] \
+  [--format json|jsonl] [--timeout <seconds>]
+# Long-running, reconnecting long-poll that streams new inbound DMs (default --format jsonl)
+# Ordered, deduplicated across reconnects via an opt-in server cursor; older servers fail fast
+# Retries connection failures and 429/500/502/503/504 with backoff (1,2,4,8,16,30s, up to 8 retries)
+# Stop with Ctrl-C or by closing its output pipe. See CLI_DM_WATCH.md for full semantics.
 ```
 
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
@@ -724,6 +752,10 @@ Both `--from` and `--to` accept either an integer session ID or a session UUID. 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
 
 `dm list` / `dm inbox` default to `--since-session`: only DMs received since the current session started (its `started_at`, resolved from the API) are returned. This suppresses stale DMs from prior sessions that may replay when resuming. Pass `--all-time` for the full history, or `--since <iso8601>` for an explicit cutoff (`--all-time` conflicts with `--since`, `--since-session`, and `--strict`). If the session start cannot be resolved, a `warnings` array (`code: "session_start_unresolved"`, `reason`, `session`, `effective_since`) is attached to the JSON response on stdout and all DMs are returned, unless `--strict` is set, which fails instead.
+
+For a persistent background watcher instead of one-shot polling, use `dm watch`
+(above) — it never terminates on an empty poll and preserves ordering across
+reconnects. See [CLI_DM_WATCH.md](CLI_DM_WATCH.md).
 
 ---
 
@@ -933,6 +965,18 @@ Runs read-only diagnostics for the local CLI environment. The JSON output includ
 - hook script and registration status
 - whether the current identity can support task, note, commit, and DM operations
 - warnings and a suggested next command
+
+```bash
+eits doctor cli [--pretty]
+```
+
+Local-only migration report (no server access, credential/config loading, or
+subprocess execution) for the running Rust binary: actual OS-resolved
+`executable` path, `implementation`/`version`/`build` info, whether the
+`eits-extras` fallback resolver finds an executable (`fallback`, `executed:
+false`), and the native (`command_families.rust`) vs. legacy
+(`command_families.legacy`) command family lists. JSON even under `--quiet`.
+Does not affect bare `eits doctor`. See [CLI_DOCTOR.md](CLI_DOCTOR.md).
 
 ## work / workflow
 

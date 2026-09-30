@@ -1292,6 +1292,32 @@ All four call a private `maybe_auto_name/2` helper (or equivalent `Task.start` i
 
 **PubSub:** On a successful name write, `Events.broadcast_rail_session_updated/1` fires so the rail sidebar updates immediately without a page refresh.
 
+### Rail Flyout Refresh on Session/Task Mutations
+
+`Events.broadcast_rail_session_updated/1` only patches a single row in the rail's flyout session list — it can't signal removals or filtered-list changes. `Sessions.StatusTransitions` fires a dedicated `Events.broadcast_rail_sessions_refresh/0` after any mutation that can change *which* sessions belong in the flyout, not just one row's fields:
+
+```elixir
+def delete_session(%Session{} = session) do
+  case Repo.delete(session) do
+    {:ok, deleted} ->
+      Events.broadcast_rail_sessions_refresh()
+      {:ok, deleted}
+
+    error ->
+      error
+  end
+end
+```
+
+**Fires from:** `delete_session/1`, `batch_delete_sessions/1`, `batch_archive_sessions_for_project/2` — all StatusTransitions operations that remove or archive sessions out from under the flyout's filtered list.
+
+**Rail LiveView handling** (`lib/eye_in_the_sky_web/components/rail.ex`):
+- `{:rail_session_updated, _session}` and `:rail_sessions_refresh` both call `reload_flyout_sessions/1`, which re-runs `Loader.load_flyout_sessions/4` with the current sort/filter/limit assigns and reassigns `:flyout_sessions`. A full reload (not a row patch) is required because the mutation may have removed the row's eligibility for the current filter entirely.
+- The Rail LiveView also subscribes to `Events.subscribe_tasks()` on mount and handles `:tasks_changed` / `{:tasks_changed, _entity}` the same way, via `reload_flyout_tasks/1` — so task state changes and deletions refresh the flyout's task list, not just the row that changed.
+- Both flyout row templates (`sessions_section.ex`, `tasks_section.ex`) render a stable `id={"rail-session-#{@session.id}"}` / `id={"rail-task-#{@task.id}"}` on the row so tests (and any future targeted DOM updates) can assert on a specific row's presence/absence.
+
+**Why a full reload instead of a targeted `stream_insert`/`stream_delete`:** the flyout list isn't a LiveView stream — it's a plain assign rebuilt from `Loader.load_flyout_sessions/4` / `load_flyout_tasks/3`, so there's no dom_id-keyed structure to surgically patch. A full reload keeps the visible list consistent with the active sort/filter after any mutation that can change membership (delete, archive, task state change moving a row outside the current state filter).
+
 ---
 
 ## NewSessionModal — Workspace-Scoped Project Dropdown

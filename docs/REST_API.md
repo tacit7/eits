@@ -1407,6 +1407,23 @@ broadcast lands or the timeout elapses; no DB polling loop.
 | `session` or `session_id` | string or integer | yes | Recipient session ID (UUID or integer) |
 | `since` | string | no | ISO 8601 datetime; only a DM with `inserted_at` after this counts as new. Omit to also match any DM already sitting unread in the inbox. |
 | `timeout` | integer | no | Seconds to block for (default 25, capped at 55 — keep comfortably under typical HTTP client/proxy read timeouts) |
+| `watch` | string | no | Set to `"true"` to opt into ordered, reconnecting watch mode (see below). Requires `since` and honors `after_id`. |
+| `after_id` | string or integer | no | Only used when `watch=true`. Message ID cursor — returns the next message where `inserted_at > since`, or `inserted_at == since and id > after_id`. Defaults to `"0"`. |
+
+**Watch mode (`watch=true`):** an opt-in cursor-based variant of the same
+endpoint for callers that need to reconnect after a drop without losing or
+duplicating messages — e.g. a CLI `dm watch` loop. Instead of matching on
+`inserted_at` alone, it matches on the compound cursor
+`(since, after_id)`, breaking ties on `id` when two messages share the same
+timestamp. A broadcast wakeup always re-queries committed rows via the
+cursor rather than trusting the broadcast payload directly, so out-of-order
+or stale PubSub delivery can't skip backlog or bypass the cursor. Every
+response in watch mode carries the extra field `"watch_cursor": true`, and
+`inserted_at` is normalized to microsecond precision so cursors compare
+safely as plain strings — advance the cursor by re-issuing the same request
+with `since` and `after_id` set from the last item received. Legacy
+(non-watch) requests are unaffected — `watch` is opt-in only and the
+existing timestamp-only contract is unchanged for every other caller.
 
 **Response:** `200 OK` in both cases — the caller distinguishes "arrived" from
 "nothing yet" by `count`, not by status code.
@@ -1444,6 +1461,7 @@ On timeout with no matching DM:
 | Status | When |
 |--------|------|
 | `400 Bad Request` | `session` is missing, or `since` is not a valid ISO 8601 timestamp |
+| `400 Bad Request` | `watch=true` without a valid `since`, or `after_id` is negative/non-numeric |
 | `404 Not Found` | no session with that ID/UUID |
 
 **Fan-out:** this is a broadcast subscription, not a queue — if multiple
@@ -1455,6 +1473,7 @@ of the same DM. It's not a competing-consumers pattern.
 ```bash
 curl "localhost:5001/api/v1/dm/wait?session=42&timeout=30"
 curl "localhost:5001/api/v1/dm/wait?session=42&since=2026-03-17T10:00:00Z&timeout=10"
+curl "localhost:5001/api/v1/dm/wait?session=42&watch=true&since=2026-03-17T10:00:00.000000Z&after_id=0&timeout=30"
 eitsr dm wait --session 42 --timeout 30   # eitsr only; bash `eits dm` has no `wait`
 ```
 
@@ -2295,6 +2314,108 @@ Get all sessions linked to a task.
 
 ```bash
 eits tasks sessions 1
+```
+
+---
+
+### POST /api/v1/tasks/:id/release
+
+Owner-only: atomically releases an active task back to To Do and clears
+ownership. Runs inside a `FOR UPDATE` transaction with `claim_task`/`handoff`
+so concurrent ownership changes serialize cleanly. A retry with an identical
+prior release (matched via an ownership receipt note) is a no-op that
+returns the current task unchanged rather than erroring.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string or integer | yes | Caller's session ID (UUID or integer); must be the current sole owner |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "task": {
+    "id": 1,
+    "title": "Fix auth bug",
+    "state": "To Do",
+    "state_id": 1,
+    "session_id": null,
+    "session_ids": [],
+    "updated_at": "2026-09-25T16:00:00Z"
+  }
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `session_id` missing or invalid |
+| `404 Not Found` | task not found |
+| `403 Forbidden` | caller is not the current owner |
+| `409 Conflict` | task is archived, Done, or otherwise not active |
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/tasks/1/release \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": 42}'
+eits tasks release 1
+```
+
+---
+
+### POST /api/v1/tasks/:id/handoff
+
+Owner-only: atomically transfers an active task to another session without
+changing its workflow state (In Progress stays In Progress). Same ownership
+transaction and no-op-retry semantics as `release`. Handing off to yourself
+is a no-op.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string or integer | yes | Caller's session ID (UUID or integer); must be the current sole owner |
+| `to` | string or integer | yes | Target session ID (UUID or integer) to receive ownership |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "task": {
+    "id": 1,
+    "title": "Fix auth bug",
+    "state": "In Progress",
+    "state_id": 2,
+    "session_id": 99,
+    "session_ids": [99],
+    "updated_at": "2026-09-25T16:05:00Z"
+  }
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `session_id` or `to` missing or invalid |
+| `404 Not Found` | task not found |
+| `403 Forbidden` | caller is not the current owner |
+| `409 Conflict` | task is archived, Done, or otherwise not active |
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/tasks/1/handoff \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": 42, "to": 99}'
+eits tasks handoff 1 --to 99
 ```
 
 ---

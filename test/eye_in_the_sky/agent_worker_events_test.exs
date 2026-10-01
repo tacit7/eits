@@ -5,6 +5,7 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
 
   alias EyeInTheSky.{Agents, Channels, Messages, Sessions}
   alias EyeInTheSky.AgentWorkerEvents
+  alias EyeInTheSky.Claude.Job
 
   # --- Helpers ---
 
@@ -349,6 +350,40 @@ defmodule EyeInTheSky.AgentWorkerEventsTest do
       assert get_in(saved.metadata, ["source"]) == "channel_prompt"
       assert get_in(saved.metadata, ["channel_id"]) == channel.id
       assert get_in(saved.metadata, ["channel_message_id"]) == 99
+    end
+
+    test "real job shape (normalize_context + Job.reply_context) is not posted to the channel" do
+      {agent, session} = create_session()
+      channel = create_channel()
+      Channels.add_member(channel.id, agent.id, session.id)
+
+      # Same shape ChannelFanout builds and the worker stores on the job.
+      job =
+        Job.new(
+          "prompt",
+          Job.normalize_context(
+            channel_id: channel.id,
+            context: %{
+              "source" => "channel",
+              "channel_id" => channel.id,
+              "channel_message_id" => 7,
+              "reply_mode" => "cli_required"
+            }
+          )
+        )
+
+      AgentWorkerEvents.on_result_received(session.id, %{
+        provider: "claude",
+        text: "recap for the operator, not for the channel",
+        metadata: %{},
+        channel_id: job.context[:channel_id],
+        source_uuid: "uuid-1",
+        job_context: Job.reply_context(job)
+      })
+
+      [saved] = Messages.list_messages_for_session(session.id)
+      assert saved.channel_id == nil
+      assert get_in(saved.metadata, ["visibility"]) == "session_only"
     end
 
     test "cli_required does not insert into channel_messages" do

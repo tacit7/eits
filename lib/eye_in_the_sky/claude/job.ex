@@ -49,6 +49,16 @@ defmodule EyeInTheSky.Claude.Job do
   end
 
   @doc """
+  Return the caller-supplied, string-keyed metadata map for this job
+  (e.g. `%{"source" => "channel", "reply_mode" => "cli_required"}`), or nil.
+
+  `normalize_context/1` nests it under the `:context` key, so it is NOT at the
+  top level of `job.context`.
+  """
+  def reply_context(%__MODULE__{context: %{context: ctx}}) when is_map(ctx), do: ctx
+  def reply_context(%__MODULE__{}), do: nil
+
+  @doc """
   Assign a unique monotonic ID to this job (for queue identity).
   """
   def assign_id(%__MODULE__{} = job) do

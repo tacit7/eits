@@ -362,7 +362,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       ) do
     channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
-    job_context = if state.current_job, do: state.current_job.context, else: nil
+    job_context = if state.current_job, do: Job.reply_context(state.current_job), else: nil
 
     WorkerEvents.on_result_received(state.session_id, %{
       provider: state.provider,

@@ -31,11 +31,10 @@ const TASK_STATES = [
 ]
 
 export const REGISTRY = {
-  // Project rows live in the ProjectSwitcher popup, which is part of Rail's
-  // own live_render'd LiveView — actions push through the ctx.push() Rail
-  // bridge (see hooks/context_menu.js), not the page LiveView. Rename/open
-  // terminal/open editor all resolve the project's path server-side; the
-  // client never sends a path back for a mutating or shell-launching action.
+  // Project actions push through the ctx.push() Rail bridge (see
+  // hooks/context_menu.js), not the page LiveView. Rename/open terminal/open
+  // editor all resolve the project's path server-side; the client never sends
+  // a path back for a mutating or shell-launching action.
   project: (d) => [
     { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.navigate(`/projects/${d.ctxId}`) },
     {

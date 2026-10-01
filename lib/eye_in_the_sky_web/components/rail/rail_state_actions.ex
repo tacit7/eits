@@ -51,16 +51,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
      |> Phoenix.LiveView.push_event("save_rail_state", %{flyout_open: open})}
   end
 
-  def handle_toggle_proj_picker(params, socket) do
-    _ = params
-    {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
-  end
-
-  def handle_close_proj_picker(params, socket) do
-    _ = params
-    {:noreply, assign(socket, :proj_picker_open, false)}
-  end
-
   def handle_open_mobile(params, socket) do
     _ = params
     {:noreply, assign(socket, mobile_open: true, flyout_open: true)}
@@ -349,7 +339,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   # Re-fetch flyout content for the restored section so the panel isn't empty
   # after live navigation. Mirrors the loader pipeline in open_section/2 but
-  # without resetting session_scope / proj_picker_open / etc. — we preserve
+  # without resetting session_scope or other restored filters — we preserve
   # whatever state was already restored from localStorage. Skipped entirely
   # when the flyout is collapsed (no visible content to populate).
   defp reload_section_content(socket) do

@@ -291,7 +291,6 @@ export const VimNav = {
       }
       this.clearSequence()
       this.hideHelp()
-      this.pushEventToShell?.("close_proj_picker", {})
       return
     }
 

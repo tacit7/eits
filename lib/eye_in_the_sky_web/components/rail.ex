@@ -5,8 +5,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   alias EyeInTheSky.Events
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
-  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
-  import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -67,13 +65,11 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         projects: workspace_projects(workspace_id),
         rail_context_topic: rail_context_topic,
         flyout_open: true,
-        proj_picker_open: false,
         active_section: nil,
         flyout_sessions: [],
         flyout_channels: [],
         unread_counts: %{},
         notification_count: 0,
-        new_project_path: nil,
         renaming_project_id: nil,
         rename_value: "",
         mobile_open: false,
@@ -82,7 +78,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         workspace_id: workspace_id,
         sidebar_tab: sidebar_tab,
         active_channel_id: nil,
-        scope_type: :project,
         flyout_canvases: [],
         flyout_teams: [],
         team_search: "",
@@ -220,7 +215,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       |> assign(:workspace, workspace)
 
     # Only adopt sidebar_project if non-nil — prevents pages without a project
-    # from clearing a project locally selected via the rail's own project picker.
+    # from clearing the project restored from persisted rail state.
     socket =
       if is_nil(sidebar_project),
         do: socket,
@@ -304,40 +299,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("restore_rail_state", params, socket),
     do: RailStateActions.handle_restore_rail_state(params, socket)
 
-  def handle_event("toggle_proj_picker", params, socket),
-    do: RailStateActions.handle_toggle_proj_picker(params, socket)
-
-  def handle_event("close_proj_picker", params, socket),
-    do: RailStateActions.handle_close_proj_picker(params, socket)
-
   def handle_event("open_mobile", params, socket),
     do: RailStateActions.handle_open_mobile(params, socket)
-
-  def handle_event("select_project", params, socket),
-    do: ProjectActions.handle_select_project_with_reload(params, socket)
-
-  def handle_event("select_workspace", _params, socket),
-    do: ProjectActions.handle_select_workspace(socket)
-
-  def handle_event("show_new_project", _params, socket),
-    do: ProjectActions.handle_show_new_project(socket)
-
-  # Tauri JS bridge pushes this after the user picks a folder in the native dialog.
-  def handle_event("folder_picked", params, socket),
-    do: ProjectActions.handle_folder_picked(params, socket)
 
   # Tauri JS bridge: open a project in its own window.
   def handle_event("open_in_window", params, socket),
     do: ProjectActions.handle_open_in_window(params, socket)
-
-  def handle_event("cancel_new_project", _params, socket),
-    do: ProjectActions.handle_cancel_new_project(socket)
-
-  def handle_event("update_project_path", params, socket),
-    do: ProjectActions.handle_update_project_path(params, socket)
-
-  def handle_event("create_project", params, socket),
-    do: ProjectActions.handle_create_project(params, socket)
 
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
@@ -612,19 +579,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         id="rail-icon-strip"
         class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-base-100 z-20"
       >
-        <button
-          phx-click="toggle_proj_picker"
-          class={[
-            "w-8 h-8 rounded-box mb-2 flex items-center justify-center text-message font-bold text-primary-content transition-all",
-            "bg-primary hover:opacity-90",
-            if(@proj_picker_open, do: "ring-2 ring-primary ring-offset-2 ring-offset-base-100")
-          ]}
-          title="Switch project"
-          aria-label="Switch project"
-        >
-          {project_initial(@sidebar_project)}
-        </button>
-
         <%!-- Flyout toggle lives in the rail so it stays aligned with the icon strip.
              Desktop uses the persisted disclosure event; mobile opens/closes the drawer. --%>
         <button
@@ -818,16 +772,6 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           </.link>
         </div>
       </nav>
-
-      <.project_switcher
-        :if={@proj_picker_open}
-        projects={@projects}
-        sidebar_project={@sidebar_project}
-        open={@proj_picker_open}
-        new_project_path={@new_project_path}
-        workspace={@workspace}
-        scope_type={@scope_type}
-      />
 
       <.flyout
         open={@flyout_open}

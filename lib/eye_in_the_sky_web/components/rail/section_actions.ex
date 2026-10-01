@@ -108,7 +108,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
      |> assign(:active_section, section)
      |> assign(:flyout_open, true)
      |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(section)})
-     |> assign(:proj_picker_open, false)
      |> assign(:session_scope, :current)
      |> assign(:session_project_visible, %{})
      |> assign(:session_project_collapsed, MapSet.new())
@@ -141,7 +140,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(
            flyout_open: false,
            mobile_open: false,
-           proj_picker_open: false,
            show_new_session_form: false
          )
          |> push_event("save_rail_state", %{flyout_open: false})}
@@ -152,7 +150,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:active_section, sticky)
          |> assign(:flyout_open, true)
          |> assign(:mobile_open, false)
-         |> assign(:proj_picker_open, false)
          |> assign(:show_new_session_form, false)
          |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(sticky)})}
     end

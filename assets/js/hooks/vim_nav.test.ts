@@ -1496,9 +1496,10 @@ describe("rail coverage: g and t bindings for all rail items", () => {
     }
   })
 
-  it("tp remains proj_picker (not repurposed); prompts uses tP (capital)", () => {
+  it("tp opens project search while prompts uses tP (capital)", () => {
     const tp = COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "p")!
-    expect(tp.id).toBe("toggle.proj_picker")
+    expect(tp.id).toBe("find.projects")
+    expect(tp.action).toEqual({ kind: "client", name: "find_projects" })
     const tP = COMMANDS.find(c => c.keys[0] === "t" && c.keys[1] === "P")!
     expect(tP.id).toBe("toggle.prompts")
   })

@@ -12,28 +12,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
   alias EyeInTheSkyWeb.Components.Rail.Loader
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
 
-  def handle_select_project(%{"project_id" => id_str}, socket) do
-    case parse_int(id_str) do
-      nil ->
-        {:noreply, socket}
-
-      id ->
-        current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
-
-        if current_id == id do
-          {:noreply, assign(socket, :sidebar_project, nil)}
-        else
-          case Projects.get_project(id) do
-            {:ok, project} ->
-              {:noreply, select_project(socket, project)}
-
-            {:error, _} ->
-              {:noreply, socket}
-          end
-        end
-    end
-  end
-
   def handle_start_rename(%{"project_id" => id_str}, socket) do
     with id when not is_nil(id) <- parse_int(id_str),
          {:ok, project} <- Projects.get_project(id) do
@@ -179,50 +157,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # Pushes a phx:pick_folder event to the client.
-  # In Tauri: JS invokes the native folder picker (Rust pick_folder command) and
-  # pushes folder_picked back. In the browser: JS immediately pushes folder_picked
-  # with an empty payload to show the inline text-input fallback.
-  # NOTE: Creating a project does NOT auto-select it.
-  def handle_show_new_project(socket) do
-    {:noreply, push_event(socket, "pick_folder", %{})}
-  end
-
-  def handle_cancel_new_project(socket),
-    do: {:noreply, assign(socket, :new_project_path, nil)}
-
-  def handle_update_project_path(%{"value" => value}, socket),
-    do: {:noreply, assign(socket, :new_project_path, value)}
-
-  # Reads path from submit params first, falls back to assign.
-  # This handles paste-then-submit before keyup fires.
-  def handle_create_project(params, socket) do
-    path =
-      (params["path"] || socket.assigns.new_project_path || "")
-      |> String.trim()
-
-    if path != "" do
-      name = basename_from_path(path)
-      workspace_id = current_workspace_id(socket)
-
-      attrs = %{name: name, path: path}
-      attrs = if workspace_id, do: Map.put(attrs, :workspace_id, workspace_id), else: attrs
-
-      case Projects.create_project(attrs) do
-        {:ok, _} ->
-          {:noreply,
-           socket
-           |> assign(:projects, workspace_projects(socket))
-           |> assign(:new_project_path, nil)}
-
-        {:error, _} ->
-          {:noreply, assign(socket, :new_project_path, nil)}
-      end
-    else
-      {:noreply, assign(socket, :new_project_path, nil)}
-    end
-  end
-
   def handle_new_session(%{"project_id" => project_id_str}, socket) do
     with project_id when not is_nil(project_id) <- parse_int(project_id_str),
          {:ok, project} <- Projects.get_project(project_id),
@@ -249,51 +183,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     end
   end
 
-  # Called by handle_event("folder_picked") in rail.ex — payload comes from the
-  # Tauri pick_folder JS bridge after the user selects a folder.
-  # If the path already exists as a project, switch to it rather than failing silently.
-  # path absent or empty → falls through to the inline text-input fallback clause below.
-  def handle_folder_picked(%{"path" => path}, socket) when is_binary(path) and path != "" do
-    path = String.trim(path)
-    name = basename_from_path(path)
-    workspace_id = current_workspace_id(socket)
-
-    attrs = %{name: name, path: path}
-    attrs = if workspace_id, do: Map.put(attrs, :workspace_id, workspace_id), else: attrs
-
-    case Projects.create_project(attrs) do
-      {:ok, _} ->
-        {:noreply, assign(socket, :projects, workspace_projects(socket))}
-
-      {:error, changeset} ->
-        if path_taken?(changeset) do
-          # Path already exists — select the existing project and tell the user.
-          case Projects.get_project_by_path(path) do
-            {:ok, project} ->
-              {:noreply,
-               socket
-               |> put_flash(:info, "\"#{project.name}\" is already in your projects")
-               |> select_project(project)}
-
-            {:error, _} ->
-              {:noreply, put_flash(socket, :error, "Could not add project at #{path}")}
-          end
-        else
-          # Surface the failure — a silent {:noreply, socket} here cost multiple
-          # debugging rounds (nothing appears in the UI and nothing is logged).
-          errors =
-            changeset.errors
-            |> Enum.map_join(", ", fn {field, {msg, _}} -> "#{field} #{msg}" end)
-
-          {:noreply, put_flash(socket, :error, "Could not add project: #{errors}")}
-        end
-    end
-  end
-
-  # Empty payload = cancelled or no Tauri; show the inline text-input fallback.
-  def handle_folder_picked(_params, socket),
-    do: {:noreply, assign(socket, :new_project_path, "")}
-
   defp current_workspace_id(socket) do
     socket.assigns[:workspace_id] ||
       get_in(socket.assigns, [:workspace, Access.key(:id)]) ||
@@ -312,17 +201,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     |> assign(:workspace, workspace)
     |> assign(:workspace_id, workspace && workspace.id)
     |> assign(:projects, Projects.list_projects_for_sidebar())
-  end
-
-  defp basename_from_path(path) do
-    path |> String.split("/") |> Enum.reject(&(&1 == "")) |> List.last() || path
-  end
-
-  defp path_taken?(%Ecto.Changeset{errors: errors}) do
-    Enum.any?(errors, fn
-      {:path, {_, opts}} -> opts[:constraint] == :unique
-      _ -> false
-    end)
   end
 
   # Opens the given project in a new Tauri window. No-op in browser context
@@ -405,59 +283,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
     push_event(socket, "save_rail_state", %{project_id: project_id})
   end
 
-  # Full select_project flow: delegates to handle_select_project/2 for the project
-  # change, then reloads sessions + files, persists the selection to localStorage,
-  # and navigates to the equivalent route on the new project.
-  def handle_select_project_with_reload(params, socket) do
-    previous_project = socket.assigns.sidebar_project
-    {:noreply, socket} = handle_select_project(params, socket)
-    new_project = socket.assigns.sidebar_project
-
-    socket =
-      if new_project != previous_project do
-        socket
-        |> assign(
-          :flyout_sessions,
-          Loader.load_flyout_sessions(
-            new_project,
-            socket.assigns.session_sort,
-            socket.assigns.session_name_filter
-          )
-        )
-        |> assign(:flyout_file_expanded, MapSet.new())
-        |> assign(:flyout_file_children, %{})
-        |> Loader.maybe_load_files(socket.assigns.active_section)
-      else
-        socket
-      end
-
-    project_id = new_project && new_project.id
-
-    socket =
-      socket
-      |> push_event("save_rail_state", %{project_id: project_id})
-      |> assign(:proj_picker_open, false)
-      |> assign(:scope_type, :project)
-
-    # Navigate to the equivalent route on the newly selected project, preserving
-    # the current tab context (sessions, tasks, notes, etc.).
-    # Global tabs (:usage, :chat, :canvas, :notifications, :dm) return nil from
-    # project_path/2 — in that case skip navigation and stay on the current page.
-    socket =
-      if not is_nil(new_project) and new_project != previous_project do
-        sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
-
-        case project_path(new_project.id, sidebar_tab) do
-          nil -> socket
-          path -> push_navigate(socket, to: path)
-        end
-      else
-        socket
-      end
-
-    {:noreply, socket}
-  end
-
   # Maps the current sidebar_tab to the equivalent project-scoped route.
   # Returns nil for global tabs (:usage, :chat, :canvas, :notifications, :dm)
   # so the caller can skip navigation and leave the user on their current page.
@@ -476,14 +301,5 @@ defmodule EyeInTheSkyWeb.Components.Rail.ProjectActions do
       :config -> "/projects/#{id}/config"
       _ -> nil
     end
-  end
-
-  def handle_select_workspace(socket) do
-    {:noreply,
-     socket
-     |> assign(:proj_picker_open, false)
-     |> assign(:sidebar_project, nil)
-     |> assign(:scope_type, :workspace)
-     |> push_navigate(to: "/workspace/sessions")}
   end
 end

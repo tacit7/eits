@@ -85,8 +85,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "push_event", event: "toggle_section", payload: { section: "teams" }, target: "shell" } },
   { id: "toggle.jobs",        label: "Toggle Jobs",            keys: ["t", "j"], group: "toggle",
     action: { kind: "push_event", event: "toggle_section", payload: { section: "jobs" }, target: "shell" } },
-  { id: "toggle.proj_picker", label: "Toggle Project Picker",  keys: ["t", "p"], group: "toggle",
-    action: { kind: "push_event", event: "toggle_proj_picker", payload: {}, target: "shell" } },
+  { id: "find.projects",      label: "Find Project",           keys: ["t", "p"], group: "global",
+    action: { kind: "client", name: "find_projects" } },
   { id: "toggle.agents",        label: "Toggle Agents",          keys: ["t", "a"], group: "toggle",
     action: { kind: "push_event", event: "toggle_section", payload: { section: "agents" }, target: "shell" } },
   { id: "toggle.usage",         label: "Toggle Usage",           keys: ["t", "u"], group: "toggle",
@@ -306,8 +306,8 @@ export const COMMANDS: Command[] = [
     action: { kind: "push_event", event: "toggle_section", payload: { section: "notifications" }, target: "shell" } },
   { id: "leader.toggle.prompts",       label: "Toggle Prompts",       keys: ["Space", "t", "P"], group: "toggle",
     action: { kind: "push_event", event: "toggle_section", payload: { section: "prompts" }, target: "shell" } },
-  { id: "leader.toggle.proj_picker",   label: "Toggle Project Picker", keys: ["Space", "t", "p"], group: "toggle",
-    action: { kind: "push_event", event: "toggle_proj_picker", payload: {}, target: "shell" } },
+  { id: "leader.find.projects.alt",     label: "Find Project",          keys: ["Space", "t", "p"], group: "global",
+    action: { kind: "client", name: "find_projects" } },
 
   // Space n — create (aliases of n bindings)
   { id: "leader.create.agent",       label: "New Agent",       keys: ["Space", "n", "a"], group: "create",

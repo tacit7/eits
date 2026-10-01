@@ -11,7 +11,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         active_section: :sessions,
         flyout_open: false,
         mobile_open: false,
-        proj_picker_open: false,
         show_new_session_form: false,
         sidebar_project: nil,
         sidebar_tab: :rail,
@@ -33,8 +32,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
     test "opens flyout when section is toggled", %{socket: socket} do
       socket = %{socket | assigns: %{socket.assigns | flyout_open: false}}
 
-      # Use :tasks which has no global route (only project-scoped) → triggers flyout
-      params = %{"section" => "tasks"}
+      # Files has no canonical route, so toggling it opens the flyout.
+      params = %{"section" => "files"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
@@ -46,13 +45,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         socket
         | assigns: %{
             socket.assigns
-            | active_section: :tasks,
+            | active_section: :files,
               flyout_open: true,
               mobile_open: true
           }
       }
 
-      params = %{"section" => "tasks"}
+      params = %{"section" => "files"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
@@ -68,7 +67,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
           active_section: :sessions,
           flyout_open: true,
           mobile_open: true,
-          proj_picker_open: false,
           show_new_session_form: false,
           sidebar_project: nil,
           sidebar_tab: :rail,
@@ -83,26 +81,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
         private: %{live_temp: %{}}
       }
 
-      # Use :tasks which has no global route (only project-scoped) → triggers flyout
-      params = %{"section" => "tasks"}
+      # Files has no canonical route, so toggling it changes the flyout section.
+      params = %{"section" => "files"}
 
       {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
 
-      assert updated_socket.assigns.active_section == :tasks
+      assert updated_socket.assigns.active_section == :files
       assert updated_socket.assigns.flyout_open == true
-    end
-
-    test "resets proj_picker_open when toggling section", %{socket: socket} do
-      socket = %{
-        socket
-        | assigns: %{socket.assigns | proj_picker_open: true}
-      }
-
-      params = %{"section" => "tasks"}
-
-      {:noreply, updated_socket} = SectionActions.handle_toggle_section(params, socket)
-
-      assert updated_socket.assigns.proj_picker_open == false
     end
 
     test "resets session project filters when toggling section", %{socket: socket} do
@@ -133,7 +118,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
             | sidebar_tab: :rail,
               flyout_open: true,
               mobile_open: true,
-              proj_picker_open: true,
               show_new_session_form: true
           }
       }
@@ -142,7 +126,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
 
       assert updated_socket.assigns.flyout_open == false
       assert updated_socket.assigns.mobile_open == false
-      assert updated_socket.assigns.proj_picker_open == false
       assert updated_socket.assigns.show_new_session_form == false
     end
 
@@ -161,21 +144,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActionsTest do
 
       # Should switch to sticky section (depends on sidebar_tab)
       assert updated_socket.assigns.flyout_open == true
-    end
-
-    test "clears proj_picker_open when closing", %{socket: socket} do
-      socket = %{
-        socket
-        | assigns: %{
-            socket.assigns
-            | proj_picker_open: true,
-              flyout_open: true
-          }
-      }
-
-      {:noreply, updated_socket} = SectionActions.handle_close_flyout(socket)
-
-      assert updated_socket.assigns.proj_picker_open == false
     end
 
     test "clears show_new_session_form when closing", %{socket: socket} do

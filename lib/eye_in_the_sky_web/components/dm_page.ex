@@ -96,7 +96,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
     ~H"""
     <div
       class={[
-        "flex flex-col h-full relative overflow-hidden",
+        "flex flex-col h-full relative overflow-hidden text-base-content",
         if(@pty_pid, do: "px-0 py-0", else: "px-0 sm:px-4 lg:px-8 py-0 sm:py-4"),
         if(@pty_pid, do: "pty-content", else: nil)
       ]}

@@ -3,9 +3,9 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   use Phoenix.Component
 
   import EyeInTheSkyWeb.CoreComponents
+  import EyeInTheSkyWeb.Components.ArchiveConfirmModal
   import EyeInTheSkyWeb.Components.ProjectSessionsFilters
   import EyeInTheSkyWeb.Components.ProjectSessionsTable
-  import EyeInTheSkyWeb.Components.AgentList, only: [archive_confirm_modal: 1]
 
   @doc "Full sessions page layout. Pass `{assigns}` from the LiveView render."
   attr :has_more, :boolean, required: true
@@ -120,8 +120,13 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       submit_event="create_new_session"
     />
     <.archive_confirm_modal
-      show_archive_confirm={@show_archive_confirm}
-      selected_ids={@selected_ids}
+      id="sessions-archive-confirm-modal"
+      show={@show_archive_confirm}
+      count={MapSet.size(@selected_ids)}
+      entity="session"
+      entity_plural="sessions"
+      cancel_event="cancel_archive_selected"
+      confirm_event="archive_selected"
     />
     """
   end

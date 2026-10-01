@@ -195,7 +195,7 @@ export const ModelSelectorPopup = {
       data-provider="${this._esc(m.provider)}"
       role="option"
       aria-selected="${active}"
-      class="flex items-center gap-2 rounded-box px-3 py-2 text-message cursor-pointer hover:bg-base-content/[0.04] aria-selected:bg-base-content/[0.06]"
+      class="flex items-center gap-2 rounded-box px-3 py-2 text-message text-base-content/85 cursor-pointer hover:bg-base-content/[0.04] hover:text-base-content aria-selected:bg-base-content/[0.06] aria-selected:text-base-content"
     >
       <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
       <span class="flex-1 truncate">${this._highlight(m.label, q)}</span>

@@ -60,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
         type="button"
         disabled={@disabled?}
         data-selector-trigger
-        class="flex h-6 items-center gap-1.5 rounded-box border border-[var(--border-subtle)] bg-base-content/[0.05] px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/[0.08] hover:text-base-content/75 focus-ring disabled:cursor-not-allowed disabled:opacity-40"
+        class="flex h-6 items-center gap-1.5 rounded-box border border-[var(--border-subtle)] bg-base-content/[0.05] px-2 text-mini font-medium text-base-content/85 transition-colors hover:bg-base-content/[0.08] hover:text-base-content focus-ring disabled:cursor-not-allowed disabled:opacity-40"
       >
         <img
           src={DmHelpers.provider_icon(@selected_provider)}
@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
       <div
         data-selector-popover
         class={[
-          "hidden absolute z-[1] w-80 rounded-box border border-base-content/8 bg-base-100 shadow-lg",
+          "hidden absolute z-[1] w-80 rounded-box border border-base-content/8 bg-base-100 text-base-content shadow-lg",
           if(@placement == :up, do: "bottom-full mb-2", else: "top-full mt-2")
         ]}
       >
@@ -82,7 +82,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
             type="text"
             data-selector-search
             placeholder="Search models..."
-            class="w-full bg-transparent border-0 outline-none text-message px-1"
+            class="w-full bg-transparent border-0 px-1 text-message text-base-content outline-none placeholder:text-base-content/45"
           />
         </div>
         <ul data-selector-list role="listbox" class="max-h-96 overflow-y-auto p-1.5">
@@ -121,7 +121,7 @@ defmodule EyeInTheSkyWeb.Components.ModelSelector do
       data-default={to_string(@entry.default?)}
       role="option"
       aria-selected={to_string(@active)}
-      class="flex cursor-pointer items-center gap-2 rounded-box px-3 py-2 text-message hover:bg-base-content/[0.04] focus-ring aria-selected:bg-base-content/[0.06]"
+      class="flex cursor-pointer items-center gap-2 rounded-box px-3 py-2 text-message text-base-content/85 hover:bg-base-content/[0.04] hover:text-base-content focus-ring aria-selected:bg-base-content/[0.06] aria-selected:text-base-content"
     >
       <span class="w-[5px] h-[5px] rounded-full bg-primary/60 flex-shrink-0"></span>
       <span class="flex-1 truncate" data-selector-row-label>{@entry.label}</span>

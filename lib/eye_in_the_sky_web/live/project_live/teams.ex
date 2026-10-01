@@ -8,6 +8,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
   alias EyeInTheSkyWeb.Live.Shared.BulkHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
   alias EyeInTheSkyWeb.ProjectLive.Sessions.Selection
+  import EyeInTheSkyWeb.Components.ArchiveConfirmModal
   import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
@@ -534,36 +535,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Teams do
           </div>
         <% end %>
 
-        <dialog
+        <.archive_confirm_modal
           id="teams-archive-confirm-modal"
-          class={"eits-modal   " <> if(@show_archive_confirm, do: "eits-modal-open", else: "")}
-        >
-          <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
-            <h3 class="text-lg font-bold">Archive teams</h3>
-            <p class="py-4 text-message text-base-content/70">
-              <% count = MapSet.size(@selected_ids) %> Archive {count} selected team{if count == 1,
-                do: "",
-                else: "s"}? Archived teams can be restored later.
-            </p>
-            <div class="eits-panel__actions">
-              <button
-                phx-click="cancel_archive_selected"
-                class="eits-action eits-action--ghost eits-action--touch"
-              >
-                Cancel
-              </button>
-              <button
-                phx-click="archive_selected"
-                class="eits-action eits-action--warning-solid eits-action--touch"
-              >
-                Archive
-              </button>
-            </div>
-          </div>
-          <form method="dialog" class="eits-modal-backdrop">
-            <button phx-click="cancel_archive_selected">close</button>
-          </form>
-        </dialog>
+          show={@show_archive_confirm}
+          count={MapSet.size(@selected_ids)}
+          entity="team"
+          entity_plural="teams"
+          cancel_event="cancel_archive_selected"
+          confirm_event="archive_selected"
+        />
       </div>
     </div>
     """

@@ -9,6 +9,8 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def claude_models do
     [
+      "claude-opus-5-5",
+      "claude-fable-5-1",
       "claude-opus-4-8",
       "claude-fable-5",
       "claude-sonnet-5",
@@ -33,6 +35,9 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   """
   def codex_models do
     [
+      "gpt-6-astra",
+      "gpt-6-sol",
+      "gpt-6-luna",
       "gpt-5.6-sol",
       "gpt-5.6-tenna",
       "gpt-5.6-luna",
@@ -54,10 +59,10 @@ defmodule EyeInTheSky.Agents.ModelConfig do
   @doc """
   Returns the default model slug for a provider.
   Claude: resolved from Settings.default_model() (user-configured)
-  Codex: "gpt-5.6-sol"
+  Codex: "gpt-6-astra"
   Pi: nil (no default; model must be specified explicitly from discovery)
   """
-  def default_model("codex"), do: "gpt-5.6-sol"
+  def default_model("codex"), do: "gpt-6-astra"
   def default_model("pi"), do: nil
 
   # Pi models are format-validated ("<pi-provider>/<model-id>"); the true list

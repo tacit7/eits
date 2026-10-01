@@ -176,6 +176,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp workspace_projects(_workspace_id), do: Projects.list_projects_for_sidebar()
 
+  defp settings_href(%{sidebar_project: %{id: id}}) do
+    "/settings?return_to=#{URI.encode_www_form("/projects/#{id}/sessions")}"
+  end
+
+  defp settings_href(_assigns), do: "/settings?return_to=#{URI.encode_www_form("/sessions")}"
+
   defp maybe_reload_projects(socket, previous_workspace_id, workspace_id)
        when previous_workspace_id == workspace_id do
     socket
@@ -793,7 +799,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
         <div class="tooltip tooltip-right" data-tip="Settings">
           <.link
-            navigate="/settings"
+            navigate={settings_href(assigns)}
             class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Settings"
           >

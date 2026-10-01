@@ -6,14 +6,15 @@ Commands:
   inbox  Show inbound DMs for a session (alias: list)
   read   Fetch one DM by id (full body)
   wait   Block until the next inbound DM arrives (or timeout), then print and exit
+  watch  Continuously stream new inbound DMs, reconnecting after transient failures
   help   Print this message or the help of the given subcommand(s)
 
 Options:
       --pretty               Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
   -q, --quiet                Print only the created/affected ID on success (mutations)
-      --to <TO>              
-      --message <MESSAGE>    
-      --from <FROM>          
-      --metadata <METADATA>  
-      --response-required    
+      --to <TO>
+      --message <MESSAGE>
+      --from <FROM>
+      --metadata <METADATA>
+      --response-required
   -h, --help                 Print help

@@ -21,16 +21,40 @@ defmodule EyeInTheSkyWeb.ProjectLive.ShowTest do
     project
   end
 
-  describe "workspace switching" do
-    test "opens a project outside the current workspace", %{conn: conn} do
+  describe "workspace isolation" do
+    test "rejects a project outside the current workspace", %{conn: conn} do
       other_user = user_fixture()
       other_workspace = Workspaces.default_workspace_for_user!(other_user)
       foreign_project = create_project_in_workspace(other_workspace.id)
 
-      {:ok, view, html} = live(conn, ~p"/projects/#{foreign_project.id}")
+      {:ok, view, _html} = live(conn, ~p"/projects/#{foreign_project.id}")
 
-      assert html =~ foreign_project.name
-      refute has_element?(view, "#flash-error", "Project not found")
+      assert has_element?(view, "#flash-error", "Project not found")
+    end
+
+    test "shared project mounts reject foreign and missing projects before loading page data", %{
+      conn: conn
+    } do
+      other_workspace = Workspaces.default_workspace_for_user!(user_fixture())
+      foreign_project = create_project_in_workspace(other_workspace.id)
+
+      for section <- ~w(kanban notes agents skills teams jobs prompts),
+          project_id <- [foreign_project.id, -1] do
+        assert_raise Ecto.NoResultsError, fn ->
+          live(conn, "/projects/#{project_id}/#{section}")
+        end
+      end
+
+      for project_id <- [foreign_project.id, -1] do
+        assert {:error, {:redirect, %{to: "/sessions", flash: %{"error" => "Project not found"}}}} =
+                 live(conn, "/projects/#{project_id}/sessions")
+      end
+
+      for project_id <- [foreign_project.id, -1] do
+        assert {:error,
+                {:redirect, %{to: "/workspace/tasks", flash: %{"error" => "Project not found"}}}} =
+                 live(conn, "/projects/#{project_id}/tasks")
+      end
     end
   end
 end

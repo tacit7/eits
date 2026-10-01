@@ -114,6 +114,7 @@ defmodule EyeInTheSkyWeb.Router do
       live "/notifications", OverviewLive.Notifications, :index
       live "/settings", OverviewLive.Settings, :index
       live "/sessions", ProjectLive.Sessions, :index
+      live "/tasks", WorkspaceLive.Tasks, :index
       live "/teams", ProjectLive.Teams, :index
       live "/projects/:id", ProjectLive.Show, :show
       live "/projects/:id/sessions", ProjectLive.Sessions, :show
@@ -220,6 +221,8 @@ defmodule EyeInTheSkyWeb.Router do
     post "/tasks/:id/annotations", TaskController, :annotate
     post "/tasks/:id/complete", TaskController, :complete
     post "/tasks/:id/claim", TaskController, :claim
+    post "/tasks/:id/release", TaskController, :release
+    post "/tasks/:id/handoff", TaskController, :handoff
     post "/tasks/:id/sessions", TaskController, :link_session
     get "/tasks/:id/sessions", TaskController, :list_sessions
     delete "/tasks/:id/sessions/:uuid", TaskController, :unlink_session

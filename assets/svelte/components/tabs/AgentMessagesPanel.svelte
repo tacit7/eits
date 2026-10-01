@@ -33,16 +33,23 @@
   let openOverflowId = null
   let inspectMessage = null
   let inspectDialog
+  let inspectCloseButton
+  let inspectReturnFocusId = null
   let openReactionPickerId = null
 
   async function openInspect(msg) {
+    inspectReturnFocusId = `agent-message-${msg.id}-actions`
     inspectMessage = msg
     await tick()
-    inspectDialog?.showModal()
+    if (inspectDialog && !inspectDialog.open) inspectDialog.showModal()
+    inspectCloseButton?.focus()
   }
-  function closeInspect() {
-    inspectDialog?.close()
+
+  async function handleInspectClosed() {
     inspectMessage = null
+    await tick()
+    document.getElementById(inspectReturnFocusId)?.focus()
+    inspectReturnFocusId = null
   }
 
   // Per-session live streaming state: { [sessionId]: { content, tool } }
@@ -707,7 +714,7 @@
 
 <svelte:document on:keydown={handleDocKeydown} on:click={() => { openOverflowId = null; openReactionPickerId = null }} />
 
-<div class="flex h-full min-w-0">
+<div id="agent-messages-panel" class="flex h-full min-w-0">
   <!-- Main chat column -->
   <div class="relative flex flex-col flex-1 min-w-0">
   <!-- Search bar -->
@@ -717,6 +724,7 @@
         <div class="relative flex-1">
           <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-base-content/30 pointer-events-none" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" /></svg>
           <input
+            id="agent-messages-search-input"
             bind:this={searchInput}
             bind:value={searchQuery}
             on:input={handleSearchInput}
@@ -732,7 +740,7 @@
         {:else if searchQuery}
           <span class="text-mini text-base-content/30 whitespace-nowrap">0 results</span>
         {/if}
-        <button on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)">
+        <button id="agent-messages-search-close" on:click={closeSearch} class="text-base-content/30 hover:text-base-content/60 transition-colors flex-shrink-0" title="Close (Esc)" aria-label="Close message search">
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" /></svg>
         </button>
       </div>
@@ -741,11 +749,15 @@
 
   <!-- Messages Container -->
   <div
+    id="agent-messages-list"
     bind:this={messagesContainer}
     on:scroll={handleScrollState}
     use:autoScroll={{ trigger: filteredMessages?.length }}
     class="flex-1 overflow-y-auto px-4 py-2"
     style="scrollbar-width: none; -ms-overflow-style: none;"
+    role="log"
+    aria-label="Channel messages"
+    aria-live="polite"
   >
   <div class="max-w-[960px]">
     {#if hasMoreMessages && !searchQuery}
@@ -783,6 +795,7 @@
           {@const isTurnBoundary = prevMessage && prevMessage.sender_role !== message.sender_role && message.sender_role !== 'system' && prevMessage.sender_role !== 'system'}
           {@const isSameSender = prevMessage && !isTurnBoundary && prevMessage.sender_role !== 'system' && message.sender_role !== 'system' && prevMessage.session_id === message.session_id && prevMessage.sender_role === message.sender_role}
           <div
+            id={`agent-message-${message.id}`}
             class="group relative px-2 -mx-2 rounded-box transition-colors {isTurnBoundary ? 'mt-6' : isSameSender ? 'mt-0.5' : 'mt-3'} {message.sender_role === 'system' ? 'py-0.5' : 'py-3 hover:bg-base-content/[0.07]'}"
           >
             {#if message.sender_role === 'system'}
@@ -866,7 +879,7 @@
                     <div class="message-body mt-2 text-message leading-relaxed text-base-content/85 break-words">
                       {#if message.sender_role === 'agent'}
                         {@const segments = parseBodySegments(message.body)}
-                        {#each segments as seg}
+                        {#each segments as seg, segmentIdx (`${message.id}:${segmentIdx}`)}
                           {#if seg.type === 'tool_call'}
                             {@html DOMPurify.sanitize(renderToolCall(seg.name, seg.rest), DOMPURIFY_CONFIG)}
                           {:else}
@@ -965,25 +978,35 @@
                 <!-- Reaction picker -->
                 <div class="relative">
                   <button
+                    id={`agent-message-${message.id}-reactions`}
                     class="p-1 rounded-box text-base-content/30 hover:text-warning/70 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openReactionPickerId = openReactionPickerId === message.id ? null : message.id}
                     title="Add reaction"
                     aria-label="Add reaction"
+                    aria-haspopup="menu"
+                    aria-expanded={openReactionPickerId === message.id}
+                    aria-controls={`agent-message-${message.id}-reaction-menu`}
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.536-4.464a.75.75 0 1 0-1.061-1.061 3.5 3.5 0 0 1-4.95 0 .75.75 0 0 0-1.06 1.06 5 5 0 0 0 7.07 0ZM9 8.5c0 .828-.448 1.5-1 1.5s-1-.672-1-1.5S7.448 7 8 7s1 .672 1 1.5Zm3 1.5c.552 0 1-.672 1-1.5S12.552 7 12 7s-1 .672-1 1.5.448 1.5 1 1.5Z" clip-rule="evenodd"/></svg>
                   </button>
                   {#if openReactionPickerId === message.id}
                     <div
+                      id={`agent-message-${message.id}-reaction-menu`}
                       class="absolute right-0 top-full mt-1 bg-base-100 border border-base-content/10 rounded-box shadow-lg p-2 z-30 flex flex-wrap gap-1 w-48"
-                      role="presentation"
+                      role="menu"
+                      aria-label="Choose a reaction"
+                      tabindex="-1"
                       on:click|stopPropagation
                       on:keydown|stopPropagation
                     >
                       {#each ['👍','👎','❤️','🔥','✅','🚀','😂','🤔','⚠️','💯'] as emoji (emoji)}
                         <button
+                          type="button"
                           class="text-lg hover:bg-base-content/[0.08] rounded-box p-1 transition-colors cursor-pointer leading-none"
                           on:click={() => { live.pushEvent('toggle_reaction', { message_id: String(message.id), emoji }); openReactionPickerId = null }}
                           title={emoji}
+                          aria-label={`React with ${emoji}`}
+                          role="menuitem"
                         >{emoji}</button>
                       {/each}
                     </div>
@@ -1010,26 +1033,34 @@
                 <!-- Overflow (contains destructive actions) -->
                 <div class="relative">
                   <button
+                    id={`agent-message-${message.id}-actions`}
                     class="p-1 rounded-box text-base-content/25 hover:text-base-content/60 hover:bg-base-content/[0.06] transition-colors cursor-pointer"
                     on:click|stopPropagation={() => openOverflowId = openOverflowId === message.id ? null : message.id}
                     title="More actions"
                     aria-label="More actions"
+                    aria-haspopup="menu"
+                    aria-expanded={openOverflowId === message.id}
+                    aria-controls={`agent-message-${message.id}-actions-menu`}
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 6a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 12a2 2 0 1 1 0-4 2 2 0 0 1 0 4ZM10 18a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z"/></svg>
                   </button>
                   {#if openOverflowId === message.id}
-                    <div class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-box shadow-lg py-0.5 w-32 z-20">
+                    <div id={`agent-message-${message.id}-actions-menu`} class="absolute right-0 top-full mt-0.5 bg-base-100 border border-base-content/10 rounded-box shadow-lg py-0.5 w-32 z-20" role="menu" aria-label="Message actions" tabindex="-1">
                       <button
                         type="button"
+                        id={`agent-message-${message.id}-inspect`}
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-message text-base-content/60 hover:bg-base-content/[0.06] hover:text-base-content transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { openInspect(message); openOverflowId = null }}
+                        role="menuitem"
                       >
                         Inspect
                       </button>
                       <div class="my-0.5 border-t border-base-content/5"></div>
                       <button
+                        type="button"
                         class="w-full flex items-center gap-2 px-3 py-1.5 text-message text-error/80 hover:bg-error/[0.08] hover:text-error transition-colors cursor-pointer"
                         on:click|stopPropagation={() => { live.pushEvent('delete_message', { id: String(message.id) }); openOverflowId = null }}
+                        role="menuitem"
                       >
                         <svg class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                         Delete
@@ -1113,12 +1144,14 @@
   <div class="flex-shrink-0 pt-2 px-4 pb-3">
   <div class="max-w-[960px]">
     <form
+      id="agent-message-composer"
       on:submit|preventDefault={handleSubmit}
       class="relative bg-base-100 rounded-box border border-base-300 p-3 flex flex-col"
     >
       <div class="flex gap-2">
         <div class="relative flex-1">
           <textarea
+            id="agent-message-input"
             bind:value={inputValue}
             bind:this={inputElement}
             on:input={e => { handleInputChange(e); autoResizeTextarea(e.target) }}
@@ -1215,16 +1248,16 @@
   {/if}
 
   {#if inspectMessage}
-    <dialog bind:this={inspectDialog} class="eits-modal" aria-labelledby="inspect-title" on:close={closeInspect}>
+    <dialog id="agent-message-inspect-dialog" bind:this={inspectDialog} class="eits-modal" aria-labelledby="inspect-title" on:close={handleInspectClosed}>
       <div class="eits-dialog max-w-2xl">
         <div class="flex items-center justify-between mb-3">
           <h3 id="inspect-title" class="font-bold text-message">Message #{inspectMessage.id}</h3>
-          <button class="eits-action eits-action--ghost" on:click={() => inspectDialog?.close()} aria-label="Close">Close</button>
+          <button id="agent-message-inspect-close" bind:this={inspectCloseButton} class="eits-action eits-action--ghost" on:click={() => inspectDialog?.close()} aria-label="Close message inspector">Close</button>
         </div>
-        <pre class="text-mini bg-base-200 rounded-box p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
+        <pre id="inspect-description" class="text-mini bg-base-200 rounded-box p-3 overflow-auto max-h-96 whitespace-pre-wrap break-all">{JSON.stringify(inspectMessage, null, 2)}</pre>
       </div>
       <form method="dialog" class="eits-modal-backdrop">
-        <button>close</button>
+        <button aria-label="Close message inspector">close</button>
       </form>
     </dialog>
   {/if}

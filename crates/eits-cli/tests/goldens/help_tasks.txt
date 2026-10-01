@@ -6,15 +6,17 @@ Commands:
   list          List tasks (session-scoped by default; pass --all to see everything)
   get           Fetch a single task by id
   tag           Attach an existing tag to a task (tag ids: `eits tags list`)
-  begin         Claim an existing task (--id) or create + claim a new one (-t/--title)
+  begin         Claim an existing task with --id or create + claim self-owned work with --title
   complete      Atomic annotate + close (Done)
   annotate      Add an annotation to a task
   update        Patch task fields
   search        Full-text task search
   status        Task-centric team status view
   states        Show workflow state ids, names, and accepted aliases
-  create        Create a task without claiming it
+  create        Create a To Do task, optionally assigning it to a session
   claim         Claim an existing task (link session + set In Progress)
+  release       Release your task back to To Do and remove ownership
+  handoff       Transfer your task to another session (UUID or integer ID)
   delete        Delete a task
   active        In Progress + In Review tasks for the current session
   bulk-update   Apply the same update to multiple tasks at once

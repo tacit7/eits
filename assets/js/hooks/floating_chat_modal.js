@@ -98,8 +98,8 @@ export class FloatingChatModal {
       : ''
 
     return `
-      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-box shadow-2xl max-h-[850px] overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
+      <div class="fixed bottom-24 right-4 w-[520px] max-w-[calc(100vw-2rem)] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-box shadow-2xl h-[600px] max-h-[calc(100dvh-7rem)] overflow-hidden">
+        <div class="flex shrink-0 items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
             <span class="font-bold text-nano bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
             <div>
@@ -117,19 +117,19 @@ export class FloatingChatModal {
           </div>
         </div>
 
-        <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
+        <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0">
           <div id="${this._id}-" class="text-center text-base-content/25 text-mini py-10">
             Loading messages...
           </div>
         </div>
 
-        <div class="px-3 py-2.5 border-t border-base-content/5">
+        <div class="shrink-0 px-3 py-2.5 border-t border-base-content/5">
           <div class="flex gap-2">
             <input
               type="text"
               id="${this._id}-input"
               placeholder="${FloatingChatModal.escape(placeholder || '')}"
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-message placeholder:text-base-content/25"
+              class="input input-sm min-w-0 flex-1 bg-base-200/50 border-base-content/8 text-message placeholder:text-base-content/25"
               autocomplete="off"
             />
             <button id="${this._id}-send" class="eits-action eits-action--primary eits-action--icon h-8 min-h-0 min-w-8">

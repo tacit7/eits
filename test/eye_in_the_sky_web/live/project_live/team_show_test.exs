@@ -11,21 +11,17 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShowTest do
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project(overrides \\ %{}) do
+  defp create_project(user) do
     n = uniq()
 
     {:ok, project} =
-      Projects.create_project(
-        Map.merge(
-          %{
-            name: "Test Project #{n}",
-            slug: "test-project-#{n}",
-            path: "/tmp/project-#{n}",
-            active: true
-          },
-          overrides
-        )
-      )
+      Projects.create_project(%{
+        name: "Test Project #{n}",
+        slug: "test-project-#{n}",
+        path: "/tmp/project-#{n}",
+        active: true,
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id
+      })
 
     project
   end
@@ -51,8 +47,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShowTest do
   # ---------------------------------------------------------------------------
 
   describe "TeamShow — project_id ownership check" do
-    test "allows access to team within correct project", %{conn: conn} do
-      project = create_project()
+    test "allows access to team within correct project", %{conn: conn, user: user} do
+      project = create_project(user)
       team = create_team(project)
 
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams/#{team.id}")
@@ -62,9 +58,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShowTest do
       refute html =~ "Team not found"
     end
 
-    test "prevents access to team from different project", %{conn: conn} do
-      project_a = create_project()
-      project_b = create_project()
+    test "prevents access to team from different project", %{conn: conn, user: user} do
+      project_a = create_project(user)
+      project_b = create_project(user)
 
       # Create team in project A
       team_a = create_team(project_a)
@@ -77,8 +73,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShowTest do
       refute html =~ team_a.name
     end
 
-    test "shows back link to correct project teams page", %{conn: conn} do
-      project = create_project()
+    test "shows back link to correct project teams page", %{conn: conn, user: user} do
+      project = create_project(user)
       team = create_team(project)
 
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams/#{team.id}")
@@ -87,16 +83,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.TeamShowTest do
       assert html =~ "/projects/#{project.id}/teams"
     end
 
-    test "returns 404 for non-existent team", %{conn: conn} do
-      project = create_project()
+    test "returns 404 for non-existent team", %{conn: conn, user: user} do
+      project = create_project(user)
 
       {:ok, _lv, html} = live(conn, ~p"/projects/#{project.id}/teams/999999")
 
       assert html =~ "Team not found"
     end
 
-    test "global team (nil project_id) cannot be accessed via project route", %{conn: conn} do
-      project = create_project()
+    test "global team (nil project_id) cannot be accessed via project route", %{
+      conn: conn,
+      user: user
+    } do
+      project = create_project(user)
 
       # Create a team with no project_id (global team)
       {:ok, global_team} = Teams.create_team(%{name: "Global Team", project_id: nil})

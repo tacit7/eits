@@ -163,6 +163,7 @@ defmodule EyeInTheSky.Sessions.Session do
       "billing_error",
       "authentication_error",
       "rate_limit_error",
+      "cli_exit_error",
       "watchdog_timeout",
       "retry_exhausted"
     ])

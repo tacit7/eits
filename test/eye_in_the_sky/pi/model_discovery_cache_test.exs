@@ -10,11 +10,12 @@ defmodule EyeInTheSky.Pi.ModelDiscoveryCacheTest do
   end
 
   setup do
+    previous_control = Application.fetch_env!(:eye_in_the_sky, :pi_control_module)
     Application.put_env(:eye_in_the_sky, :pi_control_module, FakeControl)
     Cache.invalidate()
 
     on_exit(fn ->
-      Application.delete_env(:eye_in_the_sky, :pi_control_module)
+      Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control)
       Application.delete_env(:eye_in_the_sky, :fake_discover)
       Cache.invalidate()
     end)

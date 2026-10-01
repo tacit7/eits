@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
-  use EyeInTheSkyWeb.ConnCase, async: true
+  use EyeInTheSkyWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
   alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
@@ -155,6 +155,23 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
   end
 
   describe "shared model selector" do
+    test "configured OpenAI default keeps its Codex provider in the launch form", %{conn: conn} do
+      previous = EyeInTheSky.Settings.get("default_model")
+
+      try do
+        for model <- ["gpt-5.6-sol", "gpt-6-astra"] do
+          EyeInTheSky.Settings.put("default_model", model)
+          {:ok, view, _html} = mount_new_session_modal(conn)
+
+          assert has_element?(view, "#new-session-model-selector[data-selected-provider=codex]")
+          assert has_element?(view, ~s(input[name="agent_type"][value="codex"]))
+          assert has_element?(view, ~s(input[name="model"][value="#{model}"]))
+        end
+      after
+        EyeInTheSky.Settings.put("default_model", previous)
+      end
+    end
+
     test "renders with allow_provider_switch? true and the full cross-provider list" do
       html = render_new_session_modal(%{})
       assert html =~ ~s(data-allow-provider-switch="true")

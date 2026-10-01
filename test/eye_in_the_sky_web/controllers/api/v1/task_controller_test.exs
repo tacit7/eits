@@ -167,7 +167,41 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
           "session_id" => session.uuid
         })
 
-      assert json_response(conn, 201)["success"] == true
+      response = json_response(conn, 201)
+
+      assert response["success"] == true
+      assert Tasks.get_task!(response["task_id"]).created_by_session_id == session.id
+    end
+
+    test "tracks creator separately from the assigned session", %{conn: conn} do
+      creator_agent = create_agent()
+      creator = create_session(creator_agent)
+      worker_agent = create_agent()
+      worker = create_session(worker_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/tasks", %{
+          "title" => "Assigned worker task",
+          "created_by_session_id" => creator.uuid,
+          "session_id" => worker.uuid
+        })
+
+      task_id = json_response(conn, 201)["task_id"]
+      task = Tasks.get_task!(task_id)
+
+      assert task.created_by_session_id == creator.id
+
+      assert Repo.exists?(
+               from(ts in "task_sessions",
+                 where: ts.task_id == ^task.id and ts.session_id == ^worker.id
+               )
+             )
+
+      refute Repo.exists?(
+               from(ts in "task_sessions",
+                 where: ts.task_id == ^task.id and ts.session_id == ^creator.id
+               )
+             )
     end
   end
 

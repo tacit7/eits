@@ -8,9 +8,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
 
   # Canonical page per rail section. Click on a section icon NAVIGATES here
   # (desktop); the flyout panel opens via drag-right / chevron / vsbar toggle
-  # instead. Sections with no page (:files; :tasks/:notes without a selected
-  # project — their pages are project-scoped) keep the open-flyout behavior.
-  # NOT /workspace/tasks|notes: those require workspace scope and 302 to /.
+  # instead. Sections with no page (:files; :notes without a selected project)
+  # keep the open-flyout behavior.
   #
   # When a project is selected, project-scoped sections route to /projects/:id/*
   # and fall back to the global route when no project is selected.
@@ -26,6 +25,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   defp section_route(:teams, %{id: id}), do: "/projects/#{id}/teams"
   defp section_route(:teams, _project), do: "/teams"
   defp section_route(:tasks, %{id: id}), do: "/projects/#{id}/tasks"
+  defp section_route(:tasks, _project), do: "/tasks"
   defp section_route(:notes, %{id: id}), do: "/projects/#{id}/notes"
   defp section_route(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp section_route(:jobs, _project), do: "/jobs"

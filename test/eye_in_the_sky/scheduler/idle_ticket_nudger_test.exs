@@ -61,7 +61,108 @@ defmodule EyeInTheSky.Scheduler.IdleTicketNudgerTest do
     task
   end
 
+  defp wait_for_codex_port(worker, attempts \\ 40)
+  defp wait_for_codex_port(_worker, 0), do: nil
+
+  defp wait_for_codex_port(worker, attempts) do
+    ref = :sys.get_state(worker).sdk_ref
+    port = if ref, do: EyeInTheSky.Claude.SDK.Registry.lookup(ref)
+
+    if is_pid(port) do
+      port
+    else
+      Process.sleep(25)
+      wait_for_codex_port(worker, attempts - 1)
+    end
+  end
+
   describe "run_once_for_testing/1" do
+    test "scheduler wakes an absent Codex worker and records its response" do
+      previous_manager = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSky.Agents.AgentManager
+      )
+
+      session =
+        create_session(%{
+          provider: "codex",
+          entrypoint: "sdk-cli",
+          managed_by_app: true,
+          git_worktree_path: File.cwd!()
+        })
+
+      try do
+        task = create_task()
+        Tasks.link_session_to_task(task.id, session.id)
+        Phoenix.PubSub.subscribe(EyeInTheSky.PubSub, "session:#{session.id}")
+        assert Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id}) == []
+
+        {_state, stats} = IdleTicketNudger.run_once_for_testing(idle_age_seconds: 60)
+        assert stats.sent == 1
+
+        [{worker, "codex"}] =
+          Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id})
+
+        port = wait_for_codex_port(worker)
+        assert is_pid(port)
+
+        send(
+          port,
+          {:send_output,
+           Jason.encode!(%{
+             "type" => "item.completed",
+             "item" => %{"type" => "agent_message", "text" => "Scheduler nudge received"}
+           })}
+        )
+
+        send(
+          port,
+          {:send_output,
+           Jason.encode!(%{
+             "type" => "turn.completed",
+             "thread_id" => session.uuid,
+             "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+           })}
+        )
+
+        assert_receive {:new_message, %{body: "Scheduler nudge received"}}, 5_000
+        assert Messages.has_inbound_reply?(session.id, "codex")
+      after
+        case Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id}) do
+          [{worker, _}] ->
+            DynamicSupervisor.terminate_child(EyeInTheSky.Claude.AgentSupervisor, worker)
+
+          [] ->
+            :ok
+        end
+
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, previous_manager)
+      end
+    end
+
+    test "sdk-cli sessions without a worker request delivery rather than only persisting" do
+      session =
+        create_session(%{provider: "codex", entrypoint: "sdk-cli", managed_by_app: true})
+
+      task = create_task()
+      Tasks.link_session_to_task(task.id, session.id)
+      assert Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session.id}) == []
+
+      Process.put(:mock_send_message_response, {:error, :no_worker})
+      {_state, failed} = IdleTicketNudger.run_once_for_testing(idle_age_seconds: 60)
+      assert failed.failed == 1
+      assert failed.sent == 0
+      assert Messages.list_inbound_dms(session.id) == []
+
+      Process.put(:mock_send_message_response, {:ok, :sent})
+      {_state, delivered} = IdleTicketNudger.run_once_for_testing(idle_age_seconds: 60)
+      assert delivered.sent == 1
+      assert length(Messages.list_inbound_dms(session.id)) == 1
+    end
+
     test "sends a nudge to an idle session with linked open tasks" do
       Process.put(:mock_send_message_response, {:ok, :sent})
 

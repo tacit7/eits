@@ -172,6 +172,23 @@ defmodule EyeInTheSky.Claude.ProviderStrategyTest do
     end
   end
 
+  describe "Codex.build_opts/2" do
+    test "marks AgentWorker-launched Codex sessions as sdk-cli entrypoint" do
+      state = %{
+        provider_conversation_id: "thread-1",
+        project_path: "/tmp/project",
+        eits_session_uuid: "session-uuid",
+        session_id: 123,
+        agent_id: 456,
+        project_id: 1
+      }
+
+      opts = Codex.build_opts(state, %{model: "gpt-5.1-codex", bypass_sandbox: true})
+
+      assert opts[:entrypoint] == "sdk-cli"
+    end
+  end
+
   describe "Claude.metadata handling" do
     test "message with no metadata remains unchanged" do
       _message = "Hello world"

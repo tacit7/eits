@@ -1,7 +1,6 @@
 defmodule EyeInTheSky.Teams do
   @moduledoc false
   import Ecto.Query, warn: false
-  alias EyeInTheSky.Agents.Agent
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Tasks.Task, as: EitsTask
   alias EyeInTheSky.Tasks.WorkflowState
@@ -52,12 +51,19 @@ defmodule EyeInTheSky.Teams do
         nil ->
           query
 
-        agent_uuid ->
-          query
-          |> join(:inner, [t], m in TeamMember, on: m.team_id == t.id)
-          |> join(:inner, [_t, m], a in Agent, on: a.id == m.agent_id)
-          |> where([_t, _m, a], a.uuid == ^agent_uuid)
-          |> distinct(true)
+        agent_identity ->
+          # The legacy option name is retained for API compatibility, but callers
+          # can identify agents by either UUID or numeric ID.
+          case ToolHelpers.resolve_agent_int_id(agent_identity) do
+            {:ok, agent_id} ->
+              query
+              |> join(:inner, [t], m in TeamMember, on: m.team_id == t.id)
+              |> where([_t, m], m.agent_id == ^agent_id)
+              |> distinct(true)
+
+            {:error, _} ->
+              where(query, [t], false)
+          end
       end
 
     Repo.all(query)

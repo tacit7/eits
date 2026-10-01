@@ -120,6 +120,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Keybindings do
         %{keys: ["Space", "q"], desc: "Close flyout"},
         %{keys: ["Space", ":"], desc: "Command palette"},
         %{keys: ["Space", "?"], desc: "Keybinding help"},
+        %{keys: ["Space", "p", "p"], desc: "Project picker"},
         %{keys: ["Space", "s", "s"], desc: "Focus search"},
         %{keys: ["Space", "x", "x"], desc: "Close all flyouts"},
         %{keys: ["Space", "b", "a"], desc: "Archive session (sessions page)"},

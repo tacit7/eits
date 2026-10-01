@@ -419,8 +419,12 @@ defmodule EyeInTheSky.Codex.ParserTest do
       assert :skip = Parser.parse_stream_line("   \n  ")
     end
 
-    test "non-JSON line returns :skip (stderr/tracing)" do
-      assert :skip = Parser.parse_stream_line("2026-02-16T10:00:00Z INFO some trace message")
+    test "non-JSON line is retained as a provider diagnostic" do
+      assert {:protocol,
+              %{
+                type: :provider_diagnostic,
+                message: "2026-02-16T10:00:00Z INFO some trace message"
+              }} = Parser.parse_stream_line("2026-02-16T10:00:00Z INFO some trace message")
     end
 
     test "unknown event type returns :skip" do
@@ -428,8 +432,9 @@ defmodule EyeInTheSky.Codex.ParserTest do
       assert :skip = Parser.parse_stream_line(line)
     end
 
-    test "malformed JSON returns :skip" do
-      assert :skip = Parser.parse_stream_line("{broken json")
+    test "malformed JSON is retained as a provider diagnostic" do
+      assert {:protocol, %{type: :provider_diagnostic, message: "{broken json"}} =
+               Parser.parse_stream_line("{broken json")
     end
   end
 end

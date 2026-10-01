@@ -47,6 +47,12 @@ defmodule EyeInTheSky.Pi.ControlTest do
     :ok
   end
 
+  test "background model discovery survives temporary CLI stub teardown" do
+    Agent.stop(StubCLI)
+    assert {:ok, []} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
+    assert Process.alive?(Process.whereis(EyeInTheSky.Pi.ModelDiscoveryCache))
+  end
+
   defp wait_gone(name) do
     case Process.whereis(name) do
       nil ->

@@ -55,14 +55,25 @@ defmodule EyeInTheSky.Sessions.StatusTransitions do
   @doc """
   Deletes a session (hard delete).
   """
-  def delete_session(%Session{} = session), do: Repo.delete(session)
+  def delete_session(%Session{} = session) do
+    case Repo.delete(session) do
+      {:ok, deleted} ->
+        Events.broadcast_rail_sessions_refresh()
+        {:ok, deleted}
+
+      error ->
+        error
+    end
+  end
 
   @doc """
   Deletes multiple sessions by their integer IDs in a single query.
   Returns `{deleted_count, nil}`.
   """
   def batch_delete_sessions(ids) when is_list(ids) do
-    Repo.delete_all(from s in Session, where: s.id in ^ids)
+    result = Repo.delete_all(from s in Session, where: s.id in ^ids)
+    Events.broadcast_rail_sessions_refresh()
+    result
   end
 
   @doc """
@@ -71,12 +82,16 @@ defmodule EyeInTheSky.Sessions.StatusTransitions do
   Returns `{archived_count, nil}`.
   """
   def batch_archive_sessions_for_project(ids, project_id) when is_list(ids) and ids != [] do
-    Repo.update_all(
-      from(s in Session,
-        where: s.id in ^ids and s.project_id == ^project_id
-      ),
-      set: [archived_at: DateTime.utc_now()]
-    )
+    result =
+      Repo.update_all(
+        from(s in Session,
+          where: s.id in ^ids and s.project_id == ^project_id
+        ),
+        set: [archived_at: DateTime.utc_now()]
+      )
+
+    Events.broadcast_rail_sessions_refresh()
+    result
   end
 
   def batch_archive_sessions_for_project([], _project_id), do: {0, nil}

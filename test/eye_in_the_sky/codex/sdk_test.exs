@@ -488,22 +488,61 @@ defmodule EyeInTheSky.Codex.SDKTest do
       assert_receive {:claude_error, ^ref, {:codex_error, "Authentication failed"}}, 5_000
     end
 
-    test "non-zero exit sends claude_error" do
+    test "non-zero exit includes retained provider diagnostics" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
+      send(
+        mock_port,
+        {:send_output,
+         "ERROR codex_core::rollout: stream disconnected while using key sk-test-secret123456"}
+      )
+
       send(mock_port, {:exit, 1})
 
-      assert_receive {:claude_error, ^ref, {:exit_code, 1}}, 5_000
+      assert_receive {:claude_error, ^ref,
+                      {:codex_error,
+                       %{
+                         "type" => "cli_exit_error",
+                         "status" => 1,
+                         "message" => message
+                       }}},
+                     5_000
+
+      assert message =~ "Codex process exited with status 1"
+      assert message =~ "stream disconnected"
+      refute message =~ "sk-test-secret123456"
     end
 
-    test "clean exit without turn.completed sends complete" do
+    test "clean exit without turn.completed reports an incomplete turn" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(mock_port, {:exit, 0})
 
-      assert_receive {:claude_complete, ^ref, _session_id}, 5_000
+      assert_receive {:claude_error, ^ref, {:codex_incomplete_turn, message}}, 5_000
+      assert message =~ "turn.completed"
+      refute_receive {:claude_complete, ^ref, _session_id}
+    end
+
+    test "resumed turn with partial text still requires turn.completed" do
+      {:ok, ref, _handler} = SDK.resume("thread-partial", "continue", to: self())
+      mock_port = Registry.lookup(ref)
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "item.completed",
+           "item" => %{"type" => "agent_message", "text" => "Starting the task"}
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref, %Message{type: :text}}, 5_000
+      send(mock_port, {:exit, 0})
+
+      assert_receive {:claude_error, ^ref, {:codex_incomplete_turn, _message}}, 5_000
+      refute_receive {:claude_complete, ^ref, _session_id}
     end
   end
 

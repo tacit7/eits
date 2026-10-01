@@ -5,10 +5,15 @@ use std::path::PathBuf;
 /// Spec: discovery order — EITS_EXTRAS, ../libexec/eits-extras,
 /// sibling eits-extras, legacy eits-extras on PATH.
 pub fn find_extras() -> Result<PathBuf, EitsError> {
+    find_extras_with_source().map(|(path, _)| path)
+}
+
+/// Resolve only: never execute the selected fallback.
+pub fn find_extras_with_source() -> Result<(PathBuf, &'static str), EitsError> {
     if let Ok(p) = std::env::var("EITS_EXTRAS") {
         let p = PathBuf::from(p);
         return if is_executable_file(&p) {
-            Ok(p)
+            Ok((p, "EITS_EXTRAS"))
         } else {
             Err(EitsError::api(
                 format!("EITS_EXTRAS={} is not an executable file", p.display()),
@@ -24,12 +29,12 @@ pub fn find_extras() -> Result<PathBuf, EitsError> {
         .and_then(|p| p.canonicalize().ok());
     if let Some(me) = &me {
         if let Some(bin_dir) = me.parent() {
-            for cand in [
-                bin_dir.join("../libexec/eits-extras"),
-                bin_dir.join("eits-extras"),
+            for (cand, source) in [
+                (bin_dir.join("../libexec/eits-extras"), "libexec"),
+                (bin_dir.join("eits-extras"), "sibling"),
             ] {
                 if is_executable_file(&cand) {
-                    return Ok(cand);
+                    return Ok((cand, source));
                 }
             }
         }
@@ -38,7 +43,7 @@ pub fn find_extras() -> Result<PathBuf, EitsError> {
     if let Some(path_eits_extras) = which_on_path("eits-extras") {
         let canon = path_eits_extras.canonicalize().ok();
         if canon.is_some() && canon != me {
-            return Ok(path_eits_extras);
+            return Ok((path_eits_extras, "PATH"));
         }
     }
 
@@ -67,6 +72,10 @@ fn which_on_path(name: &str) -> Option<PathBuf> {
 }
 
 pub fn exec_extras(path: &std::path::Path, args: &[OsString]) -> std::io::Error {
+    use std::io::Write;
     use std::os::unix::process::CommandExt;
+    // Keep arguments and paths private, and never let a diagnostic prevent delegation.
+    let _ = std::io::stderr()
+        .write_all(b"[eits] delegating to legacy eits-extras; output format may differ\n");
     std::process::Command::new(path).args(args).exec()
 }

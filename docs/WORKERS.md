@@ -1026,10 +1026,9 @@ Agents can be checked for liveness via the `/api/v1/sessions/:id/worker` endpoin
 - `lib/eye_in_the_sky_web/router.ex` — route registration
 
 **Entrypoint Environment:**
-- App-spawned Codex CLI processes receive `ENTRYPOINT=cli` in their OS environment and Codex shell environment policy
-- Terminal-launched Codex sessions persist the hook `ENTRYPOINT` value when present, or `ENTRYPOINT=cli` by default, through the Codex startup env file
-- Terminal-launched Codex sessions persist the EITS session `entrypoint` as `EITS_ENTRYPOINT` when supplied, or `cli` by default so scheduler/archive logic can identify CLI-originated sessions
-- The plain Codex `ENTRYPOINT` marker and persisted session `entrypoint` both use `cli` for terminal-launched Codex by default; legacy `EITS_ENTRYPOINT` remains the override for the persisted session field
+- EITS Codex startup defaults to `ENTRYPOINT=sdk-cli` in the env file and persisted session `entrypoint`
+- Codex startup preserves a hook-provided `ENTRYPOINT` when present; legacy `EITS_ENTRYPOINT` remains the override for the persisted session field
+- Explicit `ENTRYPOINT=cli` / `entrypoint=cli` marks a terminal-owned Codex session
 - App worker ownership is tracked separately with `sessions.managed_by_app`. Hook/API updates with `entrypoint=cli` mark the session `managed_by_app=false` unless explicitly overridden. DMs to those terminal-owned sessions are persisted to the inbox, but the app does not spawn or resume a Codex worker for them.
 - `managed_by_app=false` also means lifecycle cleanup does not treat idle or stale-working terminal sessions as dead app-owned workers. If a terminal session is resumed and becomes `working`, clear any stale `archived_at` value so active-session lists do not continue hiding it.
 

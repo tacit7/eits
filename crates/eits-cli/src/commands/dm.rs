@@ -19,8 +19,15 @@ pub enum DmCmd {
         limit: Option<String>,
         #[arg(long)]
         since: Option<String>,
+        /// Fetch DMs since the session's actual started_at (default unless --since is set).
         #[arg(long = "since-session")]
         since_session: bool,
+        /// Fetch all available history without a session-start cutoff.
+        #[arg(long, conflicts_with_all = ["since", "since_session", "strict"])]
+        all_time: bool,
+        /// Fail instead of fetching DMs when the session start cannot be resolved.
+        #[arg(long, requires = "since_session")]
+        strict: bool,
         #[arg(long = "team-only")]
         team_only: bool,
         /// Accepted for muscle-memory parity with bash; Rust output is always JSON.
@@ -46,6 +53,12 @@ pub enum DmCmd {
         session: Option<String>,
         #[arg(long)]
         since: Option<String>,
+        /// Fetch DMs since the selected session's actual started_at timestamp.
+        #[arg(long = "since-session")]
+        since_session: bool,
+        /// Fail instead of fetching DMs when the session start cannot be resolved.
+        #[arg(long, requires = "since_session")]
+        strict: bool,
         /// Only keep DMs from sessions that share a team with the current agent.
         #[arg(long = "team-only")]
         team_only: bool,
@@ -53,6 +66,31 @@ pub enum DmCmd {
         #[arg(short = 't', long, default_value = "25")]
         timeout: u64,
     },
+    /// Continuously stream new inbound DMs, reconnecting after transient failures.
+    Watch {
+        #[arg(short = 's', long)]
+        session: Option<String>,
+        #[arg(long, conflicts_with = "since_session")]
+        since: Option<String>,
+        /// Start at the session's actual started_at (also the default).
+        #[arg(long = "since-session")]
+        since_session: bool,
+        /// Only emit DMs from the current agent's team members.
+        #[arg(long = "team-only")]
+        team_only: bool,
+        /// JSONL emits one DM per line; JSON emits an items/count envelope per line.
+        #[arg(long, value_enum, default_value = "jsonl")]
+        format: WatchFormat,
+        /// Server long-poll duration in seconds.
+        #[arg(short = 't', long, default_value = "25", value_parser = clap::value_parser!(u64).range(1..=55))]
+        timeout: u64,
+    },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+pub enum WatchFormat {
+    Jsonl,
+    Json,
 }
 
 /// Bash `_dm_post` payload shape: `{from_session_id, to_session_id, message,
@@ -128,6 +166,8 @@ pub fn run(
             limit,
             since,
             since_session,
+            all_time,
+            strict,
             team_only,
             json_flag: _,
         }) => {
@@ -139,31 +179,9 @@ pub fn run(
                     )
                 })?;
 
-            let mut since = since;
-            if since_session {
-                match client.get(&format!("/sessions/{session}")) {
-                    Ok(v) => {
-                        let ts = v
-                            .get("created_at")
-                            .and_then(|t| t.as_str())
-                            .or_else(|| {
-                                v.get("session")
-                                    .and_then(|s| s.get("created_at"))
-                                    .and_then(|t| t.as_str())
-                            })
-                            .map(String::from);
-                        match ts {
-                            Some(ts) => since = Some(ts),
-                            None => eprintln!(
-                                "warning: --since-session: could not resolve session created_at; showing all DMs"
-                            ),
-                        }
-                    }
-                    Err(_) => eprintln!(
-                        "warning: --since-session: could not resolve session created_at; showing all DMs"
-                    ),
-                }
-            }
+            let use_session_start = since_session || (!all_time && since.is_none());
+            let (since, warning) =
+                resolve_since(client, &session, since, use_session_start, strict)?;
 
             let mut qs: Vec<(String, String)> = vec![
                 ("session".into(), session),
@@ -188,7 +206,9 @@ pub fn run(
                 }
             }
 
-            output::print_json(&items_and_count(&resp, &["messages"]), pretty);
+            let mut result = items_and_count(&resp, &["messages"]);
+            attach_warning(&mut result, warning);
+            output::print_json(&result, pretty);
             Ok(())
         }
 
@@ -205,6 +225,8 @@ pub fn run(
         Some(DmCmd::Wait {
             session,
             since,
+            since_session,
+            strict,
             team_only,
             timeout,
         }) => {
@@ -216,6 +238,8 @@ pub fn run(
                     )
                 })?;
 
+            let (mut since, warning) =
+                resolve_since(client, &session, since, since_session, strict)?;
             let allowed = if team_only {
                 team_allowlist(client, cfg)
             } else {
@@ -223,9 +247,7 @@ pub fn run(
             };
 
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout);
-            let mut since = since;
-
-            let resp = loop {
+            let mut resp = loop {
                 let remaining = deadline.saturating_duration_since(std::time::Instant::now());
                 if remaining.is_zero() {
                     break json!({ "items": [], "count": 0 });
@@ -282,9 +304,19 @@ pub fn run(
                     break resp;
                 }
             };
+            attach_warning(&mut resp, warning);
             output::print_json(&resp, pretty);
             Ok(())
         }
+
+        Some(DmCmd::Watch {
+            session,
+            since,
+            since_session: _,
+            team_only,
+            format,
+            timeout,
+        }) => watch(client, cfg, session, since, team_only, format, timeout),
 
         None => {
             let to = to.ok_or_else(|| EitsError::usage("dm: --to is required"))?;
@@ -313,6 +345,55 @@ pub fn run(
                 Ok(())
             }
         }
+    }
+}
+
+/// Resolve from session data, never agent creation or turn/activity timestamps.
+/// Keep an explicit --since on best-effort failure, matching inbox's existing behavior.
+fn resolve_since(
+    client: &Client,
+    session: &str,
+    since: Option<String>,
+    since_session: bool,
+    strict: bool,
+) -> Result<(Option<String>, Option<Value>), EitsError> {
+    if !since_session {
+        return Ok((since, None));
+    }
+    let response = client.get(&format!("/sessions/{}", uri_encode(session)));
+    let timestamp = response.as_ref().ok().and_then(|v| {
+        v.get("session")
+            .unwrap_or(v)
+            .get("started_at")
+            .and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+            .map(String::from)
+    });
+    if let Some(timestamp) = timestamp {
+        return Ok((Some(timestamp), None));
+    }
+    let message = "--since-session: could not resolve session start timestamp (started_at)";
+    if strict {
+        return Err(EitsError::config(message)
+            .with_hint("ensure the session API exposes started_at, or use an explicit --since without --since-session"));
+    }
+    let reason = match response {
+        Ok(_) => json!("missing_started_at"),
+        Err(err) => json!(err.code),
+    };
+    let warning = json!({
+        "code": "session_start_unresolved",
+        "message": message,
+        "session": session,
+        "reason": reason,
+        "effective_since": since,
+    });
+    Ok((since, Some(warning)))
+}
+
+fn attach_warning(response: &mut Value, warning: Option<Value>) {
+    if let Some(warning) = warning {
+        response["warnings"] = json!([warning]);
     }
 }
 
@@ -385,5 +466,193 @@ fn value_to_key(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         other => other.to_string(),
+    }
+}
+
+/// Watch deliberately fails closed; inbox/wait retain their best-effort contracts.
+fn watch_team_allowlist(client: &Client, cfg: &Config) -> Result<HashSet<String>, EitsError> {
+    let agent = cfg
+        .agent_uuid
+        .as_deref()
+        .ok_or_else(|| EitsError::config("dm watch: --team-only requires EITS_AGENT_UUID"))?;
+    let response = client.get(&format!("/teams?member_agent_uuid={}", uri_encode(agent)))?;
+    let teams = response["teams"]
+        .as_array()
+        .ok_or_else(|| EitsError::config("dm watch: malformed team list"))?;
+    let mut allowed = HashSet::new();
+    for team in teams {
+        let id = team
+            .get("id")
+            .ok_or_else(|| EitsError::config("dm watch: missing team id"))?;
+        let response = client.get(&format!("/teams/{}/members", uri_encode(&value_to_key(id))))?;
+        let members = response["members"]
+            .as_array()
+            .ok_or_else(|| EitsError::config("dm watch: malformed team members"))?;
+        for member in members {
+            if let Some(id) = member.get("session_id").filter(|id| !id.is_null()) {
+                allowed.insert(value_to_key(id));
+            }
+        }
+    }
+    Ok(allowed)
+}
+
+fn watch(
+    client: &Client,
+    cfg: &Config,
+    session: Option<String>,
+    since: Option<String>,
+    team_only: bool,
+    format: WatchFormat,
+    timeout: u64,
+) -> Result<(), EitsError> {
+    use crate::error::Code;
+    use std::io::Write;
+    use std::time::{Duration, Instant};
+
+    // Client maps builder errors to ConnectionFailed too: validate persistent
+    // configuration before entering the reconnect loop.
+    let url = reqwest::Url::parse(&cfg.base_url)
+        .map_err(|_| EitsError::config("dm watch: invalid EITS_URL"))?;
+    if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
+        return Err(EitsError::config(
+            "dm watch: EITS_URL must be HTTP(S) with a host",
+        ));
+    }
+    for header in [cfg.api_key.as_deref(), cfg.session_uuid.as_deref()]
+        .into_iter()
+        .flatten()
+    {
+        reqwest::header::HeaderValue::from_str(header).map_err(|_| {
+            EitsError::config("dm watch: invalid authentication header configuration")
+        })?;
+    }
+    let session = session
+        .or_else(|| cfg.session_identity().map(String::from))
+        .ok_or_else(|| EitsError::usage("dm watch: session is required"))?;
+    let mut since = match since {
+        Some(since) => since,
+        None => {
+            let response = client.get(&format!("/sessions/{}", uri_encode(&session)))?;
+            response.get("session").unwrap_or(&response)["started_at"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .ok_or_else(|| {
+                    EitsError::config(
+                        "dm watch: could not resolve session started_at; supply --since",
+                    )
+                })?
+                .to_owned()
+        }
+    };
+    let allowed = if team_only {
+        Some(watch_team_allowlist(client, cfg)?)
+    } else {
+        None
+    };
+    let mut after_id = 0u64;
+    let mut failures = 0u32;
+    let stdout = std::io::stdout();
+    let mut output = stdout.lock();
+    loop {
+        let started = Instant::now();
+        let path = format!(
+            "/dm/wait?watch=true&session={}&since={}&after_id={after_id}&timeout={timeout}",
+            uri_encode(&session),
+            uri_encode(&since)
+        );
+        let response = match client.get_long_poll(&path, Duration::from_secs(timeout + 15)) {
+            Ok(response) => {
+                failures = 0;
+                response
+            }
+            Err(err)
+                if (err.code == Code::ConnectionFailed
+                    || matches!(err.status, Some(429 | 500 | 502 | 503 | 504)))
+                    && failures < 8 =>
+            {
+                let delay = Duration::from_secs((1u64 << failures).min(30));
+                failures += 1;
+                eprintln!(
+                    "dm watch: transient failure, reconnecting in {}s (attempt {failures}/8)",
+                    delay.as_secs()
+                );
+                std::thread::sleep(delay);
+                continue;
+            }
+            Err(err) => return Err(err),
+        };
+        if response["watch_cursor"] != true {
+            return Err(EitsError::config(
+                "dm watch: server lacks ordered watch cursor support; upgrade the server",
+            ));
+        }
+        let items = response["items"]
+            .as_array()
+            .ok_or_else(|| EitsError::config("dm watch: malformed items response"))?;
+        let mut emitted = Vec::new();
+        let mut advanced = false;
+        for item in items {
+            let id = item["id"]
+                .as_u64()
+                .filter(|id| *id > 0)
+                .ok_or_else(|| EitsError::config("dm watch: missing numeric message id"))?;
+            let timestamp = item["inserted_at"]
+                .as_str()
+                .ok_or_else(|| EitsError::config("dm watch: missing message timestamp"))?;
+            let canonical = timestamp.len() == 27
+                && timestamp
+                    .bytes()
+                    .enumerate()
+                    .all(|(index, byte)| match index {
+                        4 | 7 => byte == b'-',
+                        10 => byte == b'T',
+                        13 | 16 => byte == b':',
+                        19 => byte == b'.',
+                        26 => byte == b'Z',
+                        _ => byte.is_ascii_digit(),
+                    });
+            if !canonical {
+                return Err(EitsError::config(
+                    "dm watch: server timestamp must use canonical UTC microseconds",
+                ));
+            }
+            // The opt-in API returns canonical UTC microseconds in ascending
+            // (inserted_at, id) order. Keep the entire boundary, including IDs
+            // for equal timestamps, and never regress on a repeated response.
+            if after_id != 0 && (timestamp, id) <= (since.as_str(), after_id) {
+                continue;
+            }
+            since = timestamp.to_owned();
+            after_id = id;
+            advanced = true;
+            if allowed.as_ref().is_none_or(|set| {
+                item.get("from_session_id")
+                    .is_some_and(|id| set.contains(&value_to_key(id)))
+            }) {
+                emitted.push(item.clone());
+            }
+        }
+        if !emitted.is_empty() {
+            let records = match format {
+                WatchFormat::Jsonl => emitted,
+                WatchFormat::Json => vec![json!({"count": emitted.len(), "items": emitted})],
+            };
+            for record in records {
+                if let Err(err) = writeln!(output, "{record}").and_then(|_| output.flush()) {
+                    if err.kind() == std::io::ErrorKind::BrokenPipe {
+                        return Ok(());
+                    }
+                    return Err(EitsError::config(format!(
+                        "dm watch: cannot write output: {err}"
+                    )));
+                }
+            }
+        }
+        // Empty or duplicate-only responses must not spin. Filtered messages
+        // still advance the cursor, so finite backlogs can drain immediately.
+        if !advanced {
+            std::thread::sleep(Duration::from_secs(1).saturating_sub(started.elapsed()));
+        }
     }
 }

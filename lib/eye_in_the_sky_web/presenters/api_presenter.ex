@@ -169,6 +169,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       id: session.id,
       uuid: session.uuid,
       session_id: session.uuid,
+      started_at: session.started_at,
       agent_id: Keyword.get(opts, :agent_uuid),
       agent_int_id: session.agent_id,
       project_id: session.project_id,

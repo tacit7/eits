@@ -5,10 +5,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   alias EyeInTheSky.Factory
   alias EyeInTheSky.Projects
 
-  setup do
+  setup %{user: user} do
     # Create a test project
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "test-project",
         path: "/tmp/test-project",
         slug: "test-project"
@@ -18,6 +19,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.SessionsTest do
   end
 
   describe "New Session feature" do
+    test "redirects stale project session routes to global sessions", %{conn: conn} do
+      missing_project_id = 9_999_999_999
+
+      assert {:error, {:redirect, %{to: "/sessions", flash: %{"error" => "Project not found"}}}} =
+               live(conn, ~p"/projects/#{missing_project_id}/sessions")
+    end
+
     test "renders New Session button", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
 

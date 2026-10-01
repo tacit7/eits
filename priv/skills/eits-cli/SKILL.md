@@ -84,8 +84,12 @@ eits tasks complete <task_id> --message "..." --commit <sha1> --commit <sha2>
 | Claim an orchestrator-assigned task | `eits tasks claim <id>` |
 | `tasks begin --id <id>` | compatibility alias for `claim`; works but prefer `claim` |
 | `tasks start <id>` | **deprecated** — prints a warning; use `claim` instead |
+| Create unassigned worker work | `eits tasks create --title "..."` |
+| Create work assigned to a session | `eits tasks create --title "..." --assign-to <session>` |
 
 `tasks claim <id>` transfers ownership to the current session by removing prior session links. Use it only for orchestrator-assigned tasks or when intentionally taking over work. `--team` is accepted on claim/begin-by-id for orchestration parity, but it does not alter the existing task's team.
+
+`tasks begin` requires exactly one intent flag: `--title` creates and claims new self-owned work, while `--id` claims an existing task. `tasks create` records the caller as creator but does not assign the task unless `--assign-to` is present.
 
 ---
 

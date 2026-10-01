@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::error::{Code, EitsError};
 use crate::http::Client;
 use crate::output;
+use clap::ArgGroup;
 use serde_json::{json, Value};
 use std::io::Write;
 
@@ -11,6 +12,10 @@ pub enum TasksCmd {
     List {
         #[arg(short = 's', long)]
         session: Option<String>,
+        /// Filter by API state ID (1=To Do, 2=In Progress, 3=Done, 4=In Review)
+        /// or alias (e.g. in_progress); see `eits tasks states` for all aliases.
+        #[arg(long, value_parser = parse_list_state)]
+        state: Option<i64>,
         #[arg(short = 'p', long)]
         project: Option<String>,
         #[arg(short = 'l', long)]
@@ -35,10 +40,18 @@ pub enum TasksCmd {
     Get { id: String },
     /// Attach an existing tag to a task (tag ids: `eits tags list`)
     Tag { task_id: String, tag_id: String },
-    /// Claim an existing task (--id) or create + claim a new one (-t/--title)
+    /// Claim an existing task with --id or create + claim self-owned work with --title
+    #[command(group(
+        ArgGroup::new("intent")
+            .required(true)
+            .multiple(false)
+            .args(["id", "title"])
+    ))]
     Begin {
+        /// Claim an existing task for the current session.
         #[arg(long)]
         id: Option<String>,
+        /// Create new work owned by the current session.
         #[arg(short = 't', long)]
         title: Option<String>,
         #[arg(short = 'd', long)]
@@ -104,7 +117,7 @@ pub enum TasksCmd {
     },
     /// Show workflow state ids, names, and accepted aliases
     States,
-    /// Create a task without claiming it
+    /// Create a To Do task, optionally assigning it to a session
     Create {
         #[arg(short = 't', long)]
         title: String,
@@ -116,6 +129,9 @@ pub enum TasksCmd {
         description: Option<String>,
         #[arg(long)]
         priority: Option<String>,
+        /// Assign the new task to a session (UUID or integer ID).
+        #[arg(long = "assign-to")]
+        assign_to: Option<String>,
     },
     /// Claim an existing task (link session + set In Progress)
     Claim {
@@ -123,6 +139,14 @@ pub enum TasksCmd {
         /// Accepted for orchestration parity; claim itself ignores team_id.
         #[arg(long)]
         team: Option<String>,
+    },
+    /// Release your task back to To Do and remove ownership
+    Release { id: String },
+    /// Transfer your task to another session (UUID or integer ID)
+    Handoff {
+        id: String,
+        #[arg(long)]
+        to: String,
     },
     /// Delete a task
     Delete { id: String },
@@ -152,15 +176,39 @@ use super::{is_numeric, items_and_count, uri_encode};
 /// `apply_update_state` (the `update`/`begin`/`claim` alias resolver) and the
 /// `states` command derive from this table so they cannot drift apart.
 const STATE_ALIAS_TABLE: &[(i64, &str, &[&str])] = &[
-    (1, "To Do", &["todo", "to-do", "to do"]),
+    (1, "To Do", &["todo", "to-do", "to do", "to_do"]),
     (
         2,
         "In Progress",
-        &["start", "in-progress", "progress", "in progress"],
+        &[
+            "start",
+            "in-progress",
+            "progress",
+            "in progress",
+            "in_progress",
+        ],
     ),
     (3, "Done", &["done", "complete", "completed"]),
-    (4, "In Review", &["in-review", "review", "in review"]),
+    (
+        4,
+        "In Review",
+        &["in-review", "review", "in review", "in_review"],
+    ),
 ];
+
+// Listing takes API IDs, not the legacy update command's workflow positions.
+fn parse_list_state(value: &str) -> Result<i64, String> {
+    let lower = value.to_lowercase();
+    STATE_ALIAS_TABLE
+        .iter()
+        .find(|(id, _, aliases)| {
+            value.parse::<i64>().ok() == Some(*id) || aliases.contains(&lower.as_str())
+        })
+        .map(|(id, _, _)| *id)
+        .ok_or_else(|| {
+            "expected API state ID 1=To Do, 2=In Progress, 3=Done, 4=In Review or an alias from `eits tasks states`".into()
+        })
+}
 
 /// Port of bash `update`'s `_resolve_state`: numeric input remaps workflow
 /// position (1-4) to the actual DB state_id (3 and 4 are swapped); named
@@ -195,6 +243,74 @@ fn states_payload() -> Value {
         .collect();
     let count = items.len();
     json!({ "items": items, "count": count })
+}
+
+fn create_project_from_cwd(client: &Client) -> Option<String> {
+    let project_id = (|| {
+        let cwd = std::env::current_dir().ok()?.canonicalize().ok()?;
+        let resp = client
+            .get(&format!(
+                "/projects?path={}",
+                uri_encode(&cwd.to_string_lossy())
+            ))
+            .ok()?;
+        let projects = resp.get("projects")?.as_array()?;
+        let [project] = projects.as_slice() else {
+            return None;
+        };
+        match project.get("id")? {
+            Value::Number(id) => id.as_i64().filter(|id| *id > 0).map(|id| id.to_string()),
+            Value::String(id) if id.parse::<i64>().is_ok_and(|id| id > 0) => Some(id.clone()),
+            _ => None,
+        }
+    })();
+    if project_id.is_none() {
+        eprintln!("warning: could not infer a project from cwd; creating a global/unscoped task. Use --project or EITS_PROJECT_ID to select a project.");
+    }
+    project_id
+}
+
+/// Add a common mutation summary without discarding the API envelope. Only
+/// successful HTTP responses reach this helper; explicit API success is retained.
+/// Context comes from the response, never the caller's environment or requested
+/// state (which may differ from the persisted task).
+fn mutation_response(response: &Value, target_id: Option<&str>) -> Value {
+    let mut result = response.as_object().cloned().unwrap_or_default();
+    result.entry("success").or_insert(json!(true));
+    let id = response
+        .get("id")
+        .or_else(|| response.get("task_id"))
+        .or_else(|| response.pointer("/task/id"))
+        .cloned()
+        .or_else(|| {
+            target_id.map(|id| {
+                id.parse::<i64>()
+                    .map(Value::from)
+                    .unwrap_or_else(|_| json!(id))
+            })
+        })
+        .unwrap_or(Value::Null);
+    result.entry("id").or_insert(id.clone());
+    for key in ["state", "session_id", "project_id"] {
+        result.entry(key).or_insert_with(|| {
+            response
+                .get("task")
+                .and_then(|task| task.get(key))
+                .cloned()
+                .unwrap_or(Value::Null)
+        });
+    }
+    // Suggest a read-only follow-up. Accept only positive numeric task IDs so
+    // API-provided strings cannot become shell syntax in a suggested command.
+    let numeric_id = id
+        .as_i64()
+        .or_else(|| id.as_str().and_then(|s| s.parse::<i64>().ok()));
+    let next = match numeric_id.filter(|id| *id > 0) {
+        Some(id) => json!([format!("eits tasks get {id}")]),
+        None => json!([]),
+    };
+    result.entry("next").or_insert(next);
+    Value::Object(result)
 }
 
 pub fn run(
@@ -238,6 +354,7 @@ pub fn run(
 
         TasksCmd::List {
             session,
+            state,
             project,
             limit,
             query,
@@ -253,6 +370,9 @@ pub fn run(
                 ));
             }
             let mut qs: Vec<(String, String)> = Vec::new();
+            if let Some(state_id) = state {
+                qs.push(("state_id".into(), state_id.to_string()));
+            }
             let project_flag = project.is_some();
             if let Some(p) = &project {
                 qs.push(("project_id".into(), p.clone()));
@@ -371,7 +491,7 @@ pub fn run(
                 if quiet {
                     println!("{task_id}");
                 } else {
-                    output::print_json(&resp, pretty);
+                    output::print_json(&mutation_response(&resp, Some(&task_id)), pretty);
                 }
                 return Ok(());
             }
@@ -423,12 +543,18 @@ pub fn run(
             } else {
                 let full = client.get(&format!("/tasks/{task_id}"))?;
                 let task = full.get("task").cloned().unwrap_or_else(|| json!({}));
+                let normalized = mutation_response(&full, Some(&task_id.to_string()));
                 output::print_json(
                     &json!({
                         "task_id": task.get("id").cloned().unwrap_or(json!(task_id)),
                         "title": task.get("title").cloned().unwrap_or(Value::Null),
-                        "state": task.get("state").cloned().unwrap_or(Value::Null),
-                        "state_id": task.get("state_id").cloned().unwrap_or(Value::Null),
+                        "success": normalized["success"],
+                        "id": normalized["id"],
+                        "state": normalized["state"],
+                        "state_id": task.get("state_id").or_else(|| full.get("state_id")).cloned().unwrap_or(Value::Null),
+                        "session_id": normalized["session_id"],
+                        "project_id": normalized["project_id"],
+                        "next": normalized["next"],
                         "message": "Task created",
                     }),
                     pretty,
@@ -459,14 +585,15 @@ pub fn run(
                     .parse::<i64>()
                     .map(Value::from)
                     .unwrap_or_else(|_| Value::String(id.clone()));
-                output::print_json(
-                    &json!({
-                        "status": "already_closed",
-                        "message": "task is already Done — no change made",
-                        "task_id": task_id_val,
-                    }),
-                    pretty,
-                );
+                if quiet {
+                    println!("{id}");
+                } else {
+                    let mut summary = mutation_response(&check, Some(&id));
+                    summary["status"] = json!("already_closed");
+                    summary["message"] = json!("task is already Done — no change made");
+                    summary["task_id"] = task_id_val;
+                    output::print_json(&summary, pretty);
+                }
                 return Ok(());
             }
 
@@ -484,11 +611,24 @@ pub fn run(
                 if let Some(agent_uuid) = cfg.agent_uuid.as_deref() {
                     payload["agent_id"] = json!(agent_uuid);
                 }
-                if let Err(e) = client.post("/commits", payload) {
-                    eprintln!(
+                match client.post("/commits", payload) {
+                    Ok(result) => {
+                        for (field, action) in
+                            [("errors", "tracked"), ("link_errors", "linked to task")]
+                        {
+                            if let Some(errors) = result.get(field).and_then(Value::as_array) {
+                                for error in errors {
+                                    eprintln!(
+                                        "warning: task closed but commit {hash} could not be {action}: {error}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!(
                         "warning: task closed but commit {hash} could not be tracked: {}",
                         e.message
-                    );
+                    ),
                 }
             }
 
@@ -504,7 +644,7 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
         }
@@ -563,7 +703,7 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
         }
@@ -600,22 +740,26 @@ pub fn run(
             team,
             description,
             priority,
+            assign_to,
         } => {
-            let identity = cfg.session_identity().unwrap_or("").to_string();
-            let project_id = project.or_else(|| cfg.project_id.clone());
+            let creator_identity = cfg.session_identity().unwrap_or("").to_string();
+            let project_id = project
+                .or_else(|| cfg.project_id.clone())
+                .or_else(|| create_project_from_cwd(client));
             let body = json!({
                 "title": title,
                 "description": description.unwrap_or_default(),
                 "project_id": project_id,
                 "team_id": team,
                 "priority": priority,
-                "session_id": identity,
+                "created_by_session_id": creator_identity,
+                "session_id": assign_to,
             });
             let resp = client.post("/tasks", body)?;
             if quiet {
                 output::print_quiet_id(&resp, "/task_id")?;
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, None), pretty);
             }
             Ok(())
         }
@@ -630,9 +774,17 @@ pub fn run(
             if quiet {
                 println!("{id}");
             } else {
-                output::print_json(&resp, pretty);
+                output::print_json(&mutation_response(&resp, Some(&id)), pretty);
             }
             Ok(())
+        }
+
+        TasksCmd::Release { id } => {
+            ownership_change(client, cfg, &id, "release", None, quiet, pretty)
+        }
+
+        TasksCmd::Handoff { id, to } => {
+            ownership_change(client, cfg, &id, "handoff", Some(&to), quiet, pretty)
         }
 
         TasksCmd::Delete { id } => {
@@ -756,6 +908,36 @@ pub fn run(
             Ok(())
         }
     }
+}
+
+fn ownership_change(
+    client: &Client,
+    cfg: &Config,
+    id: &str,
+    action: &str,
+    target: Option<&str>,
+    quiet: bool,
+    pretty: bool,
+) -> Result<(), EitsError> {
+    let identity = cfg
+        .session_identity()
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| {
+            EitsError::usage(format!(
+                "{action}: EITS_SESSION_UUID or EITS_SESSION_ID is required"
+            ))
+        })?;
+    let mut body = json!({"session_id": identity});
+    if let Some(to) = target {
+        body["to"] = json!(to);
+    }
+    let resp = client.post(&format!("/tasks/{id}/{action}"), body)?;
+    if quiet {
+        println!("{id}");
+    } else {
+        output::print_json(&resp, pretty);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

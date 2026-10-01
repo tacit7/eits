@@ -122,7 +122,7 @@ export const VimNav = {
       this._recordSessionVisit()
       this._recentSessionIdx = -1
     }
-    window.addEventListener("phx:page--stop", this._onPageLoad)
+    window.addEventListener("phx:page-loading-stop", this._onPageLoad)
 
     document.addEventListener("keydown", this._onKeydown, { capture: true })
     document.addEventListener("focusin", this._onFocusin)
@@ -157,7 +157,7 @@ export const VimNav = {
     if (this._onKeydown) document.removeEventListener("keydown", this._onKeydown, { capture: true } as EventListenerOptions)
     if (this._onFocusin) document.removeEventListener("focusin", this._onFocusin)
     if (this._onFocusout) document.removeEventListener("focusout", this._onFocusout)
-    if (this._onPageLoad) window.removeEventListener("phx:page--stop", this._onPageLoad)
+    if (this._onPageLoad) window.removeEventListener("phx:page-loading-stop", this._onPageLoad)
     if (this._quickDmComposeHandler) document.removeEventListener("vim:quick-dm-compose", this._quickDmComposeHandler)
     if (this.sequenceTimer) clearTimeout(this.sequenceTimer)
     if (this.countTimer) clearTimeout(this.countTimer)
@@ -354,7 +354,10 @@ export const VimNav = {
     const m = window.location.pathname.match(/^(\/projects\/\d+)/)
     if (m) return m[1]
     const railId = (document.getElementById("rail-root") as HTMLElement | null)?.dataset.projectId
-    return railId ? `/projects/${railId}` : null
+    if (railId) return `/projects/${railId}`
+
+    const projectLink = document.querySelector<HTMLAnchorElement>('#rail-root a[href^="/projects/"]')
+    return projectLink?.getAttribute("href")?.match(/^(\/projects\/\d+)(?:\/|$)/)?.[1] ?? null
   },
 
   buildPath(path: string, relative?: boolean): string | null {

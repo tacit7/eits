@@ -146,7 +146,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatusTest do
           status: "idle"
         })
 
-      stale = DateTime.utc_now() |> DateTime.add(-31 * 60, :second)
+      stale = DateTime.utc_now() |> DateTime.add(-6, :day)
 
       {:ok, session} =
         Sessions.create_session(%{

@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.NavHookTest do
     }
   end
 
-  test "loads all active projects into the palette" do
+  test "loads only active workspace projects into the palette" do
     user = Factory.user_fixture()
     workspace = Workspaces.default_workspace_for_user!(user)
 
@@ -34,10 +34,18 @@ defmodule EyeInTheSkyWeb.NavHookTest do
         workspace_id: other_workspace.id
       })
 
+    {:ok, inactive_project} =
+      Projects.create_project(%{
+        name: "Inactive project #{Factory.uniq()}",
+        workspace_id: workspace.id,
+        active: false
+      })
+
     {:cont, result} = NavHook.on_mount(:default, %{}, %{}, build_socket(%{current_user: user}))
 
     assert result.assigns.workspace_id == workspace.id
     assert Enum.any?(result.assigns.palette_projects, &(&1.id == own_project.id))
-    assert Enum.any?(result.assigns.palette_projects, &(&1.id == foreign_project.id))
+    refute Enum.any?(result.assigns.palette_projects, &(&1.id == foreign_project.id))
+    refute Enum.any?(result.assigns.palette_projects, &(&1.id == inactive_project.id))
   end
 end

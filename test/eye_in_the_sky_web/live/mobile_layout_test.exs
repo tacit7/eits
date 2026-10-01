@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.{Projects, Tasks}
+  alias EyeInTheSky.{Projects, Tasks, Workspaces}
 
   # ---------------------------------------------------------------------------
   # Fixtures
@@ -29,12 +29,15 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
+    workspace = Workspaces.default_workspace_for_user!(user)
+
     {:ok, project} =
       Projects.create_project(%{
         name: "mobile-test-#{uniq()}",
         path: "/tmp/mobile-test-#{uniq()}",
-        slug: "mobile-test-#{uniq()}"
+        slug: "mobile-test-#{uniq()}",
+        workspace_id: workspace.id
       })
 
     project
@@ -181,8 +184,11 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert html =~ "safe-inset-y"
     end
 
-    test "task detail drawer has safe-inset-y for full-height slide-over panel", %{conn: conn} do
-      project = create_project()
+    test "task detail drawer has safe-inset-y for full-height slide-over panel", %{
+      conn: conn,
+      user: user
+    } do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -319,10 +325,11 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
 
   describe "task detail drawer" do
     test "drawer panel uses w-full max-w-lg for full-width layout on narrow screens", %{
-      conn: conn
+      conn: conn,
+      user: user
     } do
       # On 375-430px, max-w-lg (~512px) is irrelevant — w-full takes over
-      project = create_project()
+      project = create_project(user)
       task = create_task(project, %{title: "Drawer Width Test"})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -336,8 +343,8 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert html =~ "max-w-lg"
     end
 
-    test "drawer has dimming backdrop covering the screen", %{conn: conn} do
-      project = create_project()
+    test "drawer has dimming backdrop covering the screen", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -351,8 +358,8 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert html =~ "bg-black/30"
     end
 
-    test "backdrop event closes the drawer", %{conn: conn} do
-      project = create_project()
+    test "backdrop event closes the drawer", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -370,8 +377,8 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert has_element?(view, "#task-detail-drawer[aria-modal='false']")
     end
 
-    test "drawer is fixed to the right edge and full-height", %{conn: conn} do
-      project = create_project()
+    test "drawer is fixed to the right edge and full-height", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -383,8 +390,8 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert render(view) =~ "absolute inset-y-0 right-0"
     end
 
-    test "drawer has z-50 so it floats above bottom nav (z-40)", %{conn: conn} do
-      project = create_project()
+    test "drawer has z-50 so it floats above bottom nav (z-40)", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -396,8 +403,8 @@ defmodule EyeInTheSkyWeb.MobileLayoutTest do
       assert render(view) =~ "z-50"
     end
 
-    test "drawer content is scrollable (overflow-y-auto)", %{conn: conn} do
-      project = create_project()
+    test "drawer content is scrollable (overflow-y-auto)", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project)
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")

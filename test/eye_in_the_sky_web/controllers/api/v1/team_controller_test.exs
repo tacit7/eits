@@ -44,6 +44,27 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamControllerTest do
   # ── GET /api/v1/teams ─────────────────────────────────────────────────────
 
   describe "GET /api/v1/teams" do
+    test "accepts a numeric member agent identity within the project scope", %{
+      conn: conn,
+      session: session
+    } do
+      project = project_fixture()
+      team = create_team(%{project_id: project.id})
+      join_team(team, %{agent_id: session.agent_id, session_id: session.id})
+      create_team(%{project_id: project.id})
+      other_team = create_team(%{project_id: project_fixture().id})
+      join_team(other_team, %{agent_id: session.agent_id, session_id: session.id})
+
+      conn =
+        get(conn, ~p"/api/v1/teams", %{
+          member_agent_uuid: to_string(session.agent_id),
+          project_id: project.id
+        })
+
+      assert [%{"id" => id}] = json_response(conn, 200)["teams"]
+      assert id == team.id
+    end
+
     test "returns list of active teams", %{conn: conn} do
       create_team()
       conn = get(conn, ~p"/api/v1/teams")

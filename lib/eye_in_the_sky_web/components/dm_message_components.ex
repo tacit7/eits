@@ -209,7 +209,8 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
 
     {dm_info, body} =
       if is_dm_body do
-        {parse_dm_info(raw_body), strip_dm_prefix(raw_body)}
+        {parse_dm_info(raw_body) |> with_sender_session_id(assigns.message),
+         strip_dm_prefix(raw_body)}
       else
         {nil, raw_body}
       end
@@ -441,6 +442,13 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents do
     </div>
     """
   end
+
+  defp with_sender_session_id(dm_info, %{from_session_id: session_id})
+       when is_map(dm_info) and is_integer(session_id) do
+    Map.put(dm_info, :session_id, Integer.to_string(session_id))
+  end
+
+  defp with_sender_session_id(dm_info, _message), do: dm_info
 
   defp codex_failure_title("codex_turn_failed"), do: "Codex turn failed"
   defp codex_failure_title("codex_error"), do: "Codex error"

@@ -188,6 +188,25 @@ defmodule EyeInTheSky.Metrics.TokenParserTest do
       assert usage.output_tokens == 50
     end
 
+    test "uses the final usage reported for a repeated requestId" do
+      path =
+        write_jsonl([
+          assistant_entry("req-stream", "claude-3-5-sonnet", 10, 5),
+          assistant_entry("req-stream", "claude-3-5-sonnet", 100, 50, 25, 15)
+        ])
+
+      on_exit(fn -> File.rm(path) end)
+
+      assert {:ok, usage} = TokenParser.parse_file(path)
+
+      assert usage.request_count == 1
+      assert usage.input_tokens == 100
+      assert usage.output_tokens == 50
+      assert usage.cache_creation_input_tokens == 25
+      assert usage.cache_read_input_tokens == 15
+      assert usage.total_tokens == 190
+    end
+
     test "does not deduplicate entries with distinct requestIds" do
       path =
         write_jsonl([

@@ -5,6 +5,8 @@ defmodule EyeInTheSky.Messaging.DMDelivery do
   alias EyeInTheSky.Messages
   alias EyeInTheSky.Sessions
 
+  @agent_registry EyeInTheSky.Claude.AgentRegistry
+
   @doc """
   Send a DM to `to_session_id`, persist it, and broadcast a PubSub event.
 
@@ -33,10 +35,15 @@ defmodule EyeInTheSky.Messaging.DMDelivery do
   def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{}) do
     case Sessions.get_session(to_session_id) do
       {:ok, session} ->
-        if session.status in Sessions.terminated_statuses() or not Sessions.app_managed?(session) do
-          persist(to_session_id, from_session_id, body, metadata)
-        else
-          deliver_and_persist(to_session_id, from_session_id, body, metadata)
+        cond do
+          session.status in Sessions.terminated_statuses() ->
+            persist(to_session_id, from_session_id, body, metadata)
+
+          Sessions.app_managed?(session) or live_worker?(to_session_id) ->
+            deliver_and_persist(to_session_id, from_session_id, body, metadata)
+
+          true ->
+            persist(to_session_id, from_session_id, body, metadata)
         end
 
       _ ->
@@ -77,5 +84,14 @@ defmodule EyeInTheSky.Messaging.DMDelivery do
 
   defp agent_manager_mod do
     Application.get_env(:eye_in_the_sky, :agent_manager_module, AgentManager)
+  end
+
+  defp live_worker?(session_id) do
+    case Registry.lookup(@agent_registry, {:session, session_id}) do
+      [{pid, _provider}] -> Process.alive?(pid)
+      [] -> false
+    end
+  rescue
+    ArgumentError -> false
   end
 end

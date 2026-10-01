@@ -1684,6 +1684,8 @@ Options:
   --name <n>                   Session name
   --yolo                       Bypass sandbox restrictions
   --dry-run                    Validate inputs without hitting spawn endpoint; print the curl command
+  --quiet, -q                  Print only the spawned session UUID; diagnostics go to stderr
+                               With --dry-run, print diagnostics to stderr and no UUID
 
 Valid models (--provider claude, default):
   Shorthand (recommended): sonnet, opus, haiku, opus[1m], sonnet[1m]
@@ -1726,6 +1728,7 @@ USAGE
       local instructions="" instructions_set=0 instructions_file="" interpolate_env="false" model="" provider="" project_id="${EITS_PROJECT_ID:-}" project_path="${PWD:-}"
       local worktree="" stash_if_dirty="false" effort_level="" parent_session_id="" parent_agent_id=""
       local team_name="" team_id="" member_name="" agent_name="" session_name="" bypass_sandbox="false" dry_run="false"
+      local quiet=0
       while [[ $# -gt 0 ]]; do
         case "$1" in
           --instructions)      instructions="$2"; instructions_set=1; shift 2 ;;
@@ -1747,6 +1750,7 @@ USAGE
           --name)              session_name="$2";       shift 2 ;;
           --yolo)              bypass_sandbox="true";   shift ;;
           --dry-run)           dry_run="true";          shift ;;
+          --quiet|-q)          quiet=1;                  shift ;;
           *) die "unknown flag: $1" ;;
         esac
       done
@@ -1855,14 +1859,24 @@ USAGE
         fi
       fi
 
-      # Warn about stale worktrees before creating a new one — dangling entries cause name conflicts.
+      # Only the requested path or branch can conflict; unrelated worktrees are normal.
       if [[ -n "$worktree" ]]; then
-        local _wt_count
-        _wt_count=$(git worktree list 2>/dev/null | wc -l | tr -d ' ')
-        # git worktree list always includes the main worktree; >1 means additional worktrees exist
-        if [[ "${_wt_count:-0}" -gt 1 ]]; then
-          printf 'warning: %d additional worktrees registered.\n' "$((_wt_count - 1))" >&2
-          printf '         Merged branches may conflict with --worktree "%s". Run: git worktree prune\n' "$worktree" >&2
+        local _wt_project _wt_path _wt_entry _wt_conflict=false
+        _wt_project=$(cd "$project_path" 2>/dev/null && pwd -P) || _wt_project="$project_path"
+        _wt_path="${_wt_project%/}/.claude/worktrees/$worktree"
+        if [[ -e "$_wt_path" || -L "$_wt_path" ]]; then
+          _wt_conflict=true
+        else
+          while IFS= read -r -d '' _wt_entry; do
+            if [[ "$_wt_entry" == "worktree $_wt_path" || "$_wt_entry" == "branch refs/heads/worktree-$worktree" ]]; then
+              _wt_conflict=true
+              break
+            fi
+          done < <(git -C "$project_path" worktree list --porcelain -z 2>/dev/null || true)
+        fi
+        if [[ "$_wt_conflict" == true ]]; then
+          printf 'warning: worktree "%s" already has an existing path or registered worktree branch.\n' "$worktree" >&2
+          printf '         Inspect: git -C "%s" worktree list; prune only stale entries before retrying.\n' "$project_path" >&2
         fi
       fi
 
@@ -1910,18 +1924,21 @@ USAGE
          + (if $stash_if_dirty           then {stash_if_dirty: true}                   else {} end)')
       # Dry-run: print the curl command and exit without making the request
       if [[ "$dry_run" == "true" ]]; then
-        echo "Dry-run validation passed. Curl command that would execute:"
-        echo ""
-        echo "curl -sk -X POST \\"
-        echo "  -H 'Content-Type: application/json' \\"
-        if [[ -n "${EITS_API_KEY:-}" ]]; then
-          echo "  -H 'Authorization: Bearer <EITS_API_KEY>' \\"
-        fi
-        echo "  -d '$payload' \\"
-        echo "  '$BASE_URL/agents'"
-        echo ""
-        echo "Request payload:"
-        echo "$payload" | _jq .
+        (
+          [[ $quiet -eq 0 ]] || exec 1>&2
+          echo "Dry-run validation passed. Curl command that would execute:"
+          echo ""
+          echo "curl -sk -X POST \\"
+          echo "  -H 'Content-Type: application/json' \\"
+          if [[ -n "${EITS_API_KEY:-}" ]]; then
+            echo "  -H 'Authorization: Bearer <EITS_API_KEY>' \\"
+          fi
+          echo "  -d '$payload' \\"
+          echo "  '$BASE_URL/agents'"
+          echo ""
+          echo "Request payload:"
+          echo "$payload" | _jq .
+        )
         return 0
       fi
 
@@ -1956,6 +1973,15 @@ USAGE
         printf '%s rc=%s cmd=agents/spawn %s\n' "$_ts" "$_sp_status" "$_sp_resp_body" >> "$spawn_log"
         printf 'spawn failed (HTTP %s): %s\n' "$_sp_status" "$_sp_resp_body" >&2
         return 1
+      fi
+      if [[ $quiet -eq 1 ]]; then
+        local _sp_uuid
+        if ! _sp_uuid=$(printf '%s\n' "$_sp_resp_body" | jq -er '.session_uuid | select(type == "string" and length > 0)' 2>/dev/null); then
+          printf 'spawn failed: response did not contain a non-empty session_uuid\n' >&2
+          return 1
+        fi
+        printf '%s\n' "$_sp_uuid"
+        return 0
       fi
       printf '%s\n' "$_sp_resp_body" | _jq .
       # Final compact summary line — allows: eits agents spawn ... | tail -1 | jq .session_uuid
@@ -3284,11 +3310,17 @@ Fields per member:
 Orchestrators should check member_status, not session_status.
 
 --wait:         Block until all members have member_status done or spawn_failed.
-                Polls every 5 seconds and prints a summary line each tick.
+                Polls every 5 seconds; progress goes to stderr.
+                Prints one JSON result to stdout on completion or hung detection:
+                team_id, team_name, status, results (member/session IDs, name, role,
+                status, session_status, branch, task_ids), and hung_members if hung.
+                Branch and task IDs come from session details, including completed tasks.
+                Unavailable session metadata is reported per result as metadata_error.
+                Status reflects lifecycle, not a review verdict; unknown branch is null.
                 Exits with 0 when all done, 1 if any spawn_failed, 2 if any hung agents.
 --watch [<n>]:  Continuously refresh status every N seconds (default: 5).
                 Clears the screen each tick. Press Ctrl+C to stop.
---json:         Output raw JSON instead of formatted text (useful for scripting).
+--json:         Output raw JSON for snapshots; with --wait, wait for final results.
 HELP
         return 0; }
       local id="${1:-}"; need id; shift
@@ -3351,9 +3383,36 @@ HELP
         '
       }
 
-      if [[ $json -eq 1 ]]; then
+      # Session detail retains completed tasks and resolves the actual Git branch.
+      # Missing metadata must not alter the wait lifecycle exit code.
+      _teams_wait_results() {
+        local outcome="$1" hung="${2:-[]}" results='[]' member detail session_ref result
+        while IFS= read -r member; do
+          detail='{}'
+          session_ref=$(echo "$member" | jq -r '.session_uuid // .session_id // empty')
+          if [[ -n "$session_ref" ]]; then
+            if ! detail=$(_curl "$BASE_URL/sessions/$session_ref"); then
+              detail='{"metadata_error":"session details unavailable"}'
+            elif ! echo "$detail" | jq -e 'type == "object" and .error == null' >/dev/null; then
+              detail='{"metadata_error":"session details unavailable"}'
+            fi
+          fi
+          result=$(echo "$member" | jq --argjson detail "$detail" '{
+            member_id: .id, name, role, session_id, session_uuid,
+            status: (.member_status // .status // "unknown"), session_status,
+            branch: ($detail.branch_name // null),
+            task_ids: ([$detail.tasks[]?.id, .claimed_task.id] | map(select(. != null)) | unique)
+          } + (if $detail.metadata_error then {metadata_error: $detail.metadata_error} else {} end)')
+          results=$(echo "$results" | jq --argjson result "$result" '. + [$result]')
+        done < <(echo "$resp" | jq -c '.members // [] | .[]')
+        echo "$resp" | _jq --arg status "$outcome" --argjson results "$results" --argjson hung "$hung" '
+          {team_id: .id, team_name: .name, status: $status, results: $results}
+          + (if $hung | length > 0 then {hung_members: $hung} else {} end)'
+      }
+
+      if [[ $json -eq 1 && $wait -eq 0 ]]; then
         _curl "$BASE_URL/teams/$id" | _jq .
-      elif [[ $watch -eq 1 ]]; then
+      elif [[ $watch -eq 1 && $wait -eq 0 ]]; then
         # Continuous refresh mode — clears screen each tick until Ctrl+C
         while true; do
           clear
@@ -3390,25 +3449,9 @@ HELP
           total=$(echo "$resp" | jq '.members // [] | length')
           printf '[%s] waiting: %d/%d done, %d pending\n' "$(date -u +%H:%M:%S)" "$done_count" "$total" "$pending" >&2
           if [[ "$pending" -eq 0 ]]; then
-            echo "$resp" | jq -r '
-              . as $t |
-              (.members // []) as $members |
-              ($members | length) as $total |
-              ($members | map(select(.member_status == "done")) | length) as $done |
-              ($members | map(select(.member_status == "spawn_failed")) | length) as $spawn_failed |
-              "Team: \($t.name) (ID: \($t.id)) — all members settled.",
-              "Done: \($done)/\($total)\(if $spawn_failed > 0 then ", spawn_failed: \($spawn_failed)" else "" end)",
-              "",
-              "Final member status:",
-              ($members[] |
-                (.member_status // .status // "unknown") as $member_str |
-                (.session_uuid // "—") as $uuid_str |
-                (.session_id | tostring) as $sid_str |
-                (if .git_worktree_path then (.git_worktree_path | rtrimstr("/") | split("/") | .[-1]) else "—" end) as $branch_str |
-                (if .claimed_task then " [task #\(.claimed_task.id): \(.claimed_task.title)]" else "" end) as $task_str |
-                "  \(.name) (\(.role)) — \($member_str) branch:\($branch_str) uuid:\($uuid_str) id:\($sid_str)\($task_str)"
-              )
-            '
+            local outcome=done
+            [[ "$spawn_failed_count" -gt 0 ]] && outcome=spawn_failed
+            _teams_wait_results "$outcome"
             [[ "$spawn_failed_count" -gt 0 ]] && return 1 || return 0
           fi
           # Check pending members for hung workers before sleeping.
@@ -3431,6 +3474,7 @@ HELP
           done < <(echo "$resp" | jq -c '.members // [] | .[]')
           if [[ "${#hung_agents[@]}" -gt 0 ]]; then
             printf 'teams status --wait: hung agents detected: %s\n' "$(IFS=', '; echo "${hung_agents[*]}")" >&2
+            _teams_wait_results hung "$(printf '%s\n' "${hung_agents[@]}" | jq -R . | jq -s .)"
             return 2
           fi
           sleep 5

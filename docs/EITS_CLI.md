@@ -14,7 +14,7 @@ The `eits` command is the Rust CLI. It provides better performance, JSON-native 
 - `whoami` — identity resolution (session/agent UUIDs and IDs)
 - `doctor` — read-only CLI diagnostics for config, identity, server, git, hooks, and capabilities
 - `work` — current work checkpoint, task/team/inbox/git health, and commit tracking status
-- `workflow` — agent-facing status alias with suggested next command
+- `workflow` — agent-facing status plus explicit start-bug and finish presets
 
 Any subcommand outside Phase 1 (e.g., `agents`, `projects`, `channels`, `teams`, `jobs`, `search`, `hooks`, `skills`, `worktree`) automatically falls through to the legacy `eits-extras` script, so `eits` remains the single command users and agents call. The `eitsr` binary target remains as a compatibility alias during the transition.
 
@@ -59,7 +59,7 @@ With `--quiet`, only the ID:
 
 1. **JSON-only stdout for Rust-owned commands** — all Rust-owned responses are JSON (even errors); never plain text tables or shell-friendly output. Legacy extras may still emit their historical formats until ported.
 
-2. **Strict config validation** — missing or malformed `EITS_URL` exits immediately with a usage error (exit 2) instead of defaulting silently.
+2. **Config validation** — a selected `EITS_URL` with an invalid scheme or spaces exits with a configuration error (exit 2). An unset variable uses the configuration sources below; it is not an error.
 
 3. **Compact JSON default** — responses are one-line JSON unless `--pretty` or `EITS_PRETTY=1`. Bash eits pretty-prints by default.
 
@@ -83,10 +83,55 @@ EITS_SESSION_ID          # Numeric session ID
 EITS_AGENT_UUID          # Agent UUID
 EITS_PROJECT_ID          # Project context
 EITS_PRETTY=1            # Pretty-print JSON (same as --pretty flag)
-EITS_COMPACT=1           # Single-line JSON (default)
+EITS_RETRY=0             # Disable HTTP retries (other values keep retries enabled)
+EITS_RETRY_BASE_MS       # Retry base delay in milliseconds (default: 2000)
 EITS_EXTRAS              # Optional path to legacy extras executable
 EITS_CODEX_ENV_FILE      # Optional Codex session env file
 ```
+
+### API URL selection (Rust CLI)
+
+`EITS_API_URL` is unused by the Rust CLI: it is neither an alias for `EITS_URL`
+nor a backup endpoint. URL selection follows these branches, without probing
+server availability:
+
+1. Process `EITS_URL` wins, including when it is empty or invalid (which fails
+   validation rather than falling through).
+2. Otherwise, if `desktop.json` exists in the EITS configuration directory,
+   an integer `port` from 1024 through 49151 selects
+   `http://localhost:<port>/api/v1`. Unreadable or malformed JSON fails with exit 2.
+   A missing, non-integer, or out-of-range port proceeds directly to step 4,
+   **skipping the Codex env file URL**.
+3. Only when `desktop.json` does not exist, the selected Codex env file's
+   `EITS_URL` is used if present.
+4. The first line starting exactly `EITS_URL=` in the configuration directory's
+   `.env` supplies the URL. Use an unquoted value, without `export`. If the file
+   cannot be read or has no matching line, use `http://localhost:5001/api/v1`.
+
+The configuration directory is `$XDG_CONFIG_HOME/eits`, or `$HOME/.config/eits`
+when `XDG_CONFIG_HOME` is unset. The Codex file is selected by
+`EITS_CODEX_ENV_FILE`, otherwise by the first set variable among
+`EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, and `CODEX_SESSION_ID`, giving
+`$HOME/.eits/codex/sessions/<session>.env`. Characters outside ASCII letters,
+digits, `_`, `.`, and `-` in that session identifier become `_`. An unreadable
+Codex file provides no fallback values. Codex files accept `export` and quoted
+values; they are parsed, not executed.
+
+Supply the full base URL including `/api/v1`; the CLI removes trailing slashes
+but does not append the API path. Connection failure does not switch servers.
+To explicitly retry against a remote server, set `EITS_URL` for the command:
+
+```bash
+EITS_URL=https://eits.dev/api/v1 eits tasks link-session <task_id> <session_uuid>
+```
+
+`tasks link-session` reports connection failures as JSON on stdout with
+`code: "connection_failed"`, the attempted endpoint, and a hint to check the
+server or `EITS_URL`; it exits 3. This also applies with `--quiet`. Configuration
+validation failures emit `code: "config_invalid"` and exit 2. HTTP errors exit 1
+and include an HTTP `status`; connection/configuration errors omit that field.
+`EITS_RETRY=0` disables retries when diagnosing a failed connection; it does not
+change URL selection. `EITS_API_KEY` controls authentication, not routing.
 
 ### Opt-In / Cutover Strategy
 
@@ -212,6 +257,13 @@ eits sessions reopen [<uuid|self>]
 # 'self' is substituted with $EITS_SESSION_UUID at call time.
 # Use when resume hook fails or when an orchestrator needs to post work
 # against an already-ended session.
+
+eits sessions doctor self [--pretty]
+eits sessions doctor <uuid|id> [--pretty]
+# Read-only visibility diagnostics: one GET of session-detail, plus local
+# discovery of the Codex/Claude message-file and Codex env-file the CLI host
+# would read for that session. Never mutates a session. `self` requires
+# $EITS_SESSION_UUID (no integer-ID fallback). See CLI_SESSIONS_DOCTOR.md.
 ```
 
 `--status` filters by session status: `working`, `idle`, `waiting`, `completed`, `failed`.
@@ -223,6 +275,16 @@ eits sessions reopen [<uuid|self>]
 `--parent` is independent and can combine with any other filter.
 
 `sessions get <uuid>` returns a rich response that includes the session, linked tasks, notes (last 5, body truncated), and commits (last 5) in a single call.
+
+To finish a session, prefer `eits sessions complete` (defaults to the current
+session). `eits sessions update self --status completed` is an explicit field
+patch; `update` requires a UUID or `self`, and uses a different API route from
+`complete`. A missing identifier is a usage error, not a server outage.
+
+HTML API failures are emitted as JSON errors identifying the HTTP method and
+route, with query values and the HTML body omitted. Check `EITS_URL` and server
+logs for a 400/404/502 response; changing commands does not diagnose a transient
+proxy or API failure.
 
 `sessions update` model flags: `--model` sets the raw model string as reported by the CLI (e.g. `claude-opus-4-5`). `--model-name` is the authoritative structured name used for display. `--model-provider` sets the provider (e.g. `anthropic`, `openai`). `--model-version` sets the version string. All four map directly to the corresponding fields in the REST PATCH body.
 
@@ -267,14 +329,14 @@ eits tasks get <id>
 
 # Create
 eits tasks create --title <t> [--description <d>] [--project <id>] \
-  [--priority <p>] [--session <uuid>] [--agent <uuid>] \
-  [--tags <id1,id2,...>] [--team <id>] [--due-at <ISO8601>]
-# Defaults: --agent from $EITS_AGENT_UUID, --project from $EITS_PROJECT_ID, --session from $EITS_SESSION_UUID
+  [--priority <p>] [--team <id>] [--assign-to <session_uuid_or_id>]
+# The creator is tracked from the current session, but the task is unassigned unless
+# --assign-to is present. Use --assign-to when creating work for another session.
 
-# Create + start in one shot
+# Create + start self-owned work in one shot (explicit --title intent)
 eits tasks begin --title <t> [--description <d>] [--project <id>] \
   [--team <id>] [--priority <p>] [--tag <id>] [--quiet|-q]
-# Or claim a pre-created task instead of creating new
+# Or claim a pre-created task (explicit --id intent)
 # On conflict (already_claimed), shows the holding session ID, UUID, and name
 eits tasks begin --id <task_id> [--team <id>]
 # --tag: apply one or more tags after creation/claim (repeatable: --tag 1 --tag 2)
@@ -295,6 +357,8 @@ eits tasks bulk-update --session <uuid|id> [--state <id>] [--priority <p>] [--ti
 eits tasks claim <id> [--team <id>]  # → In Progress (state 2), transfers session ownership to claimer (preferred)
                                # Removes all existing task_sessions links, adds claimer's session atomically
                                # --team is accepted for orchestration parity and does not alter the existing task team
+eits tasks release <id>              # In Progress/In Review → To Do, removes all session links
+eits tasks handoff <id> --to <session_uuid_or_id>  # Transfers ownership to exactly one target session, keeps workflow state
 eits tasks complete <id> <message>  # Annotate + mark done + DM lead (preferred)
 
 # Deprecated aliases (kept for backwards compatibility, emit warning to stderr)
@@ -307,6 +371,9 @@ eits tasks complete <id> --message <text>
 eits tasks complete <id> --message <text> --commit <sha> [--commit <sha>] ...
 # --commit: track commits and link them to the task after a successful close
 #           (repeatable; eliminates separate eits commits create round-trips)
+#           Tracking failures never undo the close: a request error, or per-hash `errors` /
+#           `link_errors` in the /commits response, print "warning: task closed but commit <hash>
+#           could not be tracked|linked to task" to stderr
 # --notify <session_uuid_or_id>: DM a session after successful close (logs "Task <id> completed")
 
 # Delete
@@ -334,6 +401,18 @@ eits tasks tag <task_id> <tag_id>
 eits tasks states
 ```
 
+See [CLI_TASK_OWNERSHIP.md](CLI_TASK_OWNERSHIP.md) for `claim`/`release`/`handoff` details:
+non-owner mutations return 409/403, both `release` and `handoff` require current
+ownership, and `handoff` clears the target's stale intent while preserving
+workflow state. Handoff to yourself is a no-op.
+
+`create`, `begin`, `claim`, `update`, and `complete` return a normalized JSON
+summary: top-level `success`, `id`, `state`, `session_id`, `project_id`, and a
+`next` array of suggested follow-up commands, in addition to existing fields
+(`task_id`, nested `task`, `complete`'s `status: "already_closed"`). See
+"Task Mutation JSON Summary" in `docs/EITS_RUST_CLI_MIGRATION.md` for the exact
+field-precedence rules. `--quiet` still prints only the task ID.
+
 ### Exit codes
 
 `tasks list` and other table-printing commands are safe to use in scripts with `set -euo pipefail`. The `[[ cond ]] && cmd` pattern was replaced with `if/fi` guards so empty-result branches no longer exit 1 under pipefail. This applies to `_tbl_tasks`, `_tbl_sessions`, `_tbl_notes`, `_tbl_commits`, `channels list`, and `channels members`.
@@ -360,7 +439,8 @@ API JSON response includes both `session_id` (from first linked session) and `ag
 ### Agent task workflow (canonical)
 
 **Session Linkage Rules:**
-- `tasks begin` (create or claim), `tasks annotate`, and `tasks complete` automatically link the task to the current session (`$EITS_SESSION_UUID` or `$EITS_SESSION_ID`).
+- `tasks begin --title` creates and links self-owned work; `tasks begin --id` and `tasks claim` claim existing work for the current session.
+- `tasks create` records the current session as creator but leaves the task unassigned unless `--assign-to <session>` is provided.
 - `tasks update` and other state mutations **do not** change session linkage — they operate on existing task state only.
 - `tasks link-session` and `tasks unlink-session` provide explicit session management when needed.
 - **CRITICAL**: When no session context is available, these commands fail with a session-linkage error. Ensure `EITS_SESSION_UUID` or `EITS_SESSION_ID` is set before running task lifecycle commands.
@@ -370,18 +450,25 @@ API JSON response includes both `session_id` (from first linked session) and `ag
 ```bash
 eits tasks begin --title "Implement X"              # create + start in one shot
 eits tasks update 42 --state-name in-review        # move to review when ready
-eits tasks complete 42 "Implemented feature X"     # CANONICAL close: annotate + mark Done + DM lead
+eits tasks complete 42 --message "Implemented feature X"  # annotate + mark Done
 eits tasks complete 42 --message "done" --commit $SHA  # close + track commit atomically
 eits tasks complete 42 --message "done" --commit $SHA1 --commit $SHA2  # track multiple commits (--commit is repeatable)
 ```
 
 **Option 2: Claim pre-created task (orchestrator-assigned)**
 ```bash
-eits tasks begin --id 42                           # claim task 42 (no title required); links to current session
-                                                   # conflict: shows holding session ID, UUID, name
+eits tasks claim 42                               # preferred for an assigned task; links to current session
 eits tasks update 42 --state-name in-review        # move to review when ready
-eits tasks complete 42 "Implemented feature X"     # CANONICAL close
+eits tasks complete 42 --message "Implemented feature X"
+eits dm --to <parent-session> --message "done task=42 result=Implemented X branch=<branch> commit=<sha>"
+eits dm inbox --since-session --team-only --json
 ```
+
+For assigned work, use `tasks claim <id>`; `tasks begin --id <id>` remains a
+supported alternative. Reserve `tasks begin --title ...` for new work to avoid
+duplicate tasks. Claim before editing and send the parent an explicit completion
+DM. For combined commit logging, task completion, parent DM, and final inbox
+polling, see [workflow finish](CLI_WORKFLOW_FINISH.md).
 
 **Manual close (two round-trips, avoid if possible)**
 ```bash
@@ -622,14 +709,17 @@ eits jobs delete <id>
 **Available in:** eits (Rust, JSON output) and legacy eits-extras (table output)
 
 ```bash
-eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
-eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session] [--team-only] [--json]
+eits dm list [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session [--strict]] [--all-time] [--team-only] [--json]
+eits dm inbox [--session <uuid|id>] [--from <uuid|id>] [--limit <n>] [--since <iso8601>] [--since-session [--strict]] [--all-time] [--team-only] [--json]
 # List inbound DMs for a session (CLI-side inbox polling)
 # inbox is an alias for list
 # The table lists an ID column first — copy it into `eits dm read <id>`
 # --from: filter by sender (optional)
 # --since: return only messages inserted after ISO8601 timestamp (optional)
 # --since-session: filter to DMs received since this session started (suppresses stale DMs from prior resume sessions)
+#                  This is now the DEFAULT unless --since or --all-time is given
+# --strict: with --since-session, fail instead of fetching when the session start cannot be resolved
+# --all-time: fetch full history with no session-start cutoff (conflicts with --since, --since-session, --strict)
 # --team-only: keep only messages from sessions that share a team with the current agent
 
 eits dm read <id> [--json]
@@ -648,13 +738,24 @@ eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout 
 
 eits dm [--from <session_id|uuid>] --to <session_id|uuid> --message <text> [--response-required]
 # Send a direct message to an agent session
+
+eits dm watch [--session <uuid|id>] [--since <iso8601>|--since-session] [--team-only] \
+  [--format json|jsonl] [--timeout <seconds>]
+# Long-running, reconnecting long-poll that streams new inbound DMs (default --format jsonl)
+# Ordered, deduplicated across reconnects via an opt-in server cursor; older servers fail fast
+# Retries connection failures and 429/500/502/503/504 with backoff (1,2,4,8,16,30s, up to 8 retries)
+# Stop with Ctrl-C or by closing its output pipe. See CLI_DM_WATCH.md for full semantics.
 ```
 
 Both `--from` and `--to` accept either an integer session ID or a session UUID. `--from` defaults to `$EITS_SESSION_UUID` or `$EITS_SESSION_ID`.
 
 `--since` filters messages by insertion timestamp (ISO8601 format, e.g., `2026-04-30T12:00:00Z`). Useful for orchestrators polling for new replies without diffing the full inbox.
 
-`--since-session` automatically filters to DMs received since the current session started (resolves the session's `created_at` timestamp from the API). This suppresses stale DMs from prior sessions that may replay when resuming. If the session's creation timestamp cannot be resolved, a warning is printed to stderr and all DMs are returned.
+`dm list` / `dm inbox` default to `--since-session`: only DMs received since the current session started (its `started_at`, resolved from the API) are returned. This suppresses stale DMs from prior sessions that may replay when resuming. Pass `--all-time` for the full history, or `--since <iso8601>` for an explicit cutoff (`--all-time` conflicts with `--since`, `--since-session`, and `--strict`). If the session start cannot be resolved, a `warnings` array (`code: "session_start_unresolved"`, `reason`, `session`, `effective_since`) is attached to the JSON response on stdout and all DMs are returned, unless `--strict` is set, which fails instead.
+
+For a persistent background watcher instead of one-shot polling, use `dm watch`
+(above) — it never terminates on an empty poll and preserves ordering across
+reconnects. See [CLI_DM_WATCH.md](CLI_DM_WATCH.md).
 
 ---
 
@@ -777,9 +878,14 @@ eits teams join <team_id> --name <alias> [--role <member|admin>] \
 eits teams status <id> [--wait] [--json] [--summary]
 # Default: formatted summary with member status, session state, and current task
 # On bare invocation (no flags), prints a hint to stderr suggesting --wait for blocking until members are done
-# --wait: block until all members reach done or spawn_failed (polls every 5s)
+# --wait: block until all members reach done or spawn_failed (polls every 5s; progress on stderr)
+#         Prints one JSON result to stdout on completion or hung detection:
+#         {team_id, team_name, status: done|spawn_failed|hung, results[], hung_members?}
+#         results[]: member_id, name, role, session_id, session_uuid, status, session_status,
+#         branch (null if unknown), task_ids (includes completed tasks), metadata_error (if session lookup failed)
+#         Status is lifecycle only, not a review verdict. Exits 0 all done, 1 spawn_failed, 2 hung
 # --summary: print concise member counts by state (working, idle, done, failed, spawn_failed)
-# --json / --raw: output raw JSON instead of formatted text (useful for scripting)
+# --json / --raw: output raw JSON instead of formatted text (useful for scripting); with --wait, waits and emits the final results JSON
 
 eits teams update-member <team_id> <member_id> --status <s>
 
@@ -800,7 +906,7 @@ eits teams my-teams                            # List teams where current agent 
 
 `teams status --summary` prints a concise human-readable status showing member counts by state (working, idle, done, failed, spawn_failed).
 
-`--wait` blocks until all members reach a terminal state (done or spawn_failed), polling every 5 seconds. Exits 0 on success, 1 if any spawn_failed.
+`--wait` blocks until all members reach a terminal state (done or spawn_failed), polling every 5 seconds. Exits 0 if all done, 1 if any spawn_failed, 2 if any member is detected as hung. In every case it prints one structured JSON result document to stdout (see field list above); progress ticks go to stderr.
 
 ### Status Fields Explained
 
@@ -860,6 +966,18 @@ Runs read-only diagnostics for the local CLI environment. The JSON output includ
 - whether the current identity can support task, note, commit, and DM operations
 - warnings and a suggested next command
 
+```bash
+eits doctor cli [--pretty]
+```
+
+Local-only migration report (no server access, credential/config loading, or
+subprocess execution) for the running Rust binary: actual OS-resolved
+`executable` path, `implementation`/`version`/`build` info, whether the
+`eits-extras` fallback resolver finds an executable (`fallback`, `executed:
+false`), and the native (`command_families.rust`) vs. legacy
+(`command_families.legacy`) command family lists. JSON even under `--quiet`.
+Does not affect bare `eits doctor`. See [CLI_DOCTOR.md](CLI_DOCTOR.md).
+
 ## work / workflow
 
 **Available in:** eits (Rust, JSON output)
@@ -870,6 +988,8 @@ eits work checkpoint   # alias for status
 eits workflow status   # agent-facing alias for status
 ```
 
+For task closeout, use [`eits workflow finish`](CLI_WORKFLOW_FINISH.md). It logs existing commits, completes the task, DMs the parent, and polls the inbox. It does not run checks, claim work, validate a branch, push, open a PR, or complete the session. For a separately authorized Gitea PR, `tea --repo` expects `owner/name` (for example, `claude/eits-web`).
+
 Reports the current checkpoint for the active session. The JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, worktree and git health, commit-tracking status where feasible, and a suggested next command.
 
 **Output includes:**
@@ -879,6 +999,45 @@ Reports the current checkpoint for the active session. The JSON output includes 
 - **Team block**: Teams the current agent belongs to
 - **Inbox block**: Recent inbound DMs for the current session
 - **Git block**: Repository root, branch, HEAD, dirty paths, and unlogged commits where available
+
+Availability is explicit. A partial report still exits 0, so check `health`, each section's `available` flag, and `warnings` before treating an empty list as "no work":
+- `tasks` / `team_memberships` / `inbox` carry `available`; failed or malformed lookups set it false, add a warning, and leave counts at 0. Lookup warnings include only the error `code` and HTTP `status`, never bodies or URLs.
+- `tasks` adds `limit` (200), `possibly_truncated`, `in_progress_count`, and `in_progress_items` (state 2 only).
+- `inbox` adds `limit` (20) and `possibly_truncated`. It is scoped by session `started_at` (falls back to `created_at`; a warning is added if neither exists). `unread_count` is always null with `unread_status: "unsupported_by_api"` — the DM API has no read markers.
+- `current_session` includes `started_at`; `health.registration` is `registered`, `not_initialized`, `unknown`, `missing_identity`, or `unavailable`.
+
+See [CLI_WORK_STATUS.md](CLI_WORK_STATUS.md) for field details.
+
+---
+
+## Workflow presets
+
+`eits workflow start-bug --task 9022` checks the current session inbox, claims
+an existing bug task (links the session and sets In Progress), then checks the
+inbox again. It wraps `eits dm inbox --since-session`, `eits tasks claim 9022`,
+and `eits dm inbox --since-session`. Create a task separately with `eits tasks
+begin --title 'Bug description'` if no task exists. No bug tag is inferred.
+
+Session identity and a nonblank `--task` are required. Inbox polls use the
+session's `started_at` (falling back to `created_at`), include all senders, and
+fetch at most 200 messages. Review instructions before invoking the preset;
+it prints the first checkpoint to stderr but does not pause for review.
+
+Success stdout is one JSON object with `status: "started"`, `task_id`, the
+underlying `claim` response, `checkpoint`, `final_inbox`, `completed_steps`,
+and `operations` naming the lower-level commands. Each inbox contains `items`,
+`count`, and `possibly_truncated`. Like finish, this preset always returns JSON,
+including with global `--quiet`. Review the returned messages before editing.
+
+A failed request or malformed confirmation returns a nonzero JSON error with
+its step and recovery hint. A final inbox failure can occur after the claim
+succeeds; a lost response can also hide a successful claim. Inspect with
+`eits tasks get 9022`, then recover with `eits tasks claim` or `eits dm inbox`.
+The sequence is not transactional. It creates no tasks, sends no DMs, spawns no
+agents, and does not modify session status or execute tests.
+
+For closeout, see [workflow finish](CLI_WORKFLOW_FINISH.md). All lower-level
+commands and their JSON contracts remain available unchanged.
 
 ---
 

@@ -166,8 +166,26 @@ Keep the Tailwind v4 directives in `assets/css/app.css`:
   - hover/focus micro-interactions
   - loading/empty states
 
-### daisyUI usage (project rule)
-daisyUI is available (themes + some existing UI), but new UI should be **Tailwind-composed** and app-specific. Don’t blindly stack daisyUI component classes for new design work—use them sparingly, and keep patterns consistent with nearby UI.
+### CSS Component Classes (project rule)
+
+DaisyUI was removed as an npm/Tailwind dependency (commit e71e271b). All form and UI component styles — `input`, `select`, `textarea`, `checkbox`, `toggle`, `label`, `dropdown`, `tabs`, `tooltip`, `table`, `stats`, `skeleton`, etc. — are now **locally implemented** in `assets/css/app.css` using `@theme` CSS custom properties (`oklch` color tokens, `--radius-*` tokens). The legacy daisy-named class names (e.g. `.input`, `.btn`, `.checkbox`) are kept as-is for backward compatibility with existing markup; do not rename them in bulk.
+
+**Preferred naming for new UI:** use the `eits-*` prefixed aliases introduced in commit f0c6a264. These coexist with the legacy names and are the canonical app-owned identifiers going forward:
+
+| eits-* class | Purpose |
+|---|---|
+| `eits-field` | Text input field (replaces `.input`) |
+| `eits-select` | Select/dropdown element |
+| `eits-textarea` | Multiline text area |
+| `eits-checkbox` | Checkbox input |
+| `eits-toggle` | Toggle/switch input |
+| `eits-label` | Label wrapper element |
+| `eits-label__text` | Label text span |
+| `eits-label__hint` | Label hint/helper text span |
+
+Size modifiers follow the `--xs`, `--sm`, `--md` suffix pattern (e.g. `eits-field--sm`). Bordered and error state variants: `eits-field--bordered`, `eits-field--error`.
+
+New UI should use `eits-*` classes for form primitives. Tailwind utility composition remains the standard for layout, spacing, and typography — keep patterns consistent with nearby UI.
 
 ### Icons (required)
 Use the imported `<.icon>` component. Don’t use Heroicons modules directly.
@@ -2200,7 +2218,7 @@ Kanban task cards use a `...` overflow menu for actions (copy, delete, move) ins
 
 ---
 
-## Dropdown & Submenu Patterns (DaisyUI)
+## Dropdown & Submenu Patterns
 
 Two dropdown patterns are used depending on context:
 
@@ -2274,7 +2292,7 @@ For action dropdowns triggered by a button click (e.g., "more actions" menu):
 - Menu stays open until another element is clicked
 
 **Why these patterns:**
-- **DaisyUI handles positioning:** z-stacking, overflow clipping, and positioning are automatic
+- **Local CSS handles positioning:** z-stacking, overflow clipping, and positioning are implemented in `assets/css/app.css`
 - **Keyboard accessible:** `<details>` and `tabindex` provide native keyboard navigation
 - **Mobile-friendly:** Tap-to-open for both patterns; no hover-dependence on touch
 - **No custom JS needed:** CSS classes and HTML semantics do the work
@@ -2456,7 +2474,7 @@ Replace hardcoded `oklch(...)` and `hsl(...)` color values with semantic Tailwin
 
 **Why:**
 - Hardcoded `oklch`/`hsl` values break theme switching (dark mode, custom themes)
-- Semantic classes (e.g., `text-primary`, `bg-base-200`, `border-base-300`) adapt automatically to the active daisyUI/Tailwind theme
+- Semantic classes (e.g., `text-primary`, `bg-base-200`, `border-base-300`) adapt automatically to the active `@theme` token set defined in `assets/css/app.css`
 - Reduces diff noise when colors are adjusted globally
 
 **Migration pattern:**
@@ -2474,7 +2492,7 @@ Replace hardcoded `oklch(...)` and `hsl(...)` color values with semantic Tailwin
 - `hsl(220 14% ...)` dark backgrounds → `bg-base-100`, `bg-base-200`, `bg-base-300`
 - Border colors → `border-base-300`, `border-primary`
 
-**Rule:** No hardcoded color functions in class attributes or inline styles. Use semantic Tailwind/daisyUI classes. If a color has no semantic equivalent, add a CSS custom property via the theme, not inline.
+**Rule:** No hardcoded color functions in class attributes or inline styles. Use semantic Tailwind classes backed by `@theme` tokens in `assets/css/app.css`. If a color has no semantic equivalent, add a CSS custom property via the theme, not inline.
 
 ---
 

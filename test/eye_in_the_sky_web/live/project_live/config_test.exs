@@ -106,8 +106,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
     end
   end
 
-  describe "workspace switching" do
-    test "opens config page for a project in another workspace", %{conn: conn, user: user} do
+  describe "workspace isolation" do
+    test "rejects config page for a project in another workspace", %{conn: conn, user: user} do
       current_workspace = Workspaces.default_workspace_for_user!(user)
       other_user = user_fixture()
       other_workspace = Workspaces.default_workspace_for_user!(other_user)
@@ -123,10 +123,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.ConfigTest do
 
       assert current_workspace.id != other_workspace.id
 
-      {:ok, view, html} = live(conn, ~p"/projects/#{foreign_project.id}/config")
-
-      assert html =~ foreign_project.name
-      refute has_element?(view, "#flash-error", "Project not found")
+      assert {:error, {:live_redirect, %{to: "/"}}} =
+               live(conn, ~p"/projects/#{foreign_project.id}/config")
     end
   end
 end

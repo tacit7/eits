@@ -513,6 +513,10 @@ defmodule EyeInTheSky.Events do
   def broadcast_rail_session_updated(session),
     do: broadcast("rail:session_update", {:rail_session_updated, session})
 
+  @doc "Signal RailLive to reload its filtered sessions list."
+  def broadcast_rail_sessions_refresh,
+    do: broadcast("rail:session_update", :rail_sessions_refresh)
+
   @doc "Subscribe to notification-count refresh signals for the Rail."
   def subscribe_rail_notifications_refresh, do: sub("rail:refresh:notifications")
 
@@ -552,7 +556,7 @@ defmodule EyeInTheSky.Events do
 
           _ ->
             case Map.get(assigns, :current_user) || Map.get(assigns, "current_user") do
-              nil -> nil
+              nil -> default_workspace_for_auth_bypass()
               user -> Workspaces.default_workspace_for_user(user)
             end
         end
@@ -564,6 +568,12 @@ defmodule EyeInTheSky.Events do
     case workspace_for_assigns(assigns) do
       %Workspace{id: id} -> id
       _ -> nil
+    end
+  end
+
+  defp default_workspace_for_auth_bypass do
+    if Application.get_env(:eye_in_the_sky, :disable_auth, false) do
+      Workspaces.default_workspace()
     end
   end
 

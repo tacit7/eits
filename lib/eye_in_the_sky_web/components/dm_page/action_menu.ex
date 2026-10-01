@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
 
   def action_menu(assigns) do
     ~H"""
-    <div class="relative " id={@wrapper_id}>
+    <div class="eits-dropdown" id={@wrapper_id}>
       <button
         tabindex="0"
         class={@button_class}
@@ -30,8 +30,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
         <.icon name="hero-ellipsis-horizontal" class="size-5" />
       </button>
       <ul
+        id={if @wrapper_id, do: "#{@wrapper_id}-panel"}
         tabindex="0"
-        class="eits-menu absolute eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
+        class="eits-menu absolute right-0 eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @show_tabs do %>
           <%= for {tab, icon, label} <- @tabs do %>

@@ -49,8 +49,14 @@ impl Client {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(2000);
+        // Only the explicit opt-out changes the existing retry policy.
+        let max_attempts = if std::env::var("EITS_RETRY").as_deref() == Ok("0") {
+            1
+        } else {
+            4
+        };
         let mut delay_ms = base_ms;
-        for attempt in 0..4 {
+        for attempt in 0..max_attempts {
             let mut req = self.http.request(method.clone(), &url);
             if let Some(k) = &self.cfg.api_key {
                 req = req.bearer_auth(k);
@@ -66,7 +72,7 @@ impl Client {
             match req.send() {
                 Ok(resp) => {
                     let status = resp.status().as_u16();
-                    if matches!(status, 429 | 502 | 503 | 504) && attempt < 3 {
+                    if matches!(status, 429 | 502 | 503 | 504) && attempt + 1 < max_attempts {
                         eprintln!("[eits] {status}, retrying in {}ms...", jitter(delay_ms));
                         std::thread::sleep(Duration::from_millis(jitter(delay_ms)));
                         delay_ms = (delay_ms * 2).min(30_000);
@@ -74,7 +80,7 @@ impl Client {
                     }
                     let text = resp.text().unwrap_or_default();
                     if status >= 400 {
-                        return Err(status_error(status, &text));
+                        return Err(status_error(status, &text, &method, path));
                     }
                     return serde_json::from_str(&text).map_err(|_| {
                         EitsError::api(
@@ -87,7 +93,7 @@ impl Client {
                         )
                     });
                 }
-                Err(e) if (e.is_connect() || e.is_timeout()) && attempt < 3 => {
+                Err(e) if (e.is_connect() || e.is_timeout()) && attempt + 1 < max_attempts => {
                     eprintln!(
                         "[eits] connection error, retrying in {}ms... (server restarting?)",
                         jitter(delay_ms)
@@ -106,7 +112,7 @@ impl Client {
             }
         }
         Err(EitsError::api(
-            format!("cannot reach {url} after 4 attempts"),
+            format!("cannot reach {url} after {max_attempts} attempts"),
             crate::error::Code::ConnectionFailed,
             None,
         )
@@ -124,7 +130,7 @@ impl Client {
         timeout: Duration,
     ) -> Result<Value, EitsError> {
         let url = format!("{}{}", self.cfg.base_url, path);
-        let mut req = self.http.request(method, &url).timeout(timeout);
+        let mut req = self.http.request(method.clone(), &url).timeout(timeout);
         if let Some(k) = &self.cfg.api_key {
             req = req.bearer_auth(k);
         }
@@ -141,7 +147,7 @@ impl Client {
                 let status = resp.status().as_u16();
                 let text = resp.text().unwrap_or_default();
                 if status >= 400 {
-                    return Err(status_error(status, &text));
+                    return Err(status_error(status, &text, &method, path));
                 }
                 serde_json::from_str(&text).map_err(|_| {
                     EitsError::api(
@@ -170,7 +176,7 @@ fn jitter(ms: u64) -> u64 {
     ((ms as i64) + (ms as i64) * pct / 100).max(1) as u64
 }
 
-fn status_error(status: u16, body: &str) -> EitsError {
+fn status_error(status: u16, body: &str, method: &reqwest::Method, path: &str) -> EitsError {
     let code = code_for_status(status);
     let msg = serde_json::from_str::<Value>(body)
         .ok()
@@ -182,7 +188,10 @@ fn status_error(status: u16, body: &str) -> EitsError {
         })
         .unwrap_or_else(|| {
             if body.contains("<html") || body.contains("<!DOCTYPE") {
-                "server returned HTML — check server logs".into()
+                format!(
+                    "server returned HTML for {method} {} — verify EITS_URL and check server logs",
+                    path.split('?').next().unwrap_or(path)
+                )
             } else {
                 body.chars().take(300).collect()
             }

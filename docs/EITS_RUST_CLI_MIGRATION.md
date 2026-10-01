@@ -5,7 +5,7 @@ This document records the current state of the migration from the legacy Bash
 
 ## Current State
 
-- `eits` is intended to be the primary CLI command for agents and humans.
+- `eits` is the primary CLI command for agents and humans.
 - The Rust crate is `crates/eits-cli`.
 - The Rust binary target `eits` is the primary binary.
 - The Rust binary target `eitsr` still exists as a temporary compatibility
@@ -18,6 +18,10 @@ This document records the current state of the migration from the legacy Bash
   Rust release binary and `~/.local/bin/eits-extras` installed as the legacy
   fallback.
 
+See [EITS CLI setup](EITS_CLI_SETUP.md) for installed-command verification,
+PATH troubleshooting, and repo-local builds. A working installed `eits` is
+sufficient; no `eitsr` installation or shell alias is required.
+
 ## Rust-Owned Command Families
 
 These command families are owned by Rust today:
@@ -28,6 +32,9 @@ These command families are owned by Rust today:
 - `commits`
 - `notes`
 - `whoami`
+- `doctor`
+- `work`
+- `workflow`
 
 Agents should call `eits`, not `eitsr` and not `eits-extras`. The fallback is an
 implementation detail for unported command families.
@@ -58,6 +65,40 @@ Do not change these without updating hooks, skills, and tests:
 - Codex session env files under `~/.eits/codex/sessions/<session>.env` are used
   as CLI process-local fallback config when direct `EITS_*` env vars are not set.
 - Explicit process env vars win over Codex env-file values.
+
+## Task Mutation JSON Summary
+
+`tasks create`, `begin` (new task or `--id`), `claim`, `update`, and
+`complete` add these top-level fields to their JSON output:
+
+- `success`: defaults to `true` after a successful HTTP response; an explicit
+  API value is preserved.
+- `id`: the API task ID, falling back to the addressed task ID when available.
+  API number/string representations are preserved.
+- `state`, `session_id`, `project_id`: API-provided values, or explicit `null`
+  when unavailable. The CLI does not infer persisted context from environment
+  defaults, requested state, or a pre-mutation read.
+- `next`: an array of suggested commands. Currently this is the read-only
+  `eits tasks get <id>` for positive numeric task IDs, otherwise `[]`.
+
+Existing fields remain available, including `task_id`, nested `task`, messages,
+and `complete`'s `status: "already_closed"`. Top-level API fields take precedence
+(including explicit nulls); missing fields are filled from the nested task.
+`begin` retains its existing summary and reads context from its existing final
+GET, including envelope-level fields. No extra API requests are introduced.
+`--quiet` still prints only the task ID, including an already-closed `complete`.
+
+Task intent is explicit at the call site: `tasks begin` requires exactly one of
+`--title` (new self-owned work) or `--id` (claim existing work), and `tasks
+create` leaves work unassigned unless `--assign-to <session>` is present. The
+create request carries creator attribution separately from assignment; the API
+continues to accept legacy `session_id`-only requests for compatibility.
+
+This first pass targets the core task lifecycle, whose create/claim/begin shapes
+previously differed. Annotation, ownership, bulk, session, note, and DM mutations
+remain unchanged. Commit creation retains its distinct batch/partial-success
+contract; applying a single-resource success summary there would hide useful
+semantics. Errors and read responses (especially `sessions get`) are unchanged.
 
 ## Installer State
 
@@ -90,7 +131,7 @@ Known full-project status:
 
 ## Next Steps
 
-1. Commit the current Rust-first baseline.
+1. Preserve the committed Rust-first baseline (`f49d0c1f` documents the cutover).
 2. Audit every installer, release workflow, app bundle path, hook, skill, and
    doc reference that still assumes Bash is `eits`.
 3. Port remaining command families from `scripts/eits-extras` into Rust one

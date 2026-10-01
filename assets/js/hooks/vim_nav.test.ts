@@ -126,6 +126,29 @@ describe("VimNav.buildPath", () => {
     expect(h.buildPath("/notes", true)).toBe("/projects/42/notes")
   })
 
+  it("reads project ID from the rail data attribute off project routes", () => {
+    const h = makeHook()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/sessions" }, configurable: true,
+    })
+    document.body.insertAdjacentHTML("beforeend", '<div id="rail-root" data-project-id="7"></div>')
+
+    expect(h.buildPath("tasks", true)).toBe("/projects/7/tasks")
+  })
+
+  it("reads project ID from rail project links when the data attribute is absent", () => {
+    const h = makeHook()
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/sessions" }, configurable: true,
+    })
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="rail-root"><a href="/projects/9/sessions">Sessions</a></div>'
+    )
+
+    expect(h.buildPath("tasks", true)).toBe("/projects/9/tasks")
+  })
+
   it("returns null for all relative paths when not on a project URL", () => {
     const h = makeHook()
     Object.defineProperty(window, "location", {
@@ -139,6 +162,27 @@ describe("VimNav.buildPath", () => {
 
 describe("VimNav mode transitions", () => {
   beforeEach(() => { document.body.innerHTML = "" })
+
+  it("resets navigation state on Phoenix page-loading-stop and unregisters on destroy", () => {
+    const h = makeHook()
+    h._recordSessionVisit = vi.fn()
+    h.mounted()
+    try {
+      h.listFocusIndex = 3
+      h._recentSessionIdx = 2
+
+      window.dispatchEvent(new CustomEvent("phx:page-loading-stop"))
+
+      expect(h.listFocusIndex).toBe(-1)
+      expect(h._recentSessionIdx).toBe(-1)
+      expect(h._recordSessionVisit).toHaveBeenCalledOnce()
+    } finally {
+      h.destroyed()
+    }
+
+    window.dispatchEvent(new CustomEvent("phx:page-loading-stop"))
+    expect(h._recordSessionVisit).toHaveBeenCalledOnce()
+  })
 
   it("focusin on non-editable element does NOT switch to insert", () => {
     const h = makeHook()

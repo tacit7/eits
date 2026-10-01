@@ -15,9 +15,9 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
+  alias EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
   alias EyeInTheSkyWeb.NavHook.PaletteHandlers
 
@@ -26,9 +26,7 @@ defmodule EyeInTheSkyWeb.NavHook do
 
     workspace = Events.workspace_for_assigns(socket.assigns)
 
-    projects =
-      Projects.list_projects_for_sidebar()
-      |> Enum.map(&%{id: &1.id, name: &1.name})
+    projects = ProjectLiveHelpers.palette_projects_for_socket(socket)
 
     # live_render-embedded views (e.g. Rail) don't support :handle_params hooks
     # because they're not mounted via live/3 in the router. Guard by the :router

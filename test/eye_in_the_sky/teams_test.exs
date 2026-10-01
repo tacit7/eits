@@ -45,6 +45,31 @@ defmodule EyeInTheSky.TeamsTest do
   end
 
   describe "list_teams/1" do
+    test "filters team membership by numeric agent ID strings and UUIDs" do
+      session = create_session()
+      {:ok, agent} = Agents.get_agent(session.agent_id)
+      team = create_team()
+      join(team, session)
+      other_team = create_team()
+      join(other_team, create_session())
+      archived_team = create_team()
+      join(archived_team, session)
+      {:ok, _} = Teams.delete_team(archived_team)
+
+      for identity <- [to_string(agent.id), agent.id, agent.uuid] do
+        assert [%{id: id, members: [_]}] = Teams.list_teams(member_agent_uuid: identity)
+        assert id == team.id
+      end
+    end
+
+    test "unknown or malformed member identities return no teams" do
+      join(create_team(), create_session())
+
+      for identity <- ["invalid-agent", "", Ecto.UUID.generate(), "-1"] do
+        assert Teams.list_teams(member_agent_uuid: identity) == []
+      end
+    end
+
     test "negative limit does not crash and returns results" do
       create_team()
       create_team()

@@ -8,8 +8,9 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
   """
 
   import Phoenix.Component, only: [assign: 3]
-  import Phoenix.LiveView, only: [connected?: 1, put_flash: 3]
+  import Phoenix.LiveView, only: [connected?: 1]
 
+  alias EyeInTheSky.Events
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Workspaces
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [parse_id: 1]
@@ -24,7 +25,7 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
   - `:sidebar_tab` — from opts
   - `:sidebar_project` — same as project (or nil)
 
-  On invalid/missing project, puts an error flash and assigns nil values.
+  On invalid, missing, or foreign projects, raises `Ecto.NoResultsError` (404).
 
   ## Options
   - `:sidebar_tab` (required) — atom for the sidebar tab, e.g. `:tasks`
@@ -50,39 +51,49 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       |> assign(:sidebar_project, project)
       |> assign(:workspace, workspace)
       |> assign(:workspace_id, workspace && workspace.id)
-      |> assign(:palette_projects, palette_projects())
+      |> assign(:palette_projects, palette_projects_for_socket(socket))
     else
-      socket
-      |> assign(:project, nil)
-      |> assign(:project_id, nil)
-      |> assign(:page_title, "Project Not Found")
-      |> assign(:sidebar_tab, sidebar_tab)
-      |> assign(:sidebar_project, nil)
-      |> put_flash(:error, "Project not found")
+      # Stop before downstream pages can interpret a nil project as global scope.
+      raise Ecto.NoResultsError, queryable: EyeInTheSky.Projects.Project
     end
   end
 
   @doc """
   Loads a project for a project route.
 
-  Project routes are the source of truth for the active workspace. This allows
-  direct navigation and command-palette jumps to projects outside the currently
-  selected workspace while still updating the rail/palette scope to match the
-  routed project.
+  The current workspace must be resolved before fetching the project. Missing
+  workspace context and foreign projects both follow the not-found path, so a
+  route parameter cannot switch the user's workspace.
   """
   def load_project_for_socket(socket, project_id, preload \\ [])
 
   def load_project_for_socket(socket, project_id, preload) when not is_nil(project_id) do
-    case Projects.get_project(project_id) do
+    workspace_id = Events.workspace_id_for_assigns(socket.assigns)
+
+    case Projects.get_project_for_workspace(project_id, workspace_id) do
       {:ok, project} ->
         maybe_preload_project(socket, project, preload)
 
       {:error, :not_found} ->
-        nil
+        load_unscoped_project_for_auth_bypass(socket, project_id, preload)
     end
   end
 
   def load_project_for_socket(_socket, _project_id, _preload), do: nil
+
+  defp load_unscoped_project_for_auth_bypass(socket, project_id, preload) do
+    if auth_bypass_without_user?(socket) do
+      case Projects.get_project(project_id) do
+        {:ok, project} -> maybe_preload_project(socket, project, preload)
+        {:error, :not_found} -> nil
+      end
+    end
+  end
+
+  defp auth_bypass_without_user?(socket) do
+    Application.get_env(:eye_in_the_sky, :disable_auth, false) &&
+      is_nil(socket.assigns[:current_user])
+  end
 
   defp maybe_preload_project(socket, project, preload) do
     if preload != [] and connected?(socket),
@@ -90,8 +101,17 @@ defmodule EyeInTheSkyWeb.Helpers.ProjectLiveHelpers do
       else: project
   end
 
-  defp palette_projects do
-    Projects.list_projects_for_sidebar()
-    |> Enum.map(&%{id: &1.id, name: &1.name})
+  @doc "Returns active command-palette projects within the socket's workspace."
+  def palette_projects_for_socket(socket) do
+    case Events.workspace_id_for_assigns(socket.assigns) do
+      nil ->
+        []
+
+      workspace_id ->
+        workspace_id
+        |> Projects.list_projects_for_workspace()
+        |> Enum.filter(& &1.active)
+        |> Enum.map(&%{id: &1.id, name: &1.name})
+    end
   end
 end

@@ -20,49 +20,57 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
     project_id = ControllerHelpers.parse_int(id)
-    if connected?(socket), do: subscribe_project_tasks(project_id)
 
-    socket =
-      socket
-      |> mount_project(params,
-        sidebar_tab: :tasks,
-        page_title_prefix: "Tasks",
-        preload: [:agents]
-      )
-      |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
-      |> assign(:show_all, false)
-      |> assign(:search_query, "")
-      |> assign(:filter_state_id, nil)
-      |> assign(:sort_by, "created_desc")
-      |> assign(:workflow_states, [])
-      |> assign(:show_new_task_drawer, false)
-      |> assign(:show_filter_sheet, false)
-      |> assign(:show_task_detail_drawer, false)
-      |> assign(:selected_task, nil)
-      |> assign(:task_notes, [])
-      |> assign(:task_count, 0)
-      |> assign(:page, 1)
-      |> assign(:has_more, false)
-      |> assign(:total_tasks, 0)
-      |> assign(:selected_task_ids, MapSet.new())
-      |> assign(:tasks_select_mode, false)
-      |> assign(:show_archive_confirm, false)
-      |> assign(:loaded_task_ids, [])
-      |> assign(:loaded_tasks, [])
-      |> assign(:state_counts, %{})
-      |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
-      |> assign(:installed_editors, Editors.detect_installed())
-      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
+    if load_project_for_socket(socket, project_id, []) do
+      if connected?(socket), do: subscribe_project_tasks(project_id)
 
-    socket =
-      if connected?(socket) do
-        assign(socket, :workflow_states, Tasks.list_workflow_states())
-      else
+      socket =
         socket
-      end
+        |> mount_project(params,
+          sidebar_tab: :tasks,
+          page_title_prefix: "Tasks",
+          preload: [:agents]
+        )
+        |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
+        |> assign(:show_all, false)
+        |> assign(:search_query, "")
+        |> assign(:filter_state_id, nil)
+        |> assign(:sort_by, "created_desc")
+        |> assign(:workflow_states, [])
+        |> assign(:show_new_task_drawer, false)
+        |> assign(:show_filter_sheet, false)
+        |> assign(:show_task_detail_drawer, false)
+        |> assign(:selected_task, nil)
+        |> assign(:task_notes, [])
+        |> assign(:task_count, 0)
+        |> assign(:page, 1)
+        |> assign(:has_more, false)
+        |> assign(:total_tasks, 0)
+        |> assign(:selected_task_ids, MapSet.new())
+        |> assign(:tasks_select_mode, false)
+        |> assign(:show_archive_confirm, false)
+        |> assign(:loaded_task_ids, [])
+        |> assign(:loaded_tasks, [])
+        |> assign(:state_counts, %{})
+        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
+        |> assign(:installed_editors, Editors.detect_installed())
+        |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
-    if connected?(socket), do: Events.broadcast_rail_context(socket)
-    {:ok, socket}
+      socket =
+        if connected?(socket) do
+          assign(socket, :workflow_states, Tasks.list_workflow_states())
+        else
+          socket
+        end
+
+      if connected?(socket), do: Events.broadcast_rail_context(socket)
+      {:ok, socket}
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, "Project not found")
+       |> redirect(to: ~p"/workspace/tasks")}
+    end
   end
 
   @impl true
@@ -331,7 +339,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     ~H"""
     <div
       class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
-      phx-hook="GlobalKeydown"
       id="project-tasks-page"
     >
       <div class="w-full max-w-3xl mx-auto">

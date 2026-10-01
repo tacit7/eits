@@ -1,5 +1,5 @@
 defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
@@ -71,6 +71,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.codex_models() != []
     end
 
+    test "does not offer the unavailable gpt-5.5 model" do
+      values = ModelHelpers.codex_models() |> Enum.map(&elem(&1, 0))
+
+      refute "gpt-5.5" in values
+    end
+
     test "every entry is a {binary, binary} tuple" do
       for {value, label} <- ModelHelpers.codex_models() do
         assert is_binary(value)
@@ -88,7 +94,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
                {"gpt-5.6-sol", "GPT-5.6 Sol"},
                {"gpt-5.6-terra", "GPT-5.6 Terra"},
                {"gpt-5.6-luna", "GPT-5.6 Luna"},
-               {"gpt-5.5", "GPT-5.5"},
                {"gpt-5.2", "GPT-5.2"}
              ]
     end
@@ -132,8 +137,6 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
                 "Balanced agentic coding model for everyday work", "text-warning"},
                {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model",
                 "text-info"},
-               {"gpt-5.5", "GPT-5.5",
-                "Frontier model for complex coding, research, and real-world work", "text-info"},
                {"gpt-5.2", "GPT-5.2", "Optimized for professional work and long-running agents",
                 "text-info"}
              ]
@@ -387,7 +390,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert by_slug["gpt-5.6-sol"].legacy? == false
       assert by_slug["gpt-5.6-terra"].legacy? == false
       assert by_slug["gpt-5.6-luna"].legacy? == false
-      assert by_slug["gpt-5.5"].legacy? == true
+      refute Map.has_key?(by_slug, "gpt-5.5")
       assert by_slug["gpt-5.2"].legacy? == true
     end
 
@@ -398,8 +401,9 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "entries_for_provider/1 — pi" do
     test "preserves sub_provider from discovery and marks non-ollama as premium" do
+      previous_control = Application.fetch_env!(:eye_in_the_sky, :pi_control_module)
       Application.put_env(:eye_in_the_sky, :pi_control_module, __MODULE__.FakeControl)
-      on_exit(fn -> Application.delete_env(:eye_in_the_sky, :pi_control_module) end)
+      on_exit(fn -> Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control) end)
       {:ok, _} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
 
       entries = ModelHelpers.entries_for_provider("pi")

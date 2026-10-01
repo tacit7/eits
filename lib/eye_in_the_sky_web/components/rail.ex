@@ -129,6 +129,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # This LiveView mounts once and persists across navigation.
     if connected?(socket) do
       Events.subscribe_rail_context(rail_context_topic)
+      Events.subscribe_tasks()
       Events.subscribe_rail_unread_counts()
       Events.subscribe_rail_session_update()
       Events.subscribe_rail_notifications_refresh()
@@ -232,23 +233,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   # Session update pushed by nav_hook
-  def handle_info({:rail_session_updated, session}, socket) do
-    sessions = socket.assigns[:flyout_sessions] || []
-
-    updated_sessions =
-      if Enum.any?(sessions, &(&1.id == session.id)) do
-        Enum.map(sessions, fn s -> if s.id == session.id, do: session, else: s end)
-      else
-        Loader.load_flyout_sessions(
-          socket.assigns[:sidebar_project],
-          socket.assigns[:session_sort] || :last_activity,
-          socket.assigns[:session_name_filter] || "",
-          socket.assigns[:session_show] || :twenty
-        )
-      end
-
-    {:noreply, assign(socket, :flyout_sessions, updated_sessions)}
+  def handle_info({:rail_session_updated, _session}, socket) do
+    {:noreply, reload_flyout_sessions(socket)}
   end
+
+  def handle_info(:rail_sessions_refresh, socket),
+    do: {:noreply, reload_flyout_sessions(socket)}
+
+  def handle_info(:tasks_changed, socket),
+    do: {:noreply, reload_flyout_tasks(socket)}
+
+  def handle_info({:tasks_changed, _entity}, socket),
+    do: {:noreply, reload_flyout_tasks(socket)}
 
   # Notification refresh from floating_chat_live
   def handle_info(:rail_refresh_notifications, socket) do
@@ -556,6 +552,31 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   defp maybe_start_usage_async(socket, _section), do: socket
+
+  defp reload_flyout_sessions(socket) do
+    assign(
+      socket,
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        socket.assigns[:sidebar_project],
+        socket.assigns[:session_sort] || :last_activity,
+        socket.assigns[:session_name_filter] || "",
+        socket.assigns[:session_show] || :twenty
+      )
+    )
+  end
+
+  defp reload_flyout_tasks(socket) do
+    assign(
+      socket,
+      :flyout_tasks,
+      Loader.load_flyout_tasks(
+        socket.assigns[:sidebar_project],
+        socket.assigns[:task_search] || "",
+        socket.assigns[:task_state_filter]
+      )
+    )
+  end
 
   @impl true
   def render(assigns) do

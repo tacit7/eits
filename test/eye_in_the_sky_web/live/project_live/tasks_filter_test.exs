@@ -7,9 +7,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "filter-test-#{uniq()}",
         path: "/tmp/filter-test-#{uniq()}",
         slug: "filter-test-#{uniq()}"
@@ -18,7 +19,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
     project
   end
 
-  defp create_task(project, overrides \\ %{}) do
+  defp create_task(project, overrides) do
     {:ok, task} =
       Tasks.create_task(
         Map.merge(
@@ -37,22 +38,42 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
   end
 
   describe "Mobile filter bottom sheet — project tasks" do
-    test "filter sheet is hidden by default", %{conn: conn} do
-      project = create_project()
+    test "loads project tasks in local auth-bypass without a session user", %{user: user} do
+      previous = Application.get_env(:eye_in_the_sky, :disable_auth, false)
+      Application.put_env(:eye_in_the_sky, :disable_auth, true)
+      on_exit(fn -> Application.put_env(:eye_in_the_sky, :disable_auth, previous) end)
+
+      project = create_project(user)
+      conn = Phoenix.ConnTest.build_conn() |> Plug.Test.init_test_session(%{})
+
+      assert {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
+      assert has_element?(view, "#project-tasks-page")
+    end
+
+    test "redirects stale project task routes to workspace tasks", %{conn: conn} do
+      missing_project_id = 9_999_999_999
+
+      assert {:error,
+              {:redirect, %{to: "/workspace/tasks", flash: %{"error" => "Project not found"}}}} =
+               live(conn, ~p"/projects/#{missing_project_id}/tasks")
+    end
+
+    test "filter sheet is hidden by default", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       refute html =~ "tasks-filter-sheet"
     end
 
-    test "mobile filter button is present", %{conn: conn} do
-      project = create_project()
+    test "mobile filter button is present", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       assert has_element?(view, ~s|button[aria-label="Open filters"]|)
     end
 
-    test "clicking filter button opens the sheet", %{conn: conn} do
-      project = create_project()
+    test "clicking filter button opens the sheet", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
@@ -62,8 +83,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       assert html =~ "Filter &amp; Sort"
     end
 
-    test "close button dismisses the sheet", %{conn: conn} do
-      project = create_project()
+    test "close button dismisses the sheet", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
@@ -73,8 +94,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       refute render(view) =~ "tasks-filter-sheet"
     end
 
-    test "status filter in sheet updates list and preserves state", %{conn: conn} do
-      project = create_project()
+    test "status filter in sheet updates list and preserves state", %{conn: conn, user: user} do
+      project = create_project(user)
       _todo_task = create_task(project, %{title: "Todo Task", state_id: 1})
       _done_task = create_task(project, %{title: "Done Task", state_id: 3})
 
@@ -92,16 +113,19 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       refute has_element?(view, "#main-content", "Todo Task")
     end
 
-    test "mobile filter button is rendered in the action bar", %{conn: conn} do
-      project = create_project()
+    test "mobile filter button is rendered in the action bar", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       # Mobile action bar includes the filter button
       assert has_element?(view, ~s|button[aria-label="Open filters"]|)
     end
 
-    test "active filter indicator dot appears when non-default filter applied", %{conn: conn} do
-      project = create_project()
+    test "active filter indicator dot appears when non-default filter applied", %{
+      conn: conn,
+      user: user
+    } do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       # Initially no dot
@@ -115,8 +139,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       assert html =~ "bg-primary rounded-full"
     end
 
-    test "reset button in sheet clears filter", %{conn: conn} do
-      project = create_project()
+    test "reset button in sheet clears filter", %{conn: conn, user: user} do
+      project = create_project(user)
       _done_task = create_task(project, %{title: "Done Task", state_id: 3})
 
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -135,8 +159,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
       refute has_element?(view, ~s|button[aria-label="Open filters"] span.bg-primary|)
     end
 
-    test "sort by buttons in sheet update sort order", %{conn: conn} do
-      project = create_project()
+    test "sort by buttons in sheet update sort order", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
@@ -155,8 +179,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
                ~r/phx-value-by="created_asc"[^>]*class="[^"]*bg-primary/s
     end
 
-    test "backdrop click closes the sheet", %{conn: conn} do
-      project = create_project()
+    test "backdrop click closes the sheet", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
 
       view |> element(~s|button[aria-label="Open filters"]|) |> render_click()
@@ -191,9 +215,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.TasksFilterTest do
     end
 
     @tag :skip
-    test "applying filter in overview sheet updates task list", %{conn: conn} do
+    test "applying filter in overview sheet updates task list", %{conn: conn, user: user} do
       # Create tasks in different states
-      project = create_project()
+      project = create_project(user)
       _todo_task = create_task(project, %{title: "Overview Todo", state_id: 1})
       _done_task = create_task(project, %{title: "Overview Done", state_id: 3})
 

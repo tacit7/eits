@@ -50,6 +50,12 @@ Start work:
 eits tasks begin --title "Task name"
 ```
 
+Create To Do work for a specific session without claiming it yourself:
+
+```bash
+eits tasks create --title "Task name" --assign-to <session_uuid_or_id>
+```
+
 Claim an existing task:
 
 ```bash
@@ -110,6 +116,10 @@ eits sessions complete
 ## Task Workflow Rules
 
 Use `eits tasks begin` instead of separate create/start/link steps when beginning new work. It creates or claims a task, links it to the current session, and sets it In Progress.
+
+Make the `begin` intent explicit: exactly one of `--title` (new self-owned
+work) or `--id` (claim existing work) is required. `tasks create` records the
+caller as creator but only assigns the task when `--assign-to` is present.
 
 Use `eits tasks complete` when possible. It annotates and closes in one command.
 

@@ -56,6 +56,45 @@ defmodule EyeInTheSkyWeb.Api.V1.SessionControllerTest do
     {:ok, conn: api_conn()}
   end
 
+  test "sdk-cli startup and updates restore EITS ownership", %{conn: conn} do
+    for method <- [:post, :patch] do
+      session = create_session(create_agent(), %{entrypoint: "cli", managed_by_app: false})
+
+      response =
+        case method do
+          :post ->
+            post(conn, ~p"/api/v1/sessions", %{
+              "session_id" => session.uuid,
+              "entrypoint" => "sdk-cli"
+            })
+
+          :patch ->
+            patch(conn, ~p"/api/v1/sessions/#{session.uuid}", %{"entrypoint" => "sdk-cli"})
+        end
+
+      assert json_response(response, 200)
+      updated = Sessions.get_session!(session.id)
+      assert updated.entrypoint == "sdk-cli"
+      assert updated.managed_by_app
+    end
+  end
+
+  test "sdk-cli preserves explicit terminal ownership overrides", %{conn: conn} do
+    for override <- [%{"managed_by_app" => false}, %{"process_owner" => "terminal"}] do
+      session = create_session(create_agent())
+
+      response =
+        patch(
+          conn,
+          ~p"/api/v1/sessions/#{session.uuid}",
+          Map.put(override, "entrypoint", "sdk-cli")
+        )
+
+      assert json_response(response, 200)
+      refute Sessions.get_session!(session.id).managed_by_app
+    end
+  end
+
   # ---- GET /api/v1/sessions ----
 
   describe "GET /api/v1/sessions" do

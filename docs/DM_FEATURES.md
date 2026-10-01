@@ -1007,7 +1007,14 @@ Agent DMs now use a structured format with a sender chip that shows agent name a
 
 **Message format:**
 
-New format (bracketed header):
+Current format (compact, commit f6d3609f):
+```
+DM from:<agent_name> (session:<uuid_or_id>) <message body>
+```
+
+Where the session reference is `from_session.uuid` with `from_session.id` as fallback. `DmHandler` delegates to `DMDelivery.deliver_or_persist/4` for live delivery into active workers.
+
+Legacy format (bracketed header, no longer generated):
 ```
 [DM from agent: <agent_name>]
 <message body>
@@ -1015,14 +1022,9 @@ New format (bracketed header):
 Reply: eits dm --to <session_id> --message ""
 ```
 
-Legacy format (still supported):
-```
-DM from:<agent_name> (session:<uuid>) <message body>
-```
-
 **DM parsing and stripping:**
 - `strip_dm_prefix/1`: Removes the DM header and reply footer, returning just the body content
-  - Handles both new bracketed format and legacy "DM from:" format
+  - Handles both current compact format and legacy bracketed format
   - Regex updated (commit 6edecd7e) to use `(.*)` capture to handle header-only DMs where the message body is empty
   - Regex tolerates no space after session UUID in legacy format
 
@@ -1541,6 +1543,7 @@ eits dm inbox                    # List DMs in table format
 eits dm inbox --json            # Raw JSON output
 eits dm inbox --from <uuid>     # Filter by sender
 eits dm inbox --since <iso8601> # Only messages after timestamp (commit dcfd4508)
+eits dm inbox --all-time        # Full history, no session-start cutoff (commit f69b8f7d)
 eits dm inbox --team-only       # Filter to team members only
 eits dm inbox --help            # Show command help
 ```
@@ -1551,6 +1554,13 @@ eits dm inbox --help            # Show command help
 - Enables incremental polling: orchestrators can fetch new replies without diffing the full inbox client-side
 - Wired through both REST API (`GET /api/v1/dm?since=...`) and CLI
 - API returns `filter_since` in response metadata
+
+**Default cutoff (commit f69b8f7d):**
+- With no `--since`, `--since-session`, or `--all-time`, `dm inbox`/`dm list` resolve the session's `started_at` (via `GET /api/v1/sessions/<id>`, using `--session`, else the env session) and pass it as `since`
+- `--all-time` skips the lookup and fetches full history; it conflicts with `--since`, `--since-session`, and `--strict` (usage error, exit 2)
+- An explicit `--since` also skips the lookup
+- If `started_at` can't be resolved (missing field or 404), the inbox is fetched without a cutoff and the response includes a `session_start_unresolved` warning (`reason`: `missing_started_at` or `not_found`); `--strict` fails instead
+- `dm wait` is unchanged (no default `since`)
 
 **Table Output (_tbl_dm renderer):**
 | Column | Description |
@@ -2653,6 +2663,14 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 3. **Schedule task** — (if applicable)
 4. **Reload check modal** — Explicitly trigger reload confirmation dialog
 
+**Closed by default (commit b21f58f4):** The menu wrapper (and the top-bar `...` overflow wrapper in `TopBar.DM`) uses the `eits-dropdown` class instead of `relative`, so the menu stays hidden until its trigger is activated. `eits-dropdown` (defined in `assets/css/app.css`) only reveals its nested `.eits-menu` on `:hover`/`:focus-within`, whereas plain `relative` had no such gating — the menu could render open before interaction.
+
+**Regression tests (commit b21f58f4):**
+- `test/eye_in_the_sky_web/components/dm_page/action_menu_test.exs` — asserts the `#dm-actions-menu` wrapper carries the `eits-dropdown` class
+- `test/eye_in_the_sky_web/components/top_bar/dm_test.exs` — asserts the top-bar `#dm-topbar-relative-menu` wrapper's parent carries the `eits-dropdown` class
+
+**Viewport fix (commit `6cf8f7b9`):** Both the action-menu overflow list and the top-bar `...` overflow menu render off-screen to the right when the trigger sits near the right edge. Fixed by adding `right-0` to the `<ul>` panel class so it anchors to the right edge of its trigger instead of the left, keeping the panel inside the viewport. Regression tests added in `action_menu_test.exs` and `top_bar/dm_test.exs`.
+
 **Attributes:**
 - `session_uuid` — optional; if present, adds the "Copy UUID" menu item
 - `wrapper_id` — menu wrapper identifier (used in button ID generation)
@@ -2775,9 +2793,9 @@ Two dead-code wrappers were removed from `MessagingController`:
 
 ## DMDelivery: deliver_or_persist and persist
 
-**Commit:** `ee5b42e0`
+**Commits:** `ee5b42e0`, `e51b7d53`
 
-Two new public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions whose status cannot accept live delivery.
+Two public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions that may or may not have a live worker.
 
 ### deliver_or_persist/4
 
@@ -2785,12 +2803,28 @@ Two new public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to ses
 def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{})
 ```
 
-Routes a DM based on the target session's current status:
+Routes a DM based on the target session's current status and whether a live in-process worker exists (commit `e51b7d53`):
 
-- **Terminal session (`completed` or `failed`):** Calls `persist/4` directly. There is no live worker to accept the message, so it is stored straight to the durable inbox without attempting live delivery.
-- **Non-terminal session (or session not found):** Falls through to `deliver_and_persist/4`, which delivers to the live worker and persists as before.
+```elixir
+cond do
+  session.status in Sessions.terminated_statuses() ->
+    persist(...)
 
-This replaces the previous behavior where DMs to terminated sessions were rejected outright at the API layer. Completed/failed sessions are still valid DM recipients — their messages are stored for later polling or inspection.
+  Sessions.app_managed?(session) or live_worker?(session_id) ->
+    deliver_and_persist(...)
+
+  true ->
+    persist(...)
+end
+```
+
+- **Terminated session (`completed` or `failed`):** Persists directly — no live worker possible.
+- **App-managed session OR live worker present:** Delivers to the in-process worker and persists. The `live_worker?/1` check allows non-app-managed sessions (e.g. Codex sdk-cli agents) that still have a registered `AgentRegistry` pid to receive live delivery.
+- **Otherwise:** Persists directly to the durable inbox for later polling.
+
+**`live_worker?/1` (private):** Looks up `Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session_id})` and checks `Process.alive?(pid)`. Rescues `ArgumentError` (uninitialized registry in test) → `false`.
+
+This replaces the previous two-branch `if` that denied live delivery to any non-app-managed session, which caused Codex sdk-cli agents to miss DMs while their worker was still running.
 
 ### persist/4
 
@@ -2803,7 +2837,9 @@ Persists a DM directly to the messages table and broadcasts a `session_new_dm` P
 Previously this logic was inlined inside `deliver_and_persist/4`; it is now a named public function so `deliver_or_persist/4` can call it independently.
 
 **Files:**
-- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4` and `persist/4`
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4`, `persist/4`, `live_worker?/1`
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` — now passes `entrypoint: "sdk-cli"` in spawn context so hooks correctly classify Codex sessions
+- `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — delegates to `DMDelivery.deliver_or_persist/4` instead of hand-building a message row
 
 ---
 
@@ -3254,6 +3290,42 @@ HTTP 403 Forbidden
 
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `authorize_session_recipient/2` replaces `authorize_dm_recipient/2`; `show_dm/2` no longer accepts `session` query param
+
+**Proposed follow-on (not yet implemented):** The `x-eits-session` header used above is caller-supplied and only asserts identity — it does not authenticate it. A design for per-session opaque API credentials (`session_api_credentials` table, `SessionApiAuth` plug, `EITS_SESSION_TOKEN`) that would replace header-based recipient checks with a verified principal is written up in [docs/SESSION_API_AUTHORIZATION_DESIGN.md](SESSION_API_AUTHORIZATION_DESIGN.md). It covers `GET /api/v1/dm`, `GET /api/v1/dm/:id`, and `GET /api/v1/dm/wait` and includes a phased rollout plan; see that doc for the full design before implementing.
+
+---
+
+## CLI: eits dm watch — Reconnecting Ordered DM Watch
+
+**Commit:** `43907846`
+
+`eits dm watch` keeps a single long-poll connection open against `GET /api/v1/dm/wait` and streams new inbound messages as they arrive, reconnecting automatically and preserving strict delivery order across reconnects. It's the CLI's answer to running a background listener instead of interval-polling `dm inbox`.
+
+**Usage:**
+```bash
+eits dm watch --since-session --team-only --format jsonl
+```
+
+**Key behavior:**
+- Set `EITS_SESSION_UUID`/`EITS_SESSION_ID` to the *watching* session (not the parent); `--session` overrides the recipient
+- `--team-only` requires `EITS_AGENT_UUID`; team membership is resolved once at startup — restart the watcher after team changes
+- Without `--since`, resolves the session's actual `started_at` as the cutoff (`--since-session` requests this explicitly); failure to resolve stops the command rather than replaying unbounded history
+- `--format jsonl` (default) emits one compact DM object per line; `--format json` emits one `{"items":[...],"count":N}` object per delivered batch — the stream itself is not one JSON array
+- `--timeout` (1–55s, default 25) bounds each individual long poll, not the watcher's lifetime
+
+**Ordering and reconnects:**
+- Uses an opt-in ordered cursor (`watch_cursor: true`) on `/dm/wait`; older servers without support fail immediately with an upgrade error
+- Requests carry `since` + `after_id`; the server returns the oldest messages strictly after `(since, after_id)`, ordered by timestamp then numeric ID, so same-timestamp messages and backlog drains stay in order
+- Reconnects preserve the last handled timestamp and message ID — no duplicate emission or backward cursor movement
+- Connection failures and HTTP 429/500/502/503/504 retry with backoff (1, 2, 4, 8, 16, then 30s, up to 8 consecutive retries); a successful response resets the budget. Other HTTP errors and malformed responses stop the command.
+
+**Delivery limits:** dedup is in-memory for the process lifetime only — no durable consumer ack or exactly-once guarantee. Consumers doing real work should dedupe on message ID themselves.
+
+**Files:**
+- `crates/eits-cli/src/commands/dm.rs` — `dm watch` subcommand
+- `lib/eye_in_the_sky/messages/listings.ex` — ordered cursor query support
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `watch_cursor`/`after_id` handling on `wait/2`
+- Full reference: [docs/CLI_DM_WATCH.md](CLI_DM_WATCH.md)
 
 ---
 

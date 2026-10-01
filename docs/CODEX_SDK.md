@@ -560,6 +560,8 @@ Events emitted by `codex exec --json`:
 | `turn.failed` | Turn failed | `message` or `error` |
 | `error` | Top-level error | `message` |
 
+**`turn.completed` is the only terminal-success signal.** If the Codex process exits cleanly (status 0) without ever emitting `turn.completed`, `Codex.SDK.on_clean_exit/1` returns `{:error, {:codex_incomplete_turn, message}}` instead of treating the exit as success — a clean exit is not proof the turn finished. `ErrorClassifier.classify/1` maps `{:codex_incomplete_turn, _}` to `:cli_exit_error`, so the session (and its AgentWorker) transitions to `"failed"` with `status_reason: "cli_exit_error"` rather than silently completing. This surfaces cases where Codex was killed, crashed, or lost its stream mid-turn.
+
 ### Item Types
 
 | Type | Description |
@@ -787,7 +789,9 @@ The `notify_agent_status/3` function in `AgentWorkerEvents` handles both notific
 ## Known Issues and Gotchas
 
 - **TOML quoting**: All `-c shell_environment_policy.set.*` values must be double-quoted. Bare integers cause Codex to exit with code 1 and no output.
-- **No stderr separation**: Codex CLI merges stderr into stdout (`:stderr_to_stdout`). Parse errors or startup failures appear as raw text lines, not structured JSONL.
+- **No stderr separation**: Codex CLI merges stderr into stdout (`:stderr_to_stdout`). Parse errors or startup failures appear as raw text lines, not structured JSONL. `Codex.Parser.parse_stream_line/1` now returns `{:protocol, %{type: :provider_diagnostic, message: line}}` for any non-JSON or malformed-JSON line (instead of silently `:skip`-ping it), so this output isn't lost.
 - **Singular/plural item types**: Codex docs reference singular names (`file_change`) but some builds emit plural (`file_changes`). Parser accepts both.
 - **thread_id vs session UUID**: The auto-generated fallback UUID is temporary. After `thread.started` fires, the real thread_id replaces it. Any external reference to the session UUID may see the old value if captured before sync.
 - **Exit code 1 with no output**: Usually means a config error (bad model name, TOML parse failure, missing API key). The Codex binary validates config before producing any JSONL.
+- **Incomplete turns are failures, not successes**: A clean process exit (status 0) without a `turn.completed` event is classified as `:cli_exit_error` (see JSONL Event Types above), not silently treated as done.
+- **Abnormal exits carry provider diagnostics**: `Codex.SDK.on_abnormal_exit/2` retains up to 5 redacted, 1000-char-capped non-JSON lines seen via `handle_protocol_event/2` (state key `provider_diagnostics`) and joins them into the `{:codex_error, %{"type" => "cli_exit_error", "status" => status, "message" => message}}` returned on non-zero exit. Secrets are stripped via `Redaction.redact/1` before storage. `ErrorClassifier` maps `error_type == "cli_exit_error"` straight to `:cli_exit_error`, so these are treated as systemic/terminal failures rather than generic exit codes. If no diagnostic output was captured, the message says so explicitly ("No provider diagnostic output was captured.").

@@ -1,108 +1,131 @@
 ---
 name: eits-workflow
-description: "EITS task, commit, and note workflow for Codex agents. Codex always uses the eits CLI directly with no CLAUDE_CODE_ENTRYPOINT check and no EITS-CMD directives. Use when beginning a task, logging a commit, marking work done, adding a note, or handling task lifecycle questions."
+description: >-
+  EITS task, commit, and note workflow for agents. Use when an agent needs to log
+  work, create/claim/complete tasks, log commits, or add notes during a session.
+  Triggers on: "begin a task", "log this commit", "mark task done", "add a
+  note", or any task lifecycle questions.
+allowed-tools: Bash
 ---
 
-# Codex EITS Workflow
+# EITS Workflow
 
-Codex agents use the `eits` CLI directly for EITS operations.
+## Codex Runtime Notes
 
-## Codex Env Bootstrap
-
-Codex startup hooks persist EITS identity to
-`~/.eits/codex/sessions/<session_id>.env`. The `eits` CLI auto-loads that
-session-specific file when `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or
-`CODEX_SESSION_ID` is set. If no session id is known, ask the user for it.
-For commands that rely on shell expansion of `$EITS_SESSION_UUID`,
-`$EITS_AGENT_UUID`, or `$EITS_PROJECT_ID`, source the session-specific file in
-the same Bash command:
+- Codex agents use the `eits` CLI directly. Do not emit `EITS-CMD:` directives and do not gate CLI usage on `CLAUDE_CODE_ENTRYPOINT`.
+- Codex startup hooks may persist non-secret identity vars to `~/.eits/codex/sessions/<session_id>.env`. Plain `eits` calls auto-load that file only when `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set.
+- For shell commands that expand `$EITS_SESSION_UUID`, `$EITS_SESSION_ID`, `$EITS_AGENT_UUID`, `$EITS_AGENT_ID`, or `$EITS_PROJECT_ID`, source the session env in the same command when needed:
 
 ```bash
 . ~/.eits/codex/sessions/<session_id>.env 2>/dev/null || true
 ```
 
-## Session Status
+- Use `$EITS_SESSION_UUID` for UUID-only commands and `$EITS_SESSION_ID` for integer session contexts. If no Codex session id or EITS env is known, ask the user before running identity-scoped commands.
 
-Codex hooks handle `working`/`idle`/`waiting`/`compacting` transitions automatically via `.codex/hooks.json` when `~/.codex/config.toml` has `features.hooks = true`. If hooks are not active, set status manually:
+## eits CLI
 
 ```bash
-eits sessions update $EITS_SESSION_UUID --status working   # start of turn
-eits sessions update $EITS_SESSION_UUID --status idle      # interactive turn stopped; resumable
-eits sessions update $EITS_SESSION_UUID --status waiting   # explicitly blocked or waiting on external input
-eits sessions update $EITS_SESSION_UUID --status compacting # context compaction in progress
-eits sessions update $EITS_SESSION_UUID --status completed # interactive session done
-eits sessions update $EITS_SESSION_UUID --status failed    # unrecoverable error
+# Task lifecycle
+eits tasks begin --title "Task name"          # create + start in one shot (canonical)
+eits tasks complete <id> --message "Summary"  # annotate + done atomically (server transaction)
+eits tasks annotate <id> --body "..."
+eits tasks update <id> --state done           # named alias: done, start, in-review, review, todo
+eits tasks update <id> --state 4              # numeric state ID also works
+
+# Commits
+eits commits create --hash <hash1> [--hash <hash2>]
+
+# Notes
+eits notes create --parent-type session --parent-id $EITS_SESSION_UUID --body "..."
+eits notes create --parent-type task --parent-id <id> --body "..."
+
+# DMs
+eits dm --to <session_uuid> --message "text"
+
+# Worktrees (EITS Elixir projects only)
+eits worktree create <branch> [--project-path <path>]  # create, symlink deps, verify compile
+eits worktree remove <branch> [--project-path <path>]  # remove worktree + branch
 ```
 
 ---
 
 ## Task Lifecycle
 
+### Canonical (1-command start)
 ```bash
-# Canonical: create + link + start in one shot
 eits tasks begin --title "..."
 # ... do work ...
 eits tasks complete <task_id> --message "What was done"
 ```
 
-Fallback (existing task or if `complete` fails):
+## Inbox Polling
+
+Use `eits dm inbox --since-session --team-only --json`:
+
+- before claiming work
+- after major task state transitions
+- before `eits tasks complete`
+- after sending a completion DM, to catch follow-up work
+
+## Work Checkpoints
+
+Use `eits work status` or `eits work checkpoint` when you need one session-level snapshot instead of piecing together multiple commands.
+
+Run it:
+
+- at session start or resume, before touching files
+- immediately after `eits tasks claim`
+- after a major state transition that may affect ownership, team membership, or git state
+- before `eits tasks complete` or handing the work off
+
+Prefer the checkpoint command for a quick local audit of your current session. It summarizes the active session, claimed tasks, team memberships, inbound DMs, git/worktree health, and commit-tracking status, while `eits dm inbox --since-session --team-only --json` remains the durable team-message check.
+
+### Manual fallback
 ```bash
-eits tasks start <id>       # sets state=2, links session — use on EXISTING tasks
-# ... do work ...
 eits tasks annotate <id> --body "Summary"
-eits tasks update <id> --state done   # aliases: done, start, in-review, todo; numeric also works
+eits tasks update <id> --state done   # or numeric: --state 3
 ```
 
-States: `1` To Do · `2` In Progress · `4` In Review · `3` Done
+### Workflow states
 
----
+| ID | Name | Alias |
+|----|------|-------|
+| 1 | To Do | `todo` |
+| 2 | In Progress | `start` |
+| 4 | In Review | `in-review`, `review` |
+| 3 | Done | `done` |
 
-## Commits
-
-After every `git commit`, log the hash. The PostToolUse hook does this automatically if `.codex/hooks.json` is active. If not:
-
-```bash
-HASH=$(git -C $EITS_PROJECT_DIR rev-parse HEAD)
-MSG=$(git log -1 --pretty=%s HEAD)
-eits commits create --hash $HASH --message "$MSG"
-```
-
----
-
-## Annotation (mandatory before stopping)
-
-The Stop hook enforces this — it exits 2 if a task is in-progress with no annotation. Always annotate before declaring a turn done:
-
-```bash
-eits tasks annotate <id> --body "What was done, what files changed"
-```
-
----
-
-## File System Guard
-
-`rm` is aliased to `rm-trash` and **follows symlinks**. Use `unlink` on symlinks:
-
-```bash
-unlink deps    # not: rm deps
-unlink _build  # not: rm _build
-```
-
----
-
-## DMs
-
-```bash
-eits dm --to <session_uuid_or_integer_id> --message "text"
-```
-
-`--to` accepts both UUID and integer session ID. Send sequentially — never in parallel Bash calls.
+Aliases are case-insensitive. Numeric IDs still work. Unknown aliases return 422.
 
 ---
 
 ## Rules
 
-- Run `eits tasks begin` before editing any files (`begin` > `create + claim`).
-- Log every commit — hook does it automatically, but verify.
-- Annotate before completing; Stop hook enforces it.
-- Use `unlink`, not `rm`, on symlinks.
+- **You MUST have a task in_progress before editing any files.**
+- The Stop hook (`Codex Stop hook`) blocks exit if any task is in state 2 (In Progress) linked to your session. Complete the task sequence before stopping.
+- Log commits after every `git commit`: `eits commits create --hash <hash>`
+- Annotate tasks before completing them — the annotation is the handoff record.
+
+---
+
+## File System Guard
+
+`rm` may be aliased to `rm-trash` and can follow symlinks. Use `unlink` on generated symlinks:
+
+```bash
+unlink deps
+unlink _build
+```
+
+---
+
+## Environment Variables
+
+| Var | Purpose |
+|-----|---------|
+| `EITS_SESSION_UUID` | Your session UUID |
+| `EITS_SESSION_ID` | Your session integer ID |
+| `EITS_AGENT_UUID` | Your agent UUID |
+| `EITS_AGENT_ID` | Your agent integer ID |
+| `EITS_PROJECT_ID` | Your project ID |
+| `EITS_URL` | `http://localhost:5001/api/v1` |

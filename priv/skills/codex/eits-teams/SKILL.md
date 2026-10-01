@@ -1,132 +1,392 @@
 ---
 name: eits-teams
-description: Create and manage EITS agent teams from a Codex orchestrator. Use when coordinating parallel tasks, spawning multiple agents, or monitoring team status.
+description: Create and manage EITS agent teams for coordinated multi-agent work. Use this skill whenever the user wants to spawn multiple agents to work together, coordinate parallel tasks, run a swarm, delegate work across agents, or says things like "create a team", "spin up agents to", "have agents work on this together", "coordinate agents", or "run agents in parallel". EITS teams are fully server-owned — membership is tracked in Postgres, not local files.
+allowed-tools: Bash
 ---
 
-# Codex EITS Teams
+# EITS Teams
 
-For Codex sessions, source `~/.eits/codex/sessions/<session_id>.env` in the
-same Bash command before using `$EITS_SESSION_UUID`, `$EITS_SESSION_ID`,
-`$EITS_AGENT_ID`, or `$EITS_PROJECT_ID` shell expansion. Plain `eits` CLI calls
-auto-load the session-specific file only when `EITS_CODEX_SESSION_ID`,
-`CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set. If no session id is known, ask
-the user for it.
+## Codex Runtime Notes
+
+- Codex agents use the `eits` CLI directly. Do not emit `EITS-CMD:` directives and do not gate CLI usage on `CLAUDE_CODE_ENTRYPOINT`.
+- Codex startup hooks may persist non-secret identity vars to `~/.eits/codex/sessions/<session_id>.env`. Plain `eits` calls auto-load that file only when `EITS_CODEX_SESSION_ID`, `CODEX_THREAD_ID`, or `CODEX_SESSION_ID` is set.
+- For shell commands that expand `$EITS_SESSION_UUID`, `$EITS_SESSION_ID`, `$EITS_AGENT_UUID`, `$EITS_AGENT_ID`, or `$EITS_PROJECT_ID`, source the session env in the same command when needed:
+
+```bash
+. ~/.eits/codex/sessions/<session_id>.env 2>/dev/null || true
+```
+
+- Use `$EITS_SESSION_UUID` for UUID-only commands and `$EITS_SESSION_ID` for integer session contexts. If no Codex session id or EITS env is known, ask the user before running identity-scoped commands.
+
+EITS teams coordinate multiple agents in parallel. Membership is server-side — agents auto-join on spawn.
+
+Use `eits-team-member` in spawned-agent instructions for the mandatory member
+protocol: inbox checkpoints, task claim, no duplicate tasks, completion, explicit
+DM-back, and final inbox check. Use `eits-team-worker` when the member is doing
+code implementation in a worktree.
+
+For the spawned agent's own session snapshot, use `eits work status` or
+`eits work checkpoint`. That command is the agent-local view of claimed tasks,
+team memberships, inbox summary, git/worktree health, and commit tracking.
+Use it at session start/resume, after task claim, after major handoff points,
+and before DM-back or completion. Use `eits teams status <team_id> --wait` for
+whole-team completion tracking instead of trying to infer team state from the
+work checkpoint alone.
+
+---
 
 ## CLI Reference
 
 ```bash
-eits teams create --name <name> [--description <desc>]
-eits teams join <team_id> --name <alias> --role lead --session $EITS_SESSION_UUID
-eits teams status <team_id> [--wait]   # --wait blocks until all members done; exits 0/1
-eits teams members <team_id>
+eits teams list [--project <id>] [--status <active|inactive|all>] [--limit <n>]
+eits teams get <id|name>
+eits teams create --name <name> [--description <desc>] [--project <id>]
+eits teams delete <id>
+eits teams members <id>
+eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid>]
+eits teams status <id> [--wait] [--watch [<n>]] [--json]
+eits tasks status --team <team_id> [--json]
+# --wait   blocks until all members have member_status=done/spawn_failed (polls every 5s)
+#          exits 0 when all done, 1 if any spawn_failed
+#          bare invocation (no flags) prints a hint reminding you about --wait
+eits teams update-member <team_id> <member_id> --status <active|idle|done|failed>
 eits teams leave <team_id> <member_id>
-eits tasks create --title "..." --description "..." --team <team_id>
-eits tasks claim <task_id>             # claim an orchestrator-assigned task
+eits tasks claim <task_id>   # worker claims an orchestrator-assigned task
 ```
 
 Spawn an agent:
+
 ```bash
 eits agents spawn \
+  --instructions "Your task prompt" \
   --provider codex \
-  --model gpt-5.4-mini \
-  --instructions "..." \
+  --model gpt-6.1-sol \
   --project-path /path/to/repo \
   --project-id <project_id> \
+  --worktree feature-branch \
+  --effort-level high \
   --parent-session-id <ORC_SESSION_ID> \
-  --parent-agent-id <ORC_AGENT_ID> \
   --team-name my-team \
-  --member-name worker-1
+  --member-name researcher
 ```
+
+Only `--instructions` is required. Always pass `EITS_PROJECT_ID` explicitly in instructions or via `--interpolate-env` — it is NOT inherited from the parent session in spawned agent environments.
+
+`--team-name` and `--team-id` are mutually exclusive. Use `--team-id` when you have the integer ID and don't know the name — it resolves automatically via the teams API.
+
+**Spawn output: extract session_uuid from the final compact summary line:**
+```bash
+session_uuid=$(eits agents spawn ... | tail -1 | jq -r '.session_uuid')
+```
+
+**Before spawning with `--worktree`, prune stale entries** to avoid name conflicts from prior rounds:
+```bash
+git worktree prune
+```
+The spawn command warns you if registered worktrees exist, but won't auto-prune.
+
+**Never redirect stderr on spawn:**
+```bash
+# WRONG — swallows errors silently; orchestrator thinks agent started, it never did
+eits agents spawn ... 2>/dev/null
+
+# RIGHT
+eits agents spawn ...
+```
+
+---
+
+## Designing the Work (do this BEFORE spawning)
+
+Most failures in multi-agent work are not merge conflicts — they are **interface mismatches**. File-ownership boundaries only protect against mechanical conflicts; they don't protect against two agents disagreeing on what an assign, function signature, or return shape looks like. Walk through this decision tree before you touch `eits agents spawn`.
+
+### Is the work actually parallelizable?
+
+- **Orthogonal** (e.g. two independent bug fixes in separate contexts): fan out, no shared contract needed.
+- **Producer/consumer** (A defines data, B renders it): **sequence them**, or give both a written contract. Parallel with hidden coupling is where wire-up gaps hide.
+- **Single refactor touching one subsystem**: do not fan out. One agent, no team.
+
+### Write the contract first
+
+If two agents share any interface — assigns, function signatures, struct fields, return shapes, URL params — write it down **before** spawning. Drop a `/tmp/contract-<team>.md` with:
+
+```md
+# Shared contract v1
+
+## Assigns
+- @scope :: :all | integer
+- @projects :: list(Project.t())  (always assigned by State.init)
+
+## Return shapes
+- Loader returns a list of maps; each map has :project_name key when scope == :all
+
+## Wire-up
+- ProjectLive.Sessions.render/1 MUST pass scope={@scope} projects={@projects} to <.page>
+```
+
+Every agent's instructions link to this file. Every reviewer checks against it. Every gap in the contract is a gap you will pay for in a follow-up commit.
+
+### Carve file ownership + note interface coupling
+
+Worker instructions must say two things:
+
+1. **Files you own** (edit these).
+2. **Files you MUST NOT touch** (merge-conflict guard).
+
+File boundaries protect against the mechanical conflict. The contract doc protects against the logical conflict. You need both.
+
+### Integration branch pattern for coupled work
+
+When workers consume each other's interfaces, don't have them each branch from `main`:
+
+```
+main → integration-branch → worker-A, worker-B (both branch from integration)
+worker-A merges back to integration
+worker-B merges back to integration  (or pre-merges A to validate combined compile)
+orchestrator does final glue commits on integration
+merge integration → main
+```
+
+The orchestrator-only steps (router flips, file deletion, cross-cutting renames) live on integration, never in worker branches. This makes worker branches reviewable in isolation while the integration branch shows the whole picture.
+
+### Cross-peer review before the orchestrator reviews
+
+After both workers DM done, have each peer-review the other's branch against the shared contract. Two independent reads of the same contract catch more gaps than one reviewer — when both reviewers independently flag the same gap, that convergence is the signal you got the contract tight.
+
+Reviewers must cite `file:line` hunks in every finding. Ungrounded reviews produce hallucinated findings and waste an integration cycle.
 
 ---
 
 ## Workflow
 
-### 1. Create team + join as lead
+### 1. Create team
+
 ```bash
-eits teams create --name "my-team" --description "..." --project $EITS_PROJECT_ID
-# ALWAYS pass --project — omitting it sets project_id=null and hides the team from /projects/:id/teams
-# NOTE: teams create uses --project, not --project-id.
-eits teams join <team_id> --name "orchestrator" --role lead --session $EITS_SESSION_UUID
+eits teams create --name "my-team" --description "What this team is doing" --project $EITS_PROJECT_ID
+# Returns team_id
+# ALWAYS pass --project — teams without it have project_id=null and won't appear
+# in the /projects/:id/teams UI page.
+# NOTE: the flag is --project, NOT --project-id (--project-id is an unknown flag here)
 ```
 
-### 2. Create shared tasks upfront
-```bash
-eits tasks create --title "Task A" --team <team_id>
-eits tasks create --title "Task B" --team <team_id>
-```
-Create tasks in To Do state for workers to claim. Do not tell workers to run
-plain `eits tasks begin --title ...` for pre-created team work; that creates a
-duplicate task. Assigned workers must run `eits tasks claim <task_id>` (or the
-compatibility alias `eits tasks begin --id <task_id>`).
+### 2. Join as orchestrator
 
-### 3. Get orchestrator integer IDs (required for spawn)
+Always pass `--session` explicitly — auto-resolve can silently produce NULL and break the DM link in the Teams UI:
+
 ```bash
-ORC_SESSION_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.id')
-ORC_AGENT_ID=$(eits sessions get $EITS_SESSION_UUID | jq '.agent_int_id')
+eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SESSION_UUID
 ```
 
-### 4. Spawn agents sequentially (preferred — avoids 429 rate limits)
-```bash
-# Spawn sequentially; capture session_uuid from compact final line
-W1=$(eits agents spawn --provider codex --model gpt-5.4-mini --project-id $EITS_PROJECT_ID \
-  --instructions "Assigned task: 123. Claim it with: eits tasks claim 123. Do not create a duplicate task. DM back to $ORC_SESSION_ID when done." \
-  --team-name my-team --member-name worker-1 \
-  --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID | tail -1 | jq -r '.session_uuid')
+### 3. Create shared tasks
 
-W2=$(eits agents spawn --provider codex --model gpt-5.4-mini --project-id $EITS_PROJECT_ID \
-  --instructions "Assigned task: 124. Claim it with: eits tasks claim 124. Do not create a duplicate task. DM back to $ORC_SESSION_ID when done." \
-  --team-name my-team --member-name worker-2 \
-  --parent-session-id $ORC_SESSION_ID --parent-agent-id $ORC_AGENT_ID | tail -1 | jq -r '.session_uuid')
+```bash
+eits tasks create --title "Research X" --description "Details" --team <team_id>
+# Use 'create' (not 'begin') here — creates the task in Todo state for workers to claim.
+# 'begin' would mark it In Progress immediately, which is wrong for pre-assigned tasks.
+# Workers claim with: eits tasks claim <task_id>
+```
+Do not tell workers to run plain `eits tasks begin --title ...` for
+pre-created team work; that creates a duplicate task. Assigned workers must use
+`eits tasks claim <task_id>` (or the compatibility alias
+`eits tasks begin --id <task_id>`).
+
+### 4. Get orchestrator IDs
+
+`$EITS_SESSION_ID` (integer) and `$EITS_AGENT_ID` (integer) are both set by the startup hook — use them directly. No psql lookup needed.
+
+### 5. Spawn agents
+
+Pass `--parent-session-id` only — the server derives `parent_agent_id` from the parent session automatically. Use `--interpolate-env` whenever instructions reference `$EITS_SESSION_ID` or other env vars — without it the agent receives the literal string `"$EITS_SESSION_ID"`, not the integer:
+
+```bash
+eits agents spawn \
+  --interpolate-env \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: <task_id>. Claim it with: eits tasks claim <task_id>. Do not create a duplicate task. team_id: <team_id>. Run mix compile before finishing. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=<task_id> result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
+  --provider codex \
+  --model gpt-6.1-sol \
+  --project-id $EITS_PROJECT_ID \
+  --team-name my-team \
+  --member-name researcher \
+  --parent-session-id $EITS_SESSION_ID
 ```
 
-**Do NOT use `&` + `wait` for parallel spawns** — 4+ concurrent spawns hit rate limits and bail. Spawn sequentially with a short sleep between calls if you hit 429.
+**Each agent must have a unique `--worktree` name.** Duplicate names cause the second spawn to fail at the git layer with a confusing error.
 
-Embed `$EITS_SESSION_UUID` or `$EITS_SESSION_ID` in instructions so agents can DM back.
+**`EITS_PROJECT_ID` is NOT in spawned agent environments.** If agents need it, hardcode the value in instructions or use `--interpolate-env` so it expands from the orchestrator's env:
+
+```bash
+--interpolate-env \
+--instructions "... EITS_PROJECT_ID=$EITS_PROJECT_ID ..."
+```
+
+Spawn all agents sequentially. Each gets a unique `--member-name`.
 Every worker instruction must include:
 - assigned task id
 - `eits tasks claim <task_id>`
 - "Do not create a duplicate task"
+- "Use `eits-team-member` and follow its required sequence"
 - the orchestrator session id to DM on completion
 - the expected DM format
 
-### 5. Monitor
-```bash
-# Block until all done — preferred over polling loops
-eits teams status <team_id> --wait
+### 6. Monitor
 
-# Collect results (suppress stale DMs from prior sessions)
-eits dm inbox --since-session --team-only --json
+**Preferred: block until all done** — eliminates shell gymnastics and stale-DM noise:
+
+```bash
+eits teams status <team_id> --wait
+# Polls every 5s; prints [HH:MM:SS] waiting: N/M done, K pending
+# Exits 0 when all done, 1 if any spawn_failed
+# member_status is the authoritative signal — not session_status
 ```
 
-`waiting` status ≠ stuck — agent session ended and is resumable. `member_status` is authoritative for completion, not `session_status`.
+For spot checks or ad-hoc DMs:
+```bash
+eits teams status <team_id>   # snapshot (also hints you about --wait)
+eits tasks status --team <team_id>   # task state, task ids, and linked session_ids
+eits dm --to $UUID_1 --message "Status update?"   # sequential only — never parallel
+eits dm --to $UUID_2 --message "Status update?"
+# Parallel DM Bash calls share the same connection pool; the CLI cancels siblings on
+# error, so one of the DMs silently never arrives.
+```
+
+### 7. Verify merges after --wait
+
+`--wait` exits when all `member_status` fields settle — that is a task/status signal, not a git signal. Workers have DM'd done with unmerged branches. After `--wait`, verify each worker's branch was actually merged:
+
+```bash
+# Should show nothing if the branch was merged into main
+git log --oneline main..<worktree-branch>
+
+# Or just check the merge commit exists
+git log --oneline --merges | head -5
+```
+
+If you need the current agent's own session snapshot during this review, run
+`eits work checkpoint` rather than re-polling every team command. It gives the
+claimed-task and git context that `teams status` does not.
+
+### 8. Review and close out
+
+After merges are confirmed, collect results:
+
+```bash
+eits dm inbox --since-session --team-only --json   # only current team DMs since this session started
+```
+
+After a major state transition, before claiming more work, before closing a worker task, and after a completion DM, poll the inbox again with `eits dm inbox --since-session --team-only --json`.
+
+If a specific agent's DM is needed before the team is fully done:
+```bash
+eits dm --to <agent_uuid_or_session_id> --message "Work complete. Run the task completion sequence and DM back."
+```
+
+### 9. Shutdown
+
+Leave the team active — **do NOT delete** unless the user explicitly says so.
+
+```bash
+eits teams delete <id>   # only when explicitly instructed
+```
 
 ---
 
-## Code Work Pattern (per agent)
+## Agent-Side Behavior
 
-Include in agent instructions:
+Agents auto-receive team context. They are expected to:
+
+```bash
+eits dm inbox --since-session --team-only --json
+eits tasks claim <assigned_task_id>      # claim the orchestrator-created task
+eits dm inbox --since-session --team-only --json
+# ... do work ...
+mix compile                              # MUST pass before DM-back — never DM done with a broken branch
+eits dm inbox --since-session --team-only --json
+eits tasks complete <task_id> --message "Summary of what was done"
+# complete: annotates + marks task Done (one round-trip)
+# team member_status → done fires automatically when the agent session ends (Stop hook)
+# DM-back to orchestrator must be explicit — it is NOT sent by tasks complete
+eits dm --to <ORC_SESSION_ID> --message "done task=<task_id> result=<summary> branch=<branch-or-pr>"
+eits dm inbox --since-session --team-only --json   # catch any follow-up work after the completion DM
 ```
-1. eits tasks claim <assigned_task_id>
-2. Do not create a duplicate task. If no task id was assigned, DM the orchestrator and wait.
-3. Check `eits dm inbox --since-session --team-only --json` at start/resume.
-4. Read all files before editing.
-5. Make changes in your worktree only.
-6. mix compile --warnings-as-errors
-7. git commit; eits commits create --hash $(git rev-parse HEAD)
-8. Use the eits-pr skill for Codex review when code changes need review. Repeat until LGTM. Merge.
-9. eits tasks complete <assigned_task_id> --message "Summary of what was done"
-10. eits dm --to <ORC_SESSION_ID> --message "done task=<id> result=<summary> branch=<branch-or-pr>"
+
+If no task id was assigned, the worker must DM the orchestrator and wait. It
+must not create a new task with `eits tasks begin --title ...` unless the
+orchestrator explicitly asks it to define new work.
+
+If `complete` fails, fall back:
+
+```bash
+eits tasks annotate <task_id> --body "Summary"
+eits tasks update <task_id> --state done
 ```
+
+**Stop hook enforces completion** — `Codex Stop hook` blocks exit if any task is in state 2 linked to the session.
 
 ---
 
 ## Rules
 
-- `--to` in `eits dm` accepts UUID **or** integer session ID — both work.
-- DM sequentially — parallel calls cancel siblings on error.
-- DM the orchestrator explicitly when done; task completion does not send that DM for you.
-- Claim assigned tasks with `eits tasks claim <id>`; plain `eits tasks begin --title ...` creates new work and duplicates pre-created team tickets.
-- Check the DM inbox at start/resume and before marking done.
-- Do NOT delete teams unless explicitly told to.
-- For `teams create`, the project flag is `--project`. For `agents spawn`, use `--project-id` when project context matters.
+- **Never manually insert DB records and spawn an agent process directly** — breaks `git_worktree_path`, session hierarchy, and "Load messages".
+- **Never redirect stderr on `eits agents spawn`** — `2>/dev/null` swallows errors silently; the orchestrator thinks the agent started when it never did.
+- **`--to` in `eits dm` accepts UUID or integer session ID** — both work.
+- **DM sequentially** — parallel Bash DM calls cancel siblings on error, silently dropping messages.
+- **Always pass `EITS_PROJECT_ID` in instructions or via `--interpolate-env`** — it is NOT inherited in spawned agent environments even when `--parent-session-id` is set.
+- **`--worktree` names must be unique per spawn** — duplicates fail at the git layer with a confusing error.
+- **`EITS_PROJECT_ID` is not in spawned agent environments** — pass it explicitly in instructions or via `--interpolate-env`.
+- `--worktree` requires a clean working tree — commit or stash first.
+- **Poll inbound DMs without the browser**: use `eits dm inbox --since-session --team-only --json` for current-team replies, and re-run it at the claim/transition/closeout checkpoints.
+
+---
+
+## Example: 2-Agent Research + Write
+
+This example shows a **producer/consumer** pattern. Per the guidance above, sequence the writer after the researcher confirms done — do not spawn both in parallel.
+
+```bash
+# 1. Create team
+eits teams create --name "docs-team" --description "Research flags and write README" --project $EITS_PROJECT_ID
+
+# 2. Join as orchestrator
+eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SESSION_UUID
+
+# 3. Create tasks
+RESEARCH_TASK=$(eits tasks create --title "Research Codex CLI flags" --team <team_id> | jq -r '.task_id')
+WRITE_TASK=$(eits tasks create --title "Write README from research" --team <team_id> | jq -r '.task_id')
+
+# 4. No lookup needed — $EITS_SESSION_ID and $EITS_AGENT_ID are set by the startup hook
+
+# 5a. Spawn researcher first
+eits agents spawn \
+  --interpolate-env \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $RESEARCH_TASK. Claim it with: eits tasks claim $RESEARCH_TASK. Do not create a duplicate task. Investigate all codex --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$RESEARCH_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
+  --provider codex --model gpt-6.1-sol --project-id $EITS_PROJECT_ID \
+  --team-name docs-team --member-name researcher \
+  --parent-session-id $EITS_SESSION_ID
+
+# 6a. Wait for researcher
+eits teams status <team_id> --wait
+
+# 5b. Only then spawn writer (producer/consumer — must be sequenced)
+eits agents spawn \
+  --interpolate-env \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $WRITE_TASK. Claim it with: eits tasks claim $WRITE_TASK. Do not create a duplicate task. Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$WRITE_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
+  --provider codex --model gpt-6.1-sol --project-id $EITS_PROJECT_ID \
+  --team-name docs-team --member-name writer \
+  --parent-session-id $EITS_SESSION_ID
+
+# 6b. Wait for writer
+eits teams status <team_id> --wait
+
+# 7. Verify merges, then collect results
+eits dm inbox --since-session --team-only --json
+```
+
+---
+
+## Tips
+
+- **Pass `team_id` in agent instructions** so they don't have to look it up.
+- **Use descriptive `--member-name` values** — DMs identify agents by this alias.
+- **Teams LiveView at `/teams`** — real-time member status and per-member task lists.
+- **One team per logical unit of work** — don't reuse teams across unrelated tasks.
+- **Task must be linked to session** for Stop hook to gate. `eits tasks claim <task_id>` claims and links atomically. Verify with `eits tasks active --json`.

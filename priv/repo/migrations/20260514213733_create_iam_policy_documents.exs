@@ -29,9 +29,7 @@ defmodule EyeInTheSky.Repo.Migrations.CreateIamPolicyDocuments do
              name: :iam_document_policies_unique
            )
 
-    create index(:iam_document_policies, [:policy_id],
-             name: :iam_document_policies_policy_id
-           )
+    create index(:iam_document_policies, [:policy_id], name: :iam_document_policies_policy_id)
 
     create table(:iam_agent_type_documents) do
       add :agent_type, :string, size: 255, null: false

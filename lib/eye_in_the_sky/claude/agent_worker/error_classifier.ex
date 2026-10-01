@@ -4,10 +4,10 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
 
   `classify/1` is the single source of truth: it maps a reason term to a
   category atom (`:billing_error`, `:authentication_error`, `:rate_limit_error`,
-  `:watchdog_timeout`, `:retry_exhausted`, `:transient`).
+  `:watchdog_timeout`, `:retry_exhausted`, `:cli_exit_error`, `:transient`).
 
   `systemic?/1` derives from `classify/1` — anything other than `:transient`
-  is systemic and should not be retried.
+  or `:rate_limit_error` is systemic and should not be retried.
 
   `status_reason/1` returns the string value persisted to
   `sessions.status_reason` so the LiveView badge layer can distinguish a
@@ -19,6 +19,8 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # Unknown errors and result errors carry free-form strings that still need
   # substring matching, but only within the message field — not on inspect output.
 
+  alias EyeInTheSky.Codex.Error, as: CodexError
+
   @type category ::
           :billing_error
           | :authentication_error
@@ -27,6 +29,7 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
           | :retry_exhausted
           | :user_canceled
           | :model_not_found
+          | :cli_exit_error
           | :transient
 
   # Rate-limit (429) is CATEGORIZED so the UI can surface a distinct badge, but
@@ -40,10 +43,14 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   def systemic?(reason), do: classify(reason) not in @non_systemic_categories
 
   @doc """
-  Map a reason term to a category atom. Unknown or retryable reasons return
-  `:transient`.
+  Map a reason term to a category atom. Unexplained non-zero process exits
+  are terminal; other unknown or retryable reasons return `:transient`.
   """
   @spec classify(term()) :: category()
+  # All CLI providers use this shape for abnormal exits without a richer error.
+  # An exit status alone is not evidence of a recoverable provider failure.
+  def classify({:exit_code, code}) when is_integer(code) and code != 0, do: :cli_exit_error
+  def classify({:codex_incomplete_turn, _message}), do: :cli_exit_error
   def classify({:watchdog_timeout, _timeout_ms}), do: :watchdog_timeout
   def classify({:billing_error, _}), do: :billing_error
   def classify({:authentication_error, _}), do: :authentication_error
@@ -58,15 +65,36 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   # Order matters: billing before auth (a 400 usage error must not read as generic).
   def classify({:pi_turn_error, msg}) when is_binary(msg) do
     cond do
-      msg =~ ~r/out of .*usage|quota|credit|billing/iu -> :billing_error
-      msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu -> :rate_limit_error
-      msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|x-api-key|token)/iu -> :authentication_error
-      msg =~ ~r/HTTP 404|not_found_error|unknown model/iu -> :model_not_found
-      true -> :transient
+      msg =~ ~r/out of .*usage|quota|credit|billing/iu ->
+        :billing_error
+
+      msg =~ ~r/HTTP 429|rate.?limit|overloaded/iu ->
+        :rate_limit_error
+
+      msg =~ ~r/HTTP 40[13]|authentication|invalid[ _]?(api[ _-]?key|x-api-key|token)/iu ->
+        :authentication_error
+
+      msg =~ ~r/HTTP 404|not_found_error|unknown model/iu ->
+        :model_not_found
+
+      true ->
+        :transient
     end
   end
 
   def classify({:pi_turn_error, _}), do: :transient
+
+  def classify({:codex_error, payload}) do
+    payload
+    |> CodexError.normalize("Codex error")
+    |> classify_codex_error()
+  end
+
+  def classify({:turn_failed, payload}) do
+    payload
+    |> CodexError.normalize("Codex turn failed")
+    |> classify_codex_error()
+  end
 
   # errors is a list of strings — scan each entry
   def classify({:claude_result_error, %{errors: errors}}) when is_list(errors) do
@@ -112,6 +140,32 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifier do
   end
 
   def classify(_), do: :transient
+
+  defp classify_codex_error(normalized) do
+    message = normalized.message || ""
+
+    cond do
+      normalized.error_type == "cli_exit_error" ->
+        :cli_exit_error
+
+      normalized.status == 429 or message =~ ~r/rate.?limit|overloaded|too many requests/iu ->
+        :rate_limit_error
+
+      CodexError.unsupported_model?(normalized) or normalized.status == 404 or
+          message =~ ~r/not_found_error|unknown model/iu ->
+        :model_not_found
+
+      normalized.status in [401, 403] or
+          message =~ ~r/authentication|unauthorized|forbidden|invalid[ _-]?(api[ _-]?key|token)/iu ->
+        :authentication_error
+
+      message =~ ~r/out of .*usage|quota|credit|billing/iu ->
+        :billing_error
+
+      true ->
+        :transient
+    end
+  end
 
   @doc """
   Category string persisted to `sessions.status_reason`. Returns `nil` for

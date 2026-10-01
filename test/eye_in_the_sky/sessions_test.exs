@@ -92,6 +92,53 @@ defmodule EyeInTheSky.SessionsTest do
       assert session.model_name != nil
     end
 
+    test "infers Codex provider metadata from gpt model hook payload" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "codex startup",
+        "model" => "gpt-5",
+        "entrypoint" => "sdk-cli"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.provider == "codex"
+      assert session.model_provider == "openai"
+      assert session.model_name == "gpt-5"
+    end
+
+    test "marks cli hook sessions as terminal-owned" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "terminal codex startup",
+        "model" => "gpt-5",
+        "entrypoint" => "cli"
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.entrypoint == "cli"
+      assert session.managed_by_app == false
+      refute Sessions.app_managed?(session)
+    end
+
+    test "allows hook sessions to explicitly stay app-managed" do
+      uuid = Ecto.UUID.generate()
+
+      params = %{
+        "session_id" => uuid,
+        "description" => "app managed hook",
+        "entrypoint" => "cli",
+        "managed_by_app" => true
+      }
+
+      assert {:ok, %{session: session}} = Sessions.register_from_hook(params, nil)
+      assert session.managed_by_app == true
+      assert Sessions.app_managed?(session)
+    end
+
     test "creates session without model info when model string is nil" do
       uuid = Ecto.UUID.generate()
 
@@ -408,8 +455,11 @@ defmodule EyeInTheSky.SessionsTest do
       agent = create_agent()
       for _ <- 1..4, do: create_session(agent)
 
-      all_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
-      offset_results = OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
+      all_results =
+        OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 0)
+
+      offset_results =
+        OverviewQueries.list_sessions_filtered(status_filter: "all", limit: 10, offset: 2)
 
       assert length(offset_results) < length(all_results)
     end

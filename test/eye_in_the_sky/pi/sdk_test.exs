@@ -127,8 +127,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
     assert last_send_of("initialize")
 
     # Respond OK to initialize.
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     Process.sleep(30)
 
     assert last_send_of("start_session"),
@@ -151,8 +159,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "ready before start_session response still gates prompt on both", ctx do
     %{handler: h} = start_handler(ctx)
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     Process.sleep(30)
 
     # ready arrives first
@@ -169,8 +185,15 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "protocol version mismatch halts with claude_error", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx)
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 2}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 2}
+      })
+    )
 
     assert_receive {:claude_error, ^ref, {:pi_protocol_version_mismatch, 2}}, 500
   end
@@ -178,8 +201,10 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "failed initialize envelope halts with pi_preamble_failed", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx)
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => false,
-                     "error" => "nope"}))
+    feed(
+      h,
+      encode(%{"type" => "response", "id" => "pi-1", "success" => false, "error" => "nope"})
+    )
 
     assert_receive {:claude_error, ^ref, {:pi_preamble_failed, "initialize", "nope"}}, 500
   end
@@ -202,14 +227,29 @@ defmodule EyeInTheSky.Pi.SDKTest do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-happy")
 
     # Drive through preamble.
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-happy"}))
     Process.sleep(30)
 
-    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{"inputTokens" => 10, "outputTokens" => 20},
-                     "totalCostUsd" => 0.01, "durationMs" => 123}))
+    feed(
+      h,
+      encode(%{
+        "type" => "turn_end",
+        "aggregate" => %{"inputTokens" => 10, "outputTokens" => 20},
+        "totalCostUsd" => 0.01,
+        "durationMs" => 123
+      })
+    )
 
     assert_receive {:claude_message, ^ref, %Message{type: :result}}, 500
     assert_receive {:claude_complete, ^ref, "sess-happy"}, 500
@@ -220,15 +260,27 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "result message carries text accumulated from assistant deltas", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-acc")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-acc"}))
     Process.sleep(30)
 
     feed(h, encode(%{"type" => "assistant_delta", "delta" => "Hello "}))
     feed(h, encode(%{"type" => "assistant_delta", "delta" => "world."}))
-    feed(h, encode(%{"type" => "turn_end", "aggregate" => %{"inputTokens" => 1, "outputTokens" => 2}}))
+
+    feed(
+      h,
+      encode(%{"type" => "turn_end", "aggregate" => %{"inputTokens" => 1, "outputTokens" => 2}})
+    )
 
     assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true}}, 500
     assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true}}, 500
@@ -242,8 +294,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "result message text is nil when no deltas streamed", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-empty")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-empty"}))
     Process.sleep(30)
@@ -259,8 +319,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "turn_error then turn_end -> claude_error {:pi_turn_error, msg} (sticky)", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx)
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-uuid-1"}))
     Process.sleep(30)
@@ -287,7 +355,8 @@ defmodule EyeInTheSky.Pi.SDKTest do
 
     feed(h, encode(%{"type" => "assistant_delta", "delta" => "hello"}))
 
-    assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true, content: "hello"}}, 500
+    assert_receive {:claude_message, ^ref, %Message{type: :text, delta: true, content: "hello"}},
+                   500
   end
 
   test "unexpected tool_request is auto-denied and stream continues", ctx do
@@ -306,8 +375,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "duplicate terminal: turn_end then error event -> exactly one terminal message", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "dup-sess")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "dup-sess"}))
     Process.sleep(30)
@@ -344,8 +421,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   # --- Codex review fixes (2026-07-06) ---------------------------------------
 
   defp drive_preamble(h, session_id) do
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => session_id}))
     Process.sleep(30)
@@ -358,10 +443,20 @@ defmodule EyeInTheSky.Pi.SDKTest do
     feed(h, encode(%{"type" => "assistant_delta", "delta" => "some noise"}))
     assert_receive {:claude_message, ^ref, %Message{content: "some noise"}}, 500
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-3", "success" => false,
-                     "error" => "model rejected prompt"}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-3",
+        "success" => false,
+        "error" => "model rejected prompt"
+      })
+    )
 
-    assert_receive {:claude_error, ^ref, {:pi_preamble_failed, "prompt", "model rejected prompt"}}, 500
+    assert_receive {:claude_error, ^ref,
+                    {:pi_preamble_failed, "prompt", "model rejected prompt"}},
+                   500
+
     refute_receive {:claude_complete, ^ref, _}, 100
   end
 
@@ -370,14 +465,30 @@ defmodule EyeInTheSky.Pi.SDKTest do
     drive_preamble(h, "sess-uuid-1")
 
     # Trigger an auto-deny so a deny_tool request is pending (id pi-4).
-    feed(h, encode(%{"type" => "tool_request", "requestId" => "r1",
-                     "toolCallId" => "t1", "kind" => "commandExecution", "input" => %{}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "tool_request",
+        "requestId" => "r1",
+        "toolCallId" => "t1",
+        "kind" => "commandExecution",
+        "input" => %{}
+      })
+    )
+
     Process.sleep(30)
     assert last_send_of("deny_tool")
 
     # Its failure response must be non-fatal.
-    feed(h, encode(%{"type" => "response", "id" => "pi-4", "success" => false,
-                     "error" => "already resolved"}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-4",
+        "success" => false,
+        "error" => "already resolved"
+      })
+    )
 
     feed(h, encode(%{"type" => "turn_end", "aggregate" => %{}}))
     assert_receive {:claude_complete, ^ref, "sess-uuid-1"}, 500
@@ -386,8 +497,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "ready echoing a different sessionId halts with pi_session_mismatch", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-someone-elses"}))
 
@@ -457,8 +576,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
     # remaps the halt reason.
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     Process.sleep(20)
 
     :ok = SDK.cancel(ref)
@@ -481,8 +608,16 @@ defmodule EyeInTheSky.Pi.SDKTest do
   test "no cancel: halt still surfaces the original halt reason", ctx do
     %{handler: h, sdk_ref: ref} = start_handler(ctx, session_id: "sess-mine")
 
-    feed(h, encode(%{"type" => "response", "id" => "pi-1", "success" => true,
-                     "data" => %{"protocolVersion" => 1}}))
+    feed(
+      h,
+      encode(%{
+        "type" => "response",
+        "id" => "pi-1",
+        "success" => true,
+        "data" => %{"protocolVersion" => 1}
+      })
+    )
+
     feed(h, encode(%{"type" => "response", "id" => "pi-2", "success" => true, "data" => %{}}))
     feed(h, encode(%{"type" => "ready", "sessionId" => "sess-someone-elses"}))
 

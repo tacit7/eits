@@ -14,14 +14,16 @@ use commands::dm::DmCmd;
 use commands::notes::NotesCmd;
 use commands::sessions::SessionsCmd;
 use commands::tasks::TasksCmd;
+use commands::work::WorkCmd;
+use commands::workflow::WorkflowCmd;
 use error::{Code, EitsError};
 use std::ffi::OsString;
 
 #[derive(Parser)]
 #[command(
-    name = "eitsr",
+    name = "eits",
     version,
-    about = "EITS CLI (Rust core; bash fallback for extras)"
+    about = "EITS CLI (Rust core; legacy extras fallback)"
 )]
 struct Cli {
     /// Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
@@ -56,7 +58,7 @@ enum Cmd {
         #[command(subcommand)]
         cmd: SessionsCmd,
     },
-    /// Send or read direct messages (root form: `eitsr dm --to <id> --message <text>`)
+    /// Send or read direct messages (root form: `eits dm --to <id> --message <text>`)
     Dm {
         #[command(subcommand)]
         cmd: Option<DmCmd>,
@@ -73,9 +75,35 @@ enum Cmd {
     },
     /// Resolve and print session/agent identity (mirrors bash `eits whoami`)
     Whoami,
-    /// Anything not Rust-owned falls through to the bash extras script
+    /// Diagnose EITS CLI config, identity, server, git, hooks, and capabilities
+    Doctor {
+        #[command(subcommand)]
+        cmd: Option<commands::doctor::DoctorCmd>,
+    },
+    /// Report current work/session checkpoint status
+    Work {
+        #[command(subcommand)]
+        cmd: WorkCmd,
+    },
+    /// Current session workflow status and suggested next command
+    Workflow {
+        #[command(subcommand)]
+        cmd: WorkflowCmd,
+    },
+    /// Anything not Rust-owned falls through to the legacy extras script
     #[command(external_subcommand)]
     External(Vec<OsString>),
+}
+
+fn print_human_and_exit(e: clap::Error) -> ! {
+    let rendered = e.render().to_string();
+    let normalized = rendered
+        .lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n");
+    println!("{normalized}");
+    std::process::exit(0);
 }
 
 fn main() {
@@ -86,14 +114,14 @@ fn main() {
         Ok(cli) => cli,
         Err(e) => match e.kind() {
             // Human-readable text on stdout, exit 0 — these are not errors.
-            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => e.exit(),
+            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => print_human_and_exit(e),
             // Everything else (missing required arg, unknown flag, bare
             // invocation, etc.) is a usage error per the JSON-stdout contract.
             _ => {
                 let msg = e.to_string();
                 let first_line = msg.lines().next().unwrap_or("invalid arguments");
                 error::exit_with(
-                    EitsError::usage(first_line).with_hint("run `eitsr <cmd> --help`"),
+                    EitsError::usage(first_line).with_hint("run `eits <cmd> --help`"),
                     false,
                 );
             }
@@ -179,13 +207,37 @@ fn main() {
                 error::exit_with(err, pretty);
             }
         }
+        Cmd::Doctor { cmd } => match cmd {
+            Some(commands::doctor::DoctorCmd::Cli) => commands::doctor::run_cli(pretty),
+            None => commands::doctor::run(pretty),
+        },
+        Cmd::Work { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::work::run(&client, &cfg, cmd, pretty) {
+                error::exit_with(err, pretty);
+            }
+        }
+        Cmd::Workflow { cmd } => {
+            let cfg = match config::Config::resolve() {
+                Ok(cfg) => cfg,
+                Err(err) => error::exit_with(err, pretty),
+            };
+            let client = http::Client::new(cfg.clone());
+            if let Err(err) = commands::workflow::run(&client, &cfg, cmd, pretty) {
+                error::exit_with(err, pretty);
+            }
+        }
         Cmd::External(args) => {
             let had_global_flags = raw.len() > args.len();
             if had_global_flags {
                 // Global flags are rejected before extras run, so there's no
                 // pretty-print preference to honor here.
                 error::exit_with(
-                    EitsError::usage("global flags are not supported for bash-extras subcommands")
+                    EitsError::usage("global flags are not supported for extras subcommands")
                         .with_hint("drop --pretty/--quiet or use a Rust-owned command"),
                     false,
                 );

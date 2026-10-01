@@ -14,36 +14,24 @@
   }
 </script>
 
-<div class="h-full flex flex-col">
+<div class="h-full flex flex-col text-base-content">
   <!-- Tab Navigation -->
-  <div class="border-b border-gray-200">
+  <div class="border-b border-base-content/8">
     <nav class="flex px-4" aria-label="Tabs">
       <button
-        class="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
-        class:border-indigo-500={activeTab === 'tasks'}
-        class:text-indigo-600={activeTab === 'tasks'}
-        class:border-transparent={activeTab !== 'tasks'}
-        class:text-gray-500={activeTab !== 'tasks'}
+        class="px-4 py-3 text-message font-medium border-b transition-colors focus-ring {activeTab === 'tasks' ? 'border-primary text-primary' : 'border-transparent text-base-content/45'}"
         on:click={() => handleTabChange('tasks')}
       >
         Tasks
       </button>
       <button
-        class="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
-        class:border-indigo-500={activeTab === 'commits'}
-        class:text-indigo-600={activeTab === 'commits'}
-        class:border-transparent={activeTab !== 'commits'}
-        class:text-gray-500={activeTab !== 'commits'}
+        class="px-4 py-3 text-message font-medium border-b transition-colors focus-ring {activeTab === 'commits' ? 'border-primary text-primary' : 'border-transparent text-base-content/45'}"
         on:click={() => handleTabChange('commits')}
       >
         Commits
       </button>
       <button
-        class="px-4 py-3 text-sm font-medium border-b-2 transition-colors"
-        class:border-indigo-500={activeTab === 'logs'}
-        class:text-indigo-600={activeTab === 'logs'}
-        class:border-transparent={activeTab !== 'logs'}
-        class:text-gray-500={activeTab !== 'logs'}
+        class="px-4 py-3 text-message font-medium border-b transition-colors focus-ring {activeTab === 'logs' ? 'border-primary text-primary' : 'border-transparent text-base-content/45'}"
         on:click={() => handleTabChange('logs')}
       >
         Logs

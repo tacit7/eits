@@ -120,5 +120,26 @@ defmodule EyeInTheSky.Agents.RuntimeContextTest do
       ctx = RuntimeContext.build(session.id, "claude", model: "sonnet", effort_level: "high")
       assert ctx.extra_cli_opts == []
     end
+
+    # bypass_sandbox tests — these cover the fix for the `false || provider == "codex"` bug
+    test "bypass_sandbox defaults to true for codex when not in opts", %{session: session} do
+      ctx = RuntimeContext.build(session.id, "codex", [])
+      assert ctx.bypass_sandbox == true
+    end
+
+    test "bypass_sandbox defaults to false for claude when not in opts", %{session: session} do
+      ctx = RuntimeContext.build(session.id, "claude", [])
+      assert ctx.bypass_sandbox == false
+    end
+
+    test "explicit bypass_sandbox: false overrides codex provider default", %{session: session} do
+      ctx = RuntimeContext.build(session.id, "codex", bypass_sandbox: false)
+      assert ctx.bypass_sandbox == false
+    end
+
+    test "explicit bypass_sandbox: true works for non-codex provider", %{session: session} do
+      ctx = RuntimeContext.build(session.id, "claude", bypass_sandbox: true)
+      assert ctx.bypass_sandbox == true
+    end
   end
 end

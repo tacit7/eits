@@ -129,6 +129,29 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpersTest do
     end
   end
 
+  describe "codex sandbox defaults" do
+    test "codex params without bypass_sandbox leave provider default in control" do
+      opts =
+        AgentCreationHelpers.build_opts(%{
+          "agent_type" => "codex",
+          "model" => "gpt-5.6-sol"
+        })
+
+      refute Keyword.has_key?(opts, :bypass_sandbox)
+    end
+
+    test "codex params preserve explicit sandbox opt-out" do
+      opts =
+        AgentCreationHelpers.build_opts(%{
+          "agent_type" => "codex",
+          "model" => "gpt-5.6-sol",
+          "bypass_sandbox" => "false"
+        })
+
+      assert opts[:bypass_sandbox] == false
+    end
+  end
+
   describe ":name wiring (do_create_session pattern)" do
     # The :name key is not set by build_opts — it is injected by
     # AgentLive.Index.do_create_session after calling build_opts.

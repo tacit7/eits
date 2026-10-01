@@ -66,6 +66,15 @@ end
 
 The pin (`^workspace_id`) makes the match fail silently for foreign projects. The error message is identical to "not found" to avoid leaking information about the existence of other workspaces' projects.
 
+When the caller already knows the workspace boundary, prefer the scoped helper instead:
+
+```elixir
+Projects.get_project_for_workspace(project_id, workspace_id)
+# → {:ok, %Project{}} | {:error, :not_found}
+```
+
+This helper treats both missing projects and foreign-workspace projects as `:not_found`, which keeps the contract aligned with user-facing not-found behavior.
+
 ### Layer 2 — Component guard (MapSet lookup)
 
 `NewSessionModal.handle_event("project_changed", ...)` re-validates the incoming `project_id` against the set of projects the component was given:
@@ -110,6 +119,13 @@ Projects.list_projects_for_workspace(workspace_id)
 
 Use this everywhere a workspace LiveView needs the project dropdown or project list. Never query `Project` directly with a `workspace_id` filter outside this function.
 
+For user-supplied project IDs that must not cross workspace boundaries, use:
+
+```elixir
+Projects.get_project_for_workspace(project_id, workspace_id)
+# → {:ok, %Project{}} | {:error, :not_found}
+```
+
 ### Sessions scoped to a workspace
 
 ```elixir
@@ -121,6 +137,74 @@ Pass the `Scope` struct, not the workspace ID directly. This keeps scope-type br
 
 ---
 
+## Agent Schedule Components — Workspace-Scoped Project Lists
+
+`AgentScheduleHelpers`, `AgentScheduleSection`, and `JobsPage` scope their project lists to the current workspace when a `workspace_id` is available.
+
+### `AgentScheduleHelpers.assign_agent_schedule_defaults/1`
+
+Reads `workspace_id` from socket assigns and delegates to the right query:
+
+```elixir
+workspace_id = Map.get(socket.assigns, :workspace_id)
+projects: list_projects_for_context(workspace_id)
+```
+
+`list_projects_for_context/1` resolves to:
+- `Projects.list_projects()` — when `workspace_id` is `nil` (no workspace context)
+- `Projects.list_projects_for_workspace(workspace_id)` — otherwise
+
+### `AgentScheduleSection` LiveComponent
+
+Accepts a `workspace_id` assign. On first mount it populates `:projects` via `list_projects_for_context/1`. On subsequent updates it refreshes `:projects` whenever `workspace_id` changes:
+
+```elixir
+workspace_changed = initialized and assigns.workspace_id != prev_workspace_id
+
+socket =
+  if workspace_changed do
+    assign(socket, :projects, list_projects_for_context(assigns.workspace_id))
+  else
+    socket
+  end
+```
+
+### `JobsPage` — Propagating `workspace_id`
+
+`JobsPage` passes the project's workspace down to `AgentScheduleSection`:
+
+```heex
+<.live_component
+  module={AgentScheduleSection}
+  id="agent-schedule-section"
+  project_id={@project_id}
+  workspace_id={if @project, do: @project.workspace_id}
+  active_tab={@active_tab}
+/>
+```
+
+When no project is selected `workspace_id` is `nil` and the full project list is shown.
+
+### `project_allowed?/2` — Schedule Save Guard
+
+Before resolving a project path for a schedule save, `AgentScheduleHelpers` validates the selected project against the scoped `:projects` list:
+
+```elixir
+defp project_allowed?(socket, id) do
+  case Map.get(socket.assigns, :workspace_id) do
+    nil -> true
+    _workspace_id ->
+      socket.assigns
+      |> Map.get(:projects, [])
+      |> Enum.any?(&(&1.id == id))
+  end
+end
+```
+
+No `workspace_id` → always allowed (backward-compatible). With a `workspace_id`, a project override from another workspace is silently rejected as `:no_project`, resulting in a "Could not resolve project path" flash error.
+
+---
+
 ## Adding a New Workspace-Scoped LiveView
 
 1. Add the route under the workspace pipeline in `router.ex`.
@@ -128,3 +212,40 @@ Pass the `Scope` struct, not the workspace ID directly. This keeps scope-type br
 3. Use `socket.assigns.workspace` (not a mount-time lookup) for the workspace reference.
 4. Use `socket.assigns.scope` with the canonical query functions above.
 5. For any form that accepts a `project_id`, apply the same pin-match pattern as `Sessions.Actions` — never trust a form-supplied project ID without verifying `workspace_id`.
+
+## Project Route and Command Palette Boundary
+
+`ProjectLiveHelpers.load_project_for_socket/3` resolves the workspace from the
+socket's existing context (via `Events.workspace_id_for_assigns/1`) before calling
+`Projects.get_project_for_workspace/2`. A project URL cannot replace that boundary:
+foreign projects and missing workspace context follow the existing not-found
+behavior. Callers include project overview, files, config, and the pages using
+`mount_project/3`. The latter raises `Ecto.NoResultsError` (404) for rejected
+projects before downstream mounts can interpret a nil project as global scope;
+overview/files/config retain their existing empty/error or redirect behavior.
+
+`ProjectLiveHelpers.palette_projects_for_socket/1` uses the same workspace
+resolution and `Projects.list_projects_for_workspace/1`, filters out inactive
+projects, and returns `%{id: id, name: name}` maps. Without workspace context it
+returns `[]`. NavHook, project mounts, and the `palette:projects` refresh event all
+use this helper, including projects created after the page mounted.
+
+### Remaining migration audit (task 9082)
+
+The route/palette change is a limited migration, not a claim of complete workspace
+isolation. The following independent surfaces still need follow-up:
+
+| Classification | Call sites | Remaining work / existing guard |
+| --- | --- | --- |
+| Workspace UI and actions | `components/rail.ex`, `components/rail/project_actions.ex` | Global project lists, select/rename/delete/bookmark/editor/terminal/window/session actions, and path-based project reuse need scoped lookups. Restore already checks workspace ownership. Rail can still expose foreign project metadata. |
+| Workspace UI and actions | `live/agent_live/index.ex`, `index_actions.ex`; `live/dm_live.ex`, `dm_live/mount_state.ex`, `message_handlers.ex`; `live/nav_hook/palette_agent_handlers.ex` | Project options, URL-supplied project IDs, and agent/session creation must be scoped before resolving paths or creating records. |
+| Workspace UI | `live/chat_live/channel_data_loader.ex`; `live/iam_live/policy_new.ex`, `policy_edit.ex`; `live/project_live/kanban.ex`; `live/project_live/sessions/state.ex`, `loader.ex` | Global dropdown/list data remains. Kanban task-copy target validation in `live/shared/tasks_helpers.ex` also needs ownership enforcement. |
+| Project route action | `live/project_live/sessions/actions.ex` | The current project comes from the scoped mount, but the submitted-ID fallback when no project is assigned remains global. |
+| Guarded workspace action | `live/workspace_live/sessions/actions.ex` | Existing pin match rejects foreign projects; can be simplified to the canonical scoped lookup. |
+| Guarded component / partial migration | `components/new_session_modal.ex`; `components/agent_schedule_section.ex`; `live/shared/agent_schedule_helpers.ex` | Lists are scoped when workspace context is supplied; modal project changes and schedule overrides have allow-list guards. Global fallbacks and schedule prompt-default path resolution still require a caller/context audit. |
+| User-facing system shortcut | `components/ai_job_creator.ex` | Hard-coded `get_project_by_name("EITS Web")` needs an explicit product decision about workspace ownership. |
+| API / authentication semantics | `controllers/api/v1/project_controller.ex`, `project_scope.ex` | Project index/show/path lookup remain global. `ProjectScope` explicitly permits bearer-only access and compares workspaces for session-scoped access. Preserve or change these semantics only with a separate API review and tests. |
+| Internal context (no browser workspace) | `workers/workable_task_worker.ex`; `agents/agent_manager/session_bridge.ex`; `agent_definitions.ex`; `iam/project_identity.ex` | Global lookups resolve persisted task/session/project identities or IAM paths. These are not browser-workspace list queries; callers accepting user input still need boundary checks before reaching them. |
+
+Palette session/task/note queries and mutations also require their own ownership
+review: scoping the project picker does not authorize arbitrary event payloads.

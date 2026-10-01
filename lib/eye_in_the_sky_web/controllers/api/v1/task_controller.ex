@@ -10,18 +10,26 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   alias EyeInTheSky.{Notes, Sessions, Tasks, Teams}
   alias EyeInTheSky.Tasks.WorkflowState
   alias EyeInTheSky.Utils.ToolHelpers, as: Helpers
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.MCP.Tools.SessionResolver
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc """
   GET /api/v1/tasks - List tasks.
-  Query params: project_id, agent_id, session_id, q (search), limit,
+  Query params: project_id, team_id, agent_id, session_id, q (search), limit,
                 since (duration string), stale_since (duration string)
   """
   def index(conn, params) do
     limit = params["limit"] |> parse_int(50) |> max(1) |> min(1000)
 
-    with {:ok, time_opts} <- resolve_time_opts(params) do
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]),
+         {:ok, time_opts} <- resolve_time_opts(params) do
+      params =
+        if project_id,
+          do: Map.put(params, "project_id", project_id),
+          else: Map.delete(params, "project_id")
+
       tasks = fetch_tasks(params, limit, time_opts)
 
       json(conn, %{
@@ -100,6 +108,13 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
+  defp fetch_tasks_by_filter(%{"team_id" => team_id}, opts) do
+    case parse_int(team_id, nil) do
+      nil -> []
+      team_int_id -> Tasks.list_tasks_for_team_with_sessions(team_int_id, opts)
+    end
+  end
+
   defp fetch_tasks_by_filter(%{"project_id" => project_id}, opts) do
     case parse_int(project_id, nil) do
       nil -> []
@@ -122,40 +137,40 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   POST /api/v1/tasks - Create a task.
   """
   def create(conn, params) do
-    creator_session_int_id =
-      case params["session_id"] do
-        sid when is_binary(sid) and sid != "" ->
-          case Helpers.resolve_session_int_id(sid) do
-            {:ok, id} -> id
-            _ -> nil
-          end
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      # Keep accepting session_id as the creator for older clients, while
+      # allowing new clients to assign a different session explicitly.
+      creator_session_id =
+        if Map.has_key?(params, "created_by_session_id"),
+          do: params["created_by_session_id"],
+          else: params["session_id"]
 
-        _ ->
-          nil
+      creator_session_int_id = resolve_session_id(creator_session_id)
+
+      attrs = %{
+        uuid: Ecto.UUID.generate(),
+        title: trim_param(params["title"]),
+        description: trim_param(params["description"]),
+        priority: params["priority"],
+        state_id: params["state_id"] || WorkflowState.todo_id(),
+        project_id: project_id,
+        team_id: parse_int(params["team_id"], nil),
+        agent_id: resolve_agent_int_id(params["agent_id"]),
+        created_by_session_id: creator_session_int_id,
+        due_at: params["due_at"],
+        created_at: DateTime.utc_now()
+      }
+
+      case Tasks.create_with_associations(attrs, params) do
+        {:ok, task} ->
+          conn
+          |> put_status(:created)
+          |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
+
+        {:error, changeset} ->
+          {:error, changeset}
       end
-
-    attrs = %{
-      uuid: Ecto.UUID.generate(),
-      title: trim_param(params["title"]),
-      description: trim_param(params["description"]),
-      priority: params["priority"],
-      state_id: params["state_id"] || WorkflowState.todo_id(),
-      project_id: params["project_id"],
-      team_id: parse_int(params["team_id"], nil),
-      agent_id: resolve_agent_int_id(params["agent_id"]),
-      created_by_session_id: creator_session_int_id,
-      due_at: params["due_at"],
-      created_at: DateTime.utc_now()
-    }
-
-    case Tasks.create_with_associations(attrs, params) do
-      {:ok, task} ->
-        conn
-        |> put_status(:created)
-        |> json(%{success: true, message: "Task created", task_id: to_string(task.id)})
-
-      {:error, changeset} ->
-        {:error, changeset}
     end
   end
 
@@ -188,12 +203,17 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
   @doc """
   PATCH /api/v1/tasks/:id - Update a task.
   Body: state_id, priority, state (shorthand: "done", "start")
+  project_id is not supported on updates; project reassignment is rejected.
   """
   def update(conn, %{"id" => id} = params) do
     case Tasks.get_task(id) do
       {:error, :not_found} -> {:error, :not_found, "Task not found"}
       {:ok, task} -> do_update_task(conn, task, params)
     end
+  end
+
+  defp do_update_task(_conn, _task, %{"project_id" => _}) do
+    {:error, "project_id cannot be updated; task project reassignment is not supported"}
   end
 
   defp do_update_task(conn, task, params) do
@@ -353,15 +373,55 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
     end
   end
 
+  @doc "POST /api/v1/tasks/:id/release — owner-only release to To Do."
+  def release(conn, params), do: ownership_change(conn, params, :release)
+
+  @doc "POST /api/v1/tasks/:id/handoff — owner-only transfer to the `to` session."
+  def handoff(conn, params), do: ownership_change(conn, params, :handoff)
+
+  defp ownership_change(conn, %{"id" => task_id} = params, action) do
+    with {:ok, actor_id} <- resolve_claimer_session(params["session_id"]),
+         {:ok, target_id} <- resolve_ownership_target(action, params["to"]),
+         {:ok, task} <- Tasks.get_task(task_id),
+         {:ok, updated} <- apply_ownership_change(action, task, actor_id, target_id) do
+      json(conn, %{success: true, task: ApiPresenter.present_task(updated)})
+    else
+      {:error, :no_session} -> {:error, :bad_request, "session_id is required"}
+      {:error, :invalid_session} -> {:error, :bad_request, "session_id is invalid"}
+      {:error, :invalid_target} -> {:error, :bad_request, "to must identify an existing session"}
+      {:error, :not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :task_not_found} -> {:error, :not_found, "Task not found"}
+      {:error, :not_owner} -> {:error, :forbidden, "Only the task owner may change ownership"}
+      {:error, :task_not_active} -> {:error, :conflict, "Task is not active"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp resolve_ownership_target(:release, _), do: {:ok, nil}
+
+  defp resolve_ownership_target(:handoff, target) do
+    case resolve_claimer_session(target) do
+      {:ok, id} -> {:ok, id}
+      _ -> {:error, :invalid_target}
+    end
+  end
+
+  defp apply_ownership_change(:release, task, actor, _), do: Tasks.release_task(task, actor)
+
+  defp apply_ownership_change(:handoff, task, actor, target),
+    do: Tasks.handoff_task(task, actor, target)
+
   defp resolve_claimer_session(sid) when is_nil(sid) or sid == "",
     do: {:error, :no_session}
 
-  defp resolve_claimer_session(session_id) do
+  defp resolve_claimer_session(session_id) when is_binary(session_id) or is_integer(session_id) do
     case Helpers.resolve_session_int_id(session_id) do
       {:ok, int_id} -> {:ok, int_id}
       {:error, _msg} -> {:error, :invalid_session}
     end
   end
+
+  defp resolve_claimer_session(_), do: {:error, :invalid_session}
 
   @doc """
   POST /api/v1/tasks/:id/sessions - Link a session to a task.
@@ -520,6 +580,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskController do
       case Sessions.get_session(int_id) do
         {:ok, session} ->
           Sessions.update_session(session, %{intent: intent, intent_set_at: DateTime.utc_now()})
+
         {:error, :not_found} ->
           :ok
       end

@@ -126,9 +126,9 @@ defmodule EyeInTheSky.Sessions.Query do
   end
 
   @doc """
-  Returns idle or waiting sessions that have not been archived and whose
-  last activity (or started_at as fallback) is older than the given cutoff.
-  Used by the scheduler to auto-archive dead idle sessions.
+  Returns app-managed idle or waiting sessions that have not been archived and
+  whose last activity (or started_at as fallback) is older than the given cutoff.
+  Used by the scheduler to auto-archive dead idle app-owned sessions.
   """
   def list_idle_sessions_older_than(cutoff) do
     # Two OR branches so PG can use the sessions(:last_activity_at) and
@@ -136,6 +136,7 @@ defmodule EyeInTheSky.Sessions.Query do
     # coalesce(last_activity_at, started_at) expression prevents index use.
     from(s in Session,
       where: s.status in ["idle", "waiting"],
+      where: s.managed_by_app == true,
       where: is_nil(s.archived_at),
       where: not is_nil(s.started_at),
       where:

@@ -15,28 +15,31 @@ defmodule EyeInTheSkyWeb.NavHook do
   import Phoenix.Component, only: [assign: 3]
 
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Settings
   alias EyeInTheSkyWeb.Helpers.MobileNav
+  alias EyeInTheSkyWeb.Helpers.ProjectLiveHelpers
   alias EyeInTheSkyWeb.NavHook.PaletteAgentHandlers
   alias EyeInTheSkyWeb.NavHook.PaletteHandlers
 
-  def on_mount(:default, _params, _session, socket) do
+  def on_mount(:default, _params, session, socket) do
     if connected?(socket), do: Events.subscribe_agents()
 
-    projects =
-      Projects.list_projects()
-      |> Enum.map(&%{id: &1.id, name: &1.name})
+    workspace = Events.workspace_for_assigns(socket.assigns)
+
+    projects = ProjectLiveHelpers.palette_projects_for_socket(socket)
 
     # live_render-embedded views (e.g. Rail) don't support :handle_params hooks
-    # because they're not mounted via live/3 in the router. Guard by the private
-    # :router key — router-mounted views always have it; embedded views don't.
-    router_mounted? = Map.get(socket.private, :router) != nil
+    # because they're not mounted via live/3 in the router. Guard by the :router
+    # struct field — router-mounted views always have it set; embedded views don't.
+    router_mounted? = socket.router != nil
 
     socket =
       socket
       |> assign(:nav_path, nil)
       |> assign(:mobile_nav_tab, :sessions)
+      |> assign(:rail_context_topic, Events.rail_context_topic(session))
+      |> assign(:workspace, workspace)
+      |> assign(:workspace_id, workspace && workspace.id)
       |> assign(:palette_projects, projects)
       |> assign(:palette_shortcut, Settings.get("palette_shortcut") || "auto")
       |> then(fn s ->

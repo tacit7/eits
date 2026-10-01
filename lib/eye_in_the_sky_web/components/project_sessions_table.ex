@@ -45,19 +45,19 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
         </span>
         <button
           phx-click="confirm_archive_selected"
-          class="btn btn-ghost btn-xs text-warning/70 hover:text-warning hover:bg-warning/10 gap-1 min-h-[44px] min-w-[44px]"
+          class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-warning/70 transition-colors hover:bg-warning/10 hover:text-warning"
         >
           <.icon name="hero-archive-box-mini" class="size-3.5" /> Archive
         </button>
         <button
           phx-click="delete_selected"
-          class="btn btn-ghost btn-sm min-h-[44px] text-error/70 hover:text-error hover:bg-error/10 gap-1"
+          class="focus-ring inline-flex min-h-[44px] items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-error/70 transition-colors hover:bg-error/10 hover:text-error"
         >
           <.icon name="hero-trash-mini" class="size-3.5" /> Delete
         </button>
         <button
           phx-click="exit_select_mode"
-          class="ml-auto btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px] text-base-content/40 hover:text-base-content/70"
+          class="focus-ring ml-auto inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
           aria-label="Exit select mode"
         >
           <.icon name="hero-x-mark" class="size-4" />
@@ -83,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
 
   def session_list(assigns) do
     ~H"""
-    <div class="mt-2 rounded-xl shadow-sm">
+    <div class="mt-2 rounded-box shadow-sm">
       <%= if @agents == [] do %>
         <.empty_state
           id="project-sessions-empty"
@@ -110,7 +110,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsTable do
               data-row-id={agent.id}
               class={
                 if Map.get(@depths, agent.id, 0) > 0,
-                  do: "ml-5 border-l-2 pl-3",
+                  do: "ml-5 border-l pl-3",
                   else: ""
               }
             >

@@ -73,12 +73,14 @@ defmodule EyeInTheSky.Claude.Parser do
     {:session_init, data}
   end
 
-  defp parse_event(%{
-         "type" => "system",
-         "subtype" => "hook_response",
-         "exit_code" => exit_code,
-         "hook_name" => hook_name
-       } = event)
+  defp parse_event(
+         %{
+           "type" => "system",
+           "subtype" => "hook_response",
+           "exit_code" => exit_code,
+           "hook_name" => hook_name
+         } = event
+       )
        when is_integer(exit_code) and exit_code != 0 do
     stderr = event["stderr"] || event["output"] || ""
     {:ok, Message.hook_failure(hook_name, exit_code, stderr)}

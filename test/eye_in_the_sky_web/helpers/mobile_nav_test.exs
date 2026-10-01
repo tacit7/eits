@@ -20,6 +20,10 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNavTest do
       assert MobileNav.active_tab_for_path("/tasks") == :tasks
     end
 
+    test "returns :tasks for /workspace/tasks" do
+      assert MobileNav.active_tab_for_path("/workspace/tasks") == :tasks
+    end
+
     test "returns :notes for /notes" do
       assert MobileNav.active_tab_for_path("/notes") == :notes
     end

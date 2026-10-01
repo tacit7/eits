@@ -97,7 +97,8 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
     """
   end
 
-  defp build_opts(state, context) do
+  @doc false
+  def build_opts(state, context) do
     optional_opts =
       [
         effort_level: context[:effort_level],
@@ -135,7 +136,15 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Claude do
       end
 
     extra = context[:extra_cli_opts] || []
-    base_opts ++ optional_opts ++ extra
+
+    Keyword.merge(base_opts ++ optional_opts, extra, fn
+      :append_system_prompt, eits_prompt, custom_prompt
+      when is_binary(eits_prompt) and is_binary(custom_prompt) ->
+        eits_prompt <> "\n\n" <> custom_prompt
+
+      _key, _default, override ->
+        override
+    end)
   end
 
   defp maybe_add_content_blocks(opts, []), do: opts

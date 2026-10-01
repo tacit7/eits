@@ -148,6 +148,12 @@ if [[ -n "$EITS_CLI" ]] && [[ -f "$EITS_CLI" ]]; then
   chmod +x "$BIN_DIR/eits"
   echo "✓ eits CLI installed to $BIN_DIR/eits"
 
+  if [[ -n "${EITS_EXTRAS:-}" ]] && [[ -f "$EITS_EXTRAS" ]]; then
+    cp "$EITS_EXTRAS" "$BIN_DIR/eits-extras"
+    chmod +x "$BIN_DIR/eits-extras"
+    echo "✓ eits legacy extras installed to $BIN_DIR/eits-extras"
+  fi
+
   # Record the repo root so 'eits skills install' can find priv/skills/ even when
   # running from the copied ~/.local/bin/eits (which has no symlink to follow).
   # This installer lives at priv/scripts/install-hooks.sh, so two levels up is repo root.

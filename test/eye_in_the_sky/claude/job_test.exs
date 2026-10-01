@@ -3,6 +3,20 @@ defmodule EyeInTheSky.Claude.JobTest do
 
   alias EyeInTheSky.Claude.{ContentBlock, Job}
 
+  describe "reply_context/1" do
+    test "returns the string-keyed context nested by normalize_context/1" do
+      ctx = %{"source" => "channel", "reply_mode" => "cli_required"}
+      job = Job.new("hi", Job.normalize_context(channel_id: 13, context: ctx))
+
+      assert Job.reply_context(job) == ctx
+    end
+
+    test "is nil when no context was supplied" do
+      job = Job.new("hi", Job.normalize_context(channel_id: 13))
+      assert Job.reply_context(job) == nil
+    end
+  end
+
   describe "new/2" do
     test "creates job with empty content_blocks by default" do
       job = Job.new("hello", %{has_messages: false})

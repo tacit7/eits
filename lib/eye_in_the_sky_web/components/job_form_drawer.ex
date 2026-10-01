@@ -1,7 +1,7 @@
 defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
   @moduledoc """
   Shared job creation/editing form drawer component.
-  Stateless — parent LiveView retains all state and handles all events.
+  Stateless | parent LiveView retains all state and handles all events.
   """
 
   use Phoenix.Component
@@ -59,15 +59,15 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 {if @editing_job, do: "Edit Job", else: "New Job"}
               </h2>
               <%= if @project || @form_scope do %>
-                <p class="text-xs text-base-content/50 mt-0.5">
+                <p class="text-mini text-base-content/50 mt-0.5">
                   {if @form_scope == "global",
-                    do: "Global — runs across all projects",
-                    else: "Project — scoped to #{@project && @project.name}"}
+                    do: "Global | runs across all projects",
+                    else: "Project | scoped to #{@project && @project.name}"}
                 </p>
               <% end %>
             </div>
             <button
-              class="btn btn-ghost btn-square min-w-[44px] min-h-[44px]"
+              class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
               phx-click="cancel_form"
               phx-target={@target}
             >
@@ -94,11 +94,11 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 name="job[name]"
                 value={@form[:name].value || ""}
                 class={[
-                  "input input-bordered w-full text-base",
+                  "input input-bordered w-full text-message",
                   @form[:name].errors != [] && "input-error"
                 ]}
               />
-              <p :for={err <- @form[:name].errors} class="mt-1 text-xs text-error">
+              <p :for={err <- @form[:name].errors} class="mt-1 text-mini text-error">
                 {translate_error(err)}
               </p>
             </div>
@@ -109,7 +109,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 type="text"
                 name="job[description]"
                 value={@form[:description].value || ""}
-                class="input input-bordered w-full text-base"
+                class="input input-bordered w-full text-message"
               />
             </div>
 
@@ -169,17 +169,17 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 phx-change={if @form_schedule_type == "cron", do: "validate_cron", else: nil}
                 phx-target={@target}
                 class={[
-                  "input input-bordered w-full font-mono text-base",
+                  "input input-bordered w-full font-mono text-message",
                   @form[:schedule_value].errors != [] && "input-error"
                 ]}
               />
-              <p :for={err <- @form[:schedule_value].errors} class="mt-1 text-xs text-error">
+              <p :for={err <- @form[:schedule_value].errors} class="mt-1 text-mini text-error">
                 {translate_error(err)}
               </p>
               <%= if @form_schedule_type == "cron" && (@form[:schedule_value].errors == [] || @form[:schedule_value].errors == nil) && (@form[:schedule_value].value || "") != "" do %>
                 <% preview = ScheduleDescription.preview(@form[:schedule_value].value) %>
                 <%= if preview do %>
-                  <p class="mt-2 text-xs text-base-content/70">
+                  <p class="mt-2 text-mini text-base-content/70">
                     <.icon name="hero-check-circle" class="inline size-3.5 text-success mr-1" /> {preview}
                   </p>
                 <% end %>
@@ -207,7 +207,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                 <label class="label"><span class="label-text">Instructions</span></label>
                 <textarea
                   name="job[config_instructions]"
-                  class="textarea textarea-bordered w-full text-base"
+                  class="textarea textarea-bordered w-full text-message"
                   rows="3"
                 ><%= cfg(@form_config, "instructions") %></textarea>
               </div>
@@ -232,7 +232,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                     type="text"
                     name="job[config_project_path]"
                     value={cfg(@form_config, "project_path")}
-                    class="input input-bordered w-full text-base"
+                    class="input input-bordered w-full text-message"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_description]"
                   value={cfg(@form_config, "description")}
-                  class="input input-bordered w-full text-base"
+                  class="input input-bordered w-full text-message"
                 />
               </div>
             <% end %>
@@ -254,7 +254,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_task]"
                   value={cfg(@form_config, "task")}
-                  class="input input-bordered w-full font-mono text-base"
+                  class="input input-bordered w-full font-mono text-message"
                   required
                 />
               </div>
@@ -266,7 +266,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_args]"
                   value={cfg(@form_config, "args")}
-                  class="input input-bordered w-full text-base"
+                  class="input input-bordered w-full text-message"
                 />
               </div>
               <div class="form-control">
@@ -275,7 +275,7 @@ defmodule EyeInTheSkyWeb.Components.JobFormDrawer do
                   type="text"
                   name="job[config_project_path]"
                   value={cfg(@form_config, "project_path")}
-                  class="input input-bordered w-full text-base"
+                  class="input input-bordered w-full text-message"
                 />
               </div>
             <% end %>

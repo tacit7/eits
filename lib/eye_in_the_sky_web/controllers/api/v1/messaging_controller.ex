@@ -87,25 +87,90 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
   """
   def wait_dm(conn, params) do
     session_raw = params["session"] || params["session_id"]
+    caller_session_raw = conn |> get_req_header("x-eits-session") |> List.first()
     timeout_ms = min(parse_int(params["timeout"], 25), 55) * 1000
 
     if is_nil(session_raw) or session_raw == "" do
       {:error, :bad_request, "session is required"}
     else
       with {:ok, session} <- SessionResolver.resolve(session_raw),
-           {:ok, since_dt} <- parse_since(params["since"]) do
+           :ok <- authorize_session_recipient(caller_session_raw, session.id),
+           {:ok, since_dt} <- parse_since(params["since"]),
+           {:ok, cursor} <- parse_watch_cursor(params, since_dt, timeout_ms) do
         # Subscribe before the initial DB check so a DM delivered in the gap
         # between the check and subscribing is still caught by the broadcast.
         EyeInTheSky.Events.subscribe_session(session.id)
 
-        case Messages.list_inbound_dms(session.id, 1, since: since_dt) do
-          [msg | _] -> json(conn, wait_dm_result(msg))
-          [] -> wait_for_dm(conn, session, System.monotonic_time(:millisecond) + timeout_ms)
+        deadline = System.monotonic_time(:millisecond) + timeout_ms
+
+        if cursor do
+          wait_for_watch(conn, session, cursor, deadline)
+        else
+          case Messages.list_inbound_dms(session.id, 1, since: since_dt) do
+            [msg | _] -> json(conn, wait_dm_result(msg))
+            [] -> wait_for_dm(conn, session, deadline)
+          end
         end
       else
+        {:error, :forbidden} -> {:error, :forbidden, "You are not the recipient of this message"}
         {:error, :not_found} -> {:error, :not_found, "session not found"}
         {:error, :bad_request, reason} -> {:error, :bad_request, reason}
       end
+    end
+  end
+
+  # Opt-in only: legacy wait/inbox timestamp and response contracts are unchanged.
+  defp parse_watch_cursor(%{"watch" => "true"} = params, since, timeout_ms) do
+    with %DateTime{} <- since,
+         raw_id when is_binary(raw_id) <- params["after_id"] || "0",
+         {id, ""} when id >= 0 and id <= 9_223_372_036_854_775_807 <-
+           Integer.parse(raw_id),
+         true <- timeout_ms >= 0 do
+      {:ok, {since, id}}
+    else
+      _ -> {:error, :bad_request, "watch requires since, nonnegative after_id and timeout"}
+    end
+  end
+
+  defp parse_watch_cursor(_params, _since, _timeout_ms), do: {:ok, nil}
+
+  defp wait_for_watch(conn, session, cursor, deadline) do
+    case watch_result(session.id, cursor) do
+      nil ->
+        remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+        receive do
+          # Broadcasts are wakeups only. Re-query committed rows so stale or
+          # out-of-order delivery cannot bypass the cursor or skip backlog.
+          {:new_dm, msg} when msg.to_session_id == session.id ->
+            wait_for_watch(conn, session, cursor, deadline)
+
+          _other ->
+            wait_for_watch(conn, session, cursor, deadline)
+        after
+          remaining ->
+            json(
+              conn,
+              watch_result(session.id, cursor) || %{items: [], count: 0, watch_cursor: true}
+            )
+        end
+
+      result ->
+        json(conn, result)
+    end
+  end
+
+  defp watch_result(session_id, cursor) do
+    case Messages.list_inbound_dms(session_id, 1, watch_cursor: cursor) do
+      [msg] ->
+        # Fixed precision makes lexical cursor comparisons safe in the CLI.
+        timestamp = %{msg.inserted_at | microsecond: {elem(msg.inserted_at.microsecond, 0), 6}}
+        result = wait_dm_result(msg)
+        items = Enum.map(result.items, &Map.put(&1, :inserted_at, DateTime.to_iso8601(timestamp)))
+        Map.merge(result, %{items: items, watch_cursor: true})
+
+      [] ->
+        nil
     end
   end
 
@@ -235,14 +300,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
     SessionResolver.resolve(raw)
   end
 
-  # waiting = sdk-cli session ended and queued for resume; DM will be delivered on next wakeup
-  @receivable_statuses ~w(working idle waiting)
-
   defp do_dm(conn, params, from_raw, to_raw) do
     with {:ok, from_session} <- resolve_dm_sender(from_raw),
          :ok <- check_sender_not_terminated(from_session),
-         {:ok, to_session} <- resolve_dm_receiver(to_raw),
-         :ok <- check_receiver_reachable(to_session) do
+         {:ok, to_session} <- resolve_dm_receiver(to_raw) do
       response_required = params["response_required"] in [true, "true", "1", 1]
       sender_name = ApiPresenter.resolve_session_sender_name(from_session)
 
@@ -266,7 +327,10 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       case Messages.find_recent_dm(to_session.id, dm_body, seconds: 30) do
         nil ->
-          case DMDelivery.deliver_and_persist(to_session.id, from_session.id, dm_body, metadata) do
+          delivery_result =
+            DMDelivery.deliver_or_persist(to_session.id, from_session.id, dm_body, metadata)
+
+          case delivery_result do
             {:ok, msg} ->
               maybe_send_test_message_auto_reply(from_session, to_session, params["message"])
               dm_success(conn, to_session, msg)
@@ -335,10 +399,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
 
       {:error, :receiver_not_found} ->
         {:error, :not_found, "Target session not found"}
-
-      {:error, :receiver_not_receivable} ->
-        {:error, :unprocessable_entity,
-         "Target session is terminated (completed or failed) and cannot receive DMs"}
     end
   end
 
@@ -354,12 +414,6 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingController do
       {:ok, session} -> {:ok, session}
       {:error, :not_found} -> {:error, :receiver_not_found}
     end
-  end
-
-  defp check_receiver_reachable(session) do
-    if session.status in @receivable_statuses,
-      do: :ok,
-      else: {:error, :receiver_not_receivable}
   end
 
   defp dm_success(conn, to_session, msg) do

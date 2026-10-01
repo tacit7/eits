@@ -56,11 +56,12 @@ defmodule EyeInTheSkyWeb.SettingsProvidersTabTest do
   end
 
   setup do
+    previous_control = Application.fetch_env!(:eye_in_the_sky, :pi_control_module)
     Application.put_env(:eye_in_the_sky, :pi_control_module, FakeControl)
     ModelDiscoveryCache.invalidate()
 
     on_exit(fn ->
-      Application.delete_env(:eye_in_the_sky, :pi_control_module)
+      Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control)
       ModelDiscoveryCache.invalidate()
     end)
 
@@ -91,8 +92,12 @@ defmodule EyeInTheSkyWeb.SettingsProvidersTabTest do
     html = render(view)
 
     cond do
-      html =~ expect -> html
-      System.monotonic_time(:millisecond) > deadline -> flunk("timeout waiting for: #{expect}")
+      html =~ expect ->
+        html
+
+      System.monotonic_time(:millisecond) > deadline ->
+        flunk("timeout waiting for: #{expect}")
+
       true ->
         Process.sleep(25)
         do_render_until(view, expect, deadline)

@@ -17,7 +17,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
 
   - `/projects/:id` and all `/projects/:id/*` sub-routes → `:project`
   - `/dm/:session_id` → `:sessions` (highlights Sessions tab so users can navigate back)
-  - `/tasks` → `:tasks`
+  - `/tasks`, `/workspace/tasks` → `:tasks`
   - `/notes` → `:notes`
   - `/`, `/sessions` → `:sessions`
   - Everything else (settings, usage, prompts, etc.) → `:none`
@@ -28,7 +28,7 @@ defmodule EyeInTheSkyWeb.Helpers.MobileNav do
   def active_tab_for_path(path) when is_binary(path) do
     cond do
       project_route?(path) -> :project
-      path == "/tasks" -> :tasks
+      path in ["/tasks", "/workspace/tasks"] -> :tasks
       path == "/notes" -> :notes
       path in ["/", "/sessions"] -> :sessions
       String.starts_with?(path, "/dm/") -> :sessions

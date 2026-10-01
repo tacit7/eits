@@ -1,9 +1,11 @@
 ---
 name: eits-workflow
-description: EITS task, commit, and note workflow for agents. Use when an agent needs to log work, create/claim/complete tasks, log commits, or add notes during a session. Triggers on: "begin a task", "log this commit", "mark task done", "add a note", or any task lifecycle questions.
-user-invocable: true
+description: >-
+  EITS task, commit, and note workflow for agents. Use when an agent needs to log
+  work, create/claim/complete tasks, log commits, or add notes during a session.
+  Triggers on: "begin a task", "log this commit", "mark task done", "add a
+  note", or any task lifecycle questions.
 allowed-tools: Bash
-argument-hint: "[task|commit|note|dm]"
 ---
 
 # EITS Workflow
@@ -43,6 +45,28 @@ eits tasks begin --title "..."
 # ... do work ...
 eits tasks complete <task_id> --message "What was done"
 ```
+
+## Inbox Polling
+
+Use `eits dm inbox --since-session --team-only --json`:
+
+- before claiming work
+- after major task state transitions
+- before `eits tasks complete`
+- after sending a completion DM, to catch follow-up work
+
+## Work Checkpoints
+
+Use `eits work status` or `eits work checkpoint` when you need one session-level snapshot instead of piecing together multiple commands.
+
+Run it:
+
+- at session start or resume, before touching files
+- immediately after `eits tasks claim`
+- after a major state transition that may affect ownership, team membership, or git state
+- before `eits tasks complete` or handing the work off
+
+Prefer the checkpoint command for a quick local audit of your current session. It summarizes the active session, claimed tasks, team memberships, inbound DMs, git/worktree health, and commit-tracking status, while `eits dm inbox --since-session --team-only --json` remains the durable team-message check.
 
 ### Manual fallback
 ```bash

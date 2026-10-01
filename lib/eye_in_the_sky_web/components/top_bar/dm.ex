@@ -28,49 +28,49 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         active={@active_tab in ["messages", nil]}
         on_click="change_tab"
         value="messages"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Tasks"
         active={@active_tab == "tasks"}
         on_click="change_tab"
         value="tasks"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Commits"
         active={@active_tab == "commits"}
         on_click="change_tab"
         value="commits"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Notes"
         active={@active_tab == "notes"}
         on_click="change_tab"
         value="notes"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Context"
         active={@active_tab == "context"}
         on_click="change_tab"
         value="context"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Tools"
         active={@active_tab == "tools"}
         on_click="change_tab"
         value="tools"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Settings"
         active={@active_tab == "settings"}
         on_click="change_tab"
         value="settings"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
     </.tab_pills>
     <div class="flex-1" />
@@ -85,18 +85,18 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
       class="w-48"
     />
     <%!-- ... menu --%>
-    <div class="dropdown dropdown-end">
+    <div class="eits-dropdown">
       <button
         tabindex="0"
-        class="btn btn-ghost btn-square w-7 h-7 text-base-content/50 hover:text-base-content/75"
+        class="focus-ring flex h-7 w-7 items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
         aria-label="More options"
       >
         <.icon name="hero-ellipsis-horizontal" class="size-4" />
       </button>
       <ul
-        id="dm-topbar-dropdown-menu"
+        id="dm-topbar-relative-menu"
         tabindex="0"
-        class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-xs"
+        class="eits-menu absolute right-0 eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @session_uuid do %>
           <li id="dm-topbar-li-uuid">
@@ -104,10 +104,10 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
               id="top-bar-copy-uuid"
               phx-hook="CopyToClipboard"
               data-copy={@session_uuid}
-              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-mini"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box font-mono text-mini"
             >
               <.icon name="hero-clipboard-document" class="size-3.5 flex-shrink-0" />
-              Copy {String.slice(@session_uuid, 0..7)}…
+              Copy {String.slice(@session_uuid, 0..7)}...
             </button>
           </li>
         <% end %>
@@ -115,20 +115,22 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           <li id="dm-topbar-li-iterm">
             <button
               phx-click="open_iterm"
-              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box"
             >
               <.icon name="hero-command-line" class="size-3.5" /> Open in iTerm
             </button>
           </li>
         <% end %>
         <%= if @session_uuid || @show_iterm do %>
-          <li id="dm-topbar-li-div1"><div class="divider my-0"></div></li>
+          <li id="dm-topbar-li-div1">
+            <div class="divider my-0"></div>
+          </li>
         <% end %>
         <li id="dm-topbar-li-reload">
           <button
             phx-click="sync_messages"
             class={[
-              "flex items-center gap-2 px-3 py-2 w-full text-left rounded",
+              "flex items-center gap-2 px-3 py-2 w-full text-left rounded-box",
               !@session_active && "hover:bg-base-content/5",
               @session_active && "opacity-40 cursor-not-allowed"
             ]}
@@ -145,7 +147,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <li>
           <button
             phx-click={JS.dispatch("dm:reload-check", to: "#dm-reload-confirm-modal")}
-            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded text-warning"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box text-warning"
           >
             <.icon name="hero-arrow-path" class="size-3.5" /> Reload from file
           </button>
@@ -153,12 +155,14 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
         <li id="dm-topbar-li-export">
           <button
             phx-click="export_markdown"
-            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box"
           >
             <.icon name="hero-clipboard-document" class="size-3.5" /> Export as Markdown
           </button>
         </li>
-        <li id="dm-topbar-li-div2"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-div2">
+          <div class="divider my-0"></div>
+        </li>
         <li id="dm-topbar-li-notify">
           <button
             id="topbar-push-setup-btn"
@@ -167,16 +171,18 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
             data-push-state="disabled"
             data-notify-on-stop={if @notify_on_stop, do: "true", else: "false"}
             title="Enable notifications"
-            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box"
           >
             <.icon name="hero-bell" class="size-3.5" /> Notify
           </button>
         </li>
-        <li id="dm-topbar-li-div3"><div class="divider my-0"></div></li>
+        <li id="dm-topbar-li-div3">
+          <div class="divider my-0"></div>
+        </li>
         <li id="dm-topbar-li-schedule">
           <button
             phx-click="open_schedule_timer"
-            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded"
+            class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded-box"
           >
             <.icon name="hero-clock" class="size-3.5" /> Schedule Message
           </button>
@@ -185,7 +191,7 @@ defmodule EyeInTheSkyWeb.TopBar.DM do
           <li id="dm-topbar-li-cancel">
             <button
               phx-click="cancel_timer"
-              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded"
+              class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-error/10 text-error rounded-box"
             >
               <.icon name="hero-x-circle" class="size-3.5" /> Cancel Schedule
             </button>

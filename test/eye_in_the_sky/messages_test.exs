@@ -135,12 +135,19 @@ defmodule EyeInTheSky.MessagesTest do
 
       usage = %{"input_tokens" => 200, "output_tokens" => 80}
 
-      {:ok, _msg} =
+      {:ok, msg} =
         Messages.record_incoming_reply(session.id, "claude", "done",
           metadata: %{"usage" => usage}
         )
 
-      assert Messages.total_tokens_for_session(session.id) == 280
+      # Body match merges metadata onto the existing row (an update, not an insert),
+      # so the session's incremental token cache is untouched — assert on the row directly.
+      assert get_in(msg.metadata, ["usage", "input_tokens"]) == 200
+      assert get_in(msg.metadata, ["usage", "output_tokens"]) == 80
+
+      all = Messages.list_messages_for_session(session.id)
+      agent_msgs = Enum.filter(all, &(&1.body == "done" and &1.sender_role == "agent"))
+      assert length(agent_msgs) == 1
     end
 
     test "updates metadata when found by source_uuid (sync-then-reply race)" do
@@ -175,6 +182,42 @@ defmodule EyeInTheSky.MessagesTest do
       updated = EyeInTheSky.Repo.get!(EyeInTheSky.Messages.Message, msg.id)
       assert get_in(updated.metadata, ["usage", "input_tokens"]) == 500
       assert get_in(updated.metadata, ["usage", "output_tokens"]) == 200
+    end
+
+    test "deduplicates by body when BulkImporter wins the race (different source_uuids)" do
+      # Regression for: session 3576 duplicate messages (ids 2171647 + 2171733).
+      # BulkImporter inserts first with source_uuid X (bare metadata).
+      # record_incoming_reply then runs with source_uuid Y and rich metadata.
+      # Without body-match dedup, find_or_create misses (Y != X) and inserts a second row.
+      session = create_session()
+      source_uuid_x = Ecto.UUID.generate()
+      source_uuid_y = Ecto.UUID.generate()
+      body = "Final agent reply body #{uniq()}"
+      rich_metadata = %{"total_cost_usd" => 0.0042, "num_turns" => 7, "stream_type" => "result"}
+
+      # Step 1: BulkImporter path — inserts with source_uuid X, no metadata
+      insert_message(session.id, source_uuid: source_uuid_x, body: body)
+
+      # Step 2: save_result path — same body, different source_uuid, rich metadata
+      {:ok, returned} =
+        Messages.record_incoming_reply(session.id, "claude", body,
+          source_uuid: source_uuid_y,
+          metadata: rich_metadata
+        )
+
+      # Only ONE row should exist for this body
+      all = Messages.list_messages_for_session(session.id)
+      agent_msgs = Enum.filter(all, &(&1.body == body and &1.sender_role == "agent"))
+      assert length(agent_msgs) == 1
+
+      # source_uuid is the original (X), not the duplicate (Y)
+      [surviving] = agent_msgs
+      assert surviving.source_uuid == source_uuid_x
+
+      # Returned message is the existing one, enriched with rich metadata
+      assert returned.id == surviving.id
+      assert returned.metadata["total_cost_usd"] == 0.0042
+      assert returned.metadata["num_turns"] == 7
     end
   end
 

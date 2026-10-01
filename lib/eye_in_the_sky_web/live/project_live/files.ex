@@ -18,10 +18,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     only: [read_file_safe_detailed: 1, path_within?: 2]
 
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [file_listing: 1]
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
 
   require Logger
 
-  alias EyeInTheSky.{Editors, Events, Projects, Settings}
+  alias EyeInTheSky.{Editors, Events, Settings}
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
@@ -29,6 +30,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
+    project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
+
     socket =
       socket
       |> assign(:file_path, nil)
@@ -44,7 +48,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
       |> assign(:installed_editors, Editors.detect_installed())
       |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
-    case parse_int(id) do
+    case project_id do
       nil ->
         {:ok,
          socket
@@ -53,9 +57,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
          |> assign(:error, "Invalid project ID")
          |> put_flash(:error, "Invalid project ID")}
 
-      project_id ->
-        case Projects.get_project(project_id) do
-          {:error, :not_found} ->
+      _ ->
+        case project do
+          nil ->
             {:ok,
              socket
              |> assign(:page_title, "Project Not Found")
@@ -63,7 +67,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
              |> assign(:error, "Project not found")
              |> put_flash(:error, "Project not found")}
 
-          {:ok, project} ->
+          project ->
             socket =
               socket
               |> assign(:page_title, "Files - #{project.name}")
@@ -277,7 +281,8 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     payload_path = Map.get(payload, "path", "")
     original_hash = Map.get(payload, "original_hash", "")
 
-    with {:ok, full_path} <- resolve_write_target(payload_path, socket.assigns.file_full_path, project.path),
+    with {:ok, full_path} <-
+           resolve_write_target(payload_path, socket.assigns.file_full_path, project.path),
          :ok <- verify_disk_hash(full_path, original_hash),
          :ok <- File.write(full_path, content) do
       new_hash = hash_content(content)
@@ -379,7 +384,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
     ~H"""
     <%= if @error do %>
       <div class="p-4">
-        <div class="alert alert-error">
+        <div class="eits-alert eits-alert--error">
           <.icon name="hero-x-circle" class="shrink-0 size-6" />
           <span>{@error}</span>
         </div>
@@ -391,12 +396,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
           <%= if @show_back_button && @file_path && @file_path != "." do %>
             <.link
               patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-              class="btn btn-ghost btn-xs btn-square"
+              class="eits-action eits-action--ghost eits-action--icon"
             >
               <.icon name="hero-arrow-left" class="size-4" />
             </.link>
           <% end %>
-          <span class="text-xs text-base-content/50 font-mono truncate flex-1 min-w-0">
+          <span class="text-mini text-base-content/50 font-mono truncate flex-1 min-w-0">
             {@file_path}
           </span>
           <.open_in_editor_button
@@ -420,7 +425,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
         <div class="text-center">
           <.icon name="hero-document-text" class="w-16 h-16 mx-auto text-base-content/20 mb-4" />
           <h3 class="text-lg font-semibold text-base-content/60 mb-2">{@empty_label}</h3>
-          <p class="text-sm text-base-content/40">{@empty_description}</p>
+          <p class="text-message text-base-content/40">{@empty_description}</p>
         </div>
       </div>
     <% end %>
@@ -486,14 +491,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             >
               <.icon name="hero-no-symbol" class="size-4" />
               {@item.name}
-              <span class="badge badge-ghost badge-xs ml-auto font-mono">bin</span>
+              <span class="eits-chip eits-chip--muted eits-chip--mono ml-auto">bin</span>
             </span>
           <% else %>
             <.link patch={~p"/projects/#{@project_id}/files?path=#{@item.path}&mode=tree"}>
               <.icon name="hero-document" class="size-4" />
               {@item.name}
               <%= if @item.size do %>
-                <span class="badge badge-ghost badge-xs ml-auto">{@item.size}</span>
+                <span class="eits-chip eits-chip--muted ml-auto">{@item.size}</span>
               <% end %>
             </.link>
           <% end %>
@@ -506,19 +511,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
   def render(assigns) do
     ~H"""
     <div class="flex flex-col h-full">
-      <!-- View Mode Toggle -->
+      <%!-- View Mode Toggle --%>
       <div class="flex-shrink-0 bg-base-100 border-b border-base-300">
         <div class="px-4 sm:px-6 lg:px-8 py-2">
-          <div class="btn-group btn-group-sm">
+          <div class="flex items-center gap-1 rounded-box bg-base-200/45 p-0.5">
             <button
-              class={"btn btn-sm" <> if @view_mode == :list, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :list, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >
               <.icon name="hero-bars-3" class="size-4" /> List
             </button>
             <button
-              class={"btn btn-sm" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :tree, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
@@ -552,23 +563,23 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_tree_view(assigns) do
     ~H"""
-    <!-- Tree View -->
+    <%!-- Tree View --%>
     <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-      <!-- File Tree Sidebar -->
+      <%!-- File Tree Sidebar --%>
       <div
         id="file-tree-sidebar"
         class="w-full md:w-80 md:flex-shrink-0 border-b md:border-b-0 md:border-r border-base-300 bg-base-100 overflow-y-auto max-h-80 md:max-h-none md:h-full"
         phx-update="ignore"
       >
         <div class="p-3 md:p-4">
-          <h2 class="text-sm font-semibold text-base-content/80 mb-2">Files</h2>
-          <ul class="menu menu-sm bg-base-200 rounded-lg max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
+          <h2 class="text-message font-semibold text-base-content/80 mb-2">Files</h2>
+          <ul class="eits-menu-list bg-base-200 rounded-box max-sm:[&_summary]:min-h-[44px] max-sm:[&_a]:min-h-[44px]">
             <.tree_item :for={item <- @file_tree} item={item} project_id={@project.id} />
           </ul>
         </div>
       </div>
 
-    <!-- File Content Viewer -->
+      <%!-- File Content Viewer --%>
       <div class="flex-1 min-h-0 overflow-hidden">
         <.file_content_pane
           error={@error}
@@ -605,13 +616,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
 
   defp file_list_view(assigns) do
     ~H"""
-    <!-- List View -->
+    <%!-- List View --%>
     <div class="flex-1 min-h-0 overflow-auto">
       <%= if @files != [] && !@file_content do %>
-        <!-- Directory Listing -->
+        <%!-- Directory Listing --%>
         <div class="p-6">
           <%= if @error do %>
-            <div class="alert alert-error mb-4">
+            <div class="eits-alert eits-alert--error mb-4">
               <.icon name="hero-x-circle" class="shrink-0 size-6" />
               <span>{@error}</span>
             </div>
@@ -620,7 +631,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Files do
             <%= if @file_path && @file_path != "." do %>
               <.link
                 patch={~p"/projects/#{@project.id}/files?path=#{Path.dirname(@file_path)}"}
-                class="btn btn-sm btn-ghost mb-4"
+                class="eits-action eits-action--ghost mb-4 gap-1.5"
               >
                 <.icon name="hero-arrow-left" class="size-4" /> Back
               </.link>

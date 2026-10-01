@@ -16,12 +16,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
           <.icon name="hero-magnifying-glass-mini" class="size-3" />
         </span>
         <input
+          id="rail-team-search"
           type="text"
           value={@team_search}
-          placeholder="Search teams…"
+          placeholder="Search teams..."
           phx-keyup="update_team_search"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="focus-ring h-7 w-full rounded-box border border-base-content/10 bg-base-content/5 pl-6 pr-2 text-micro text-base-content/80 placeholder:text-base-content/30 focus:border-primary/40"
         />
       </div>
 
@@ -43,14 +44,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
   def teams_content(assigns) do
     ~H"""
     <%= if @teams == [] do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">
         {if @team_search != "" or @team_status != "all", do: "No matching teams", else: "No teams"}
       </div>
     <% end %>
     <.link
       :if={@teams != []}
       navigate={Helpers.teams_route(@sidebar_project)}
-      class="block px-3 pb-1 text-xs text-base-content/40 hover:text-base-content/70 transition-colors"
+      class="focus-ring block rounded-box px-3 pb-1 text-micro text-base-content/40 transition-colors hover:text-base-content/70"
     >
       All Teams &rarr;
     </.link>
@@ -58,10 +59,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
       <.link
         navigate={team_route(@sidebar_project, team.id)}
         data-vim-flyout-item
-        class="flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+        class="focus-ring flex h-8 items-center gap-2 rounded-box px-3 text-mini text-base-content/65 transition-colors hover:bg-base-content/5 hover:text-base-content/90 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
       >
         <.icon name="hero-users" class="size-3 flex-shrink-0 text-base-content/30" />
-        <span class="truncate text-xs font-medium">{team.name}</span>
+        <span class="truncate text-mini font-medium">{team.name}</span>
         <span :if={team.status == "archived"} class="text-micro text-base-content/30 flex-shrink-0">
           archived
         </span>
@@ -84,10 +85,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.TeamsSection do
     ~H"""
     <% active = @current == @value %>
     <button
+      type="button"
       phx-click="set_team_status"
       phx-value-status={@value}
       class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
+        "focus-ring rounded-box px-1.5 py-0.5 text-nano transition-colors",
         if(active,
           do: "bg-primary/15 text-primary font-medium",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"

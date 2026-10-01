@@ -5,9 +5,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShowTest do
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Prompts
 
-  setup do
+  setup %{user: user} do
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "Test Project",
         path: "/tmp/test_project"
       })

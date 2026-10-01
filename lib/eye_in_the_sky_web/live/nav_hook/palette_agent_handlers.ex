@@ -179,7 +179,12 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteAgentHandlers do
          error: "Agent UUID is required"
        })}
     else
-      {:halt, push_event(socket, "palette:resume-agent-result", do_resume_agent(agent_uuid, new_instructions))}
+      {:halt,
+       push_event(
+         socket,
+         "palette:resume-agent-result",
+         do_resume_agent(agent_uuid, new_instructions)
+       )}
     end
   end
 

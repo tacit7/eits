@@ -94,7 +94,9 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   Check if a due date is today.
   """
   def due_today?(nil), do: false
-  def due_today?(%DateTime{} = dt), do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :eq
+
+  def due_today?(%DateTime{} = dt),
+    do: Date.compare(DateTime.to_date(dt), Date.utc_today()) == :eq
 
   def due_today?(datetime) when is_binary(datetime) do
     case Date.from_iso8601(String.slice(datetime, 0..9)) do
@@ -139,14 +141,14 @@ defmodule EyeInTheSkyWeb.Helpers.TaskHelpers do
   def days_since_update(_), do: nil
 
   @doc """
-  CSS classes for card aging indicator.
-  Returns {border_class, label} or nil if card is fresh.
+  CSS classes for panel aging indicator.
+  Returns {border_class, label} or nil if panel is fresh.
   """
   def card_aging_indicator(updated_at) do
     case days_since_update(updated_at) do
       nil -> nil
-      days when days >= 14 -> {"border-l-2 border-l-error/60", "#{days}d stale"}
-      days when days >= 7 -> {"border-l-2 border-l-warning/60", "#{days}d idle"}
+      days when days >= 14 -> {"border-l border-l-error/60", "#{days}d stale"}
+      days when days >= 7 -> {"border-l border-l-warning/60", "#{days}d idle"}
       _days -> nil
     end
   end

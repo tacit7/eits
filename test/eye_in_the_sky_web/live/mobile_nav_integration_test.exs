@@ -9,16 +9,19 @@ defmodule EyeInTheSkyWeb.Live.MobileNavIntegrationTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.Projects
+  alias EyeInTheSky.{Projects, Workspaces}
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
+    workspace = Workspaces.default_workspace_for_user!(user)
+
     {:ok, project} =
       Projects.create_project(%{
         name: "nav-test-#{uniq()}",
         path: "/tmp/nav-test-#{uniq()}",
-        slug: "nav-test-#{uniq()}"
+        slug: "nav-test-#{uniq()}",
+        workspace_id: workspace.id
       })
 
     project
@@ -42,9 +45,7 @@ defmodule EyeInTheSkyWeb.Live.MobileNavIntegrationTest do
       assert active_nav_tab(view) == :sessions
     end
 
-    @tag :skip
     test "Tasks tab active on /tasks", %{conn: conn} do
-      # /tasks is a REST controller, not a LiveView — no global tasks LiveView exists
       {:ok, view, _html} = live(conn, ~p"/tasks")
       assert active_nav_tab(view) == :tasks
     end
@@ -68,52 +69,52 @@ defmodule EyeInTheSkyWeb.Live.MobileNavIntegrationTest do
   end
 
   describe "project routes — Project tab must be active" do
-    test "Project tab active on /projects/:id", %{conn: conn} do
-      project = create_project()
+    test "Project tab active on /projects/:id", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}")
       assert active_nav_tab(view) == :project
     end
 
-    test "Project tab active on /projects/:id/sessions", %{conn: conn} do
-      project = create_project()
+    test "Project tab active on /projects/:id/sessions", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
       assert active_nav_tab(view) == :project
     end
 
-    test "Project tab active on /projects/:id/tasks", %{conn: conn} do
-      project = create_project()
+    test "Project tab active on /projects/:id/tasks", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
       assert active_nav_tab(view) == :project
     end
 
-    test "Project tab active on /projects/:id/kanban", %{conn: conn} do
-      project = create_project()
+    test "Project tab active on /projects/:id/kanban", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/kanban")
       assert active_nav_tab(view) == :project
     end
 
-    test "Project tab active on /projects/:id/notes", %{conn: conn} do
-      project = create_project()
+    test "Project tab active on /projects/:id/notes", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/notes")
       assert active_nav_tab(view) == :project
     end
   end
 
   describe "Session tab does NOT activate on project sub-routes" do
-    test "Sessions tab inactive on /projects/:id/sessions", %{conn: conn} do
-      project = create_project()
+    test "Sessions tab inactive on /projects/:id/sessions", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
       refute active_nav_tab(view) == :sessions
     end
 
-    test "Tasks tab inactive on /projects/:id/tasks", %{conn: conn} do
-      project = create_project()
+    test "Tasks tab inactive on /projects/:id/tasks", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/tasks")
       refute active_nav_tab(view) == :tasks
     end
 
-    test "Notes tab inactive on /projects/:id/notes", %{conn: conn} do
-      project = create_project()
+    test "Notes tab inactive on /projects/:id/notes", %{conn: conn, user: user} do
+      project = create_project(user)
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/notes")
       refute active_nav_tab(view) == :notes
     end

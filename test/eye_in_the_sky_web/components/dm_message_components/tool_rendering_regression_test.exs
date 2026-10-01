@@ -41,10 +41,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "output stream type routing" do
     test "message_body with stream_type 'output' renders through output widget, not plain Markdown" do
-      message = msg(
-        body: "some command stdout here",
-        metadata: %{"stream_type" => "output"}
-      )
+      message =
+        msg(
+          body: "some command stdout here",
+          metadata: %{"stream_type" => "output"}
+        )
 
       html =
         render_component(
@@ -61,10 +62,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
     end
 
     test "message_body with stream_type 'output' in compact mode renders output widget" do
-      message = msg(
-        body: "line 1\nline 2",
-        metadata: %{"stream_type" => "output"}
-      )
+      message =
+        msg(
+          body: "line 1\nline 2",
+          metadata: %{"stream_type" => "output"}
+        )
 
       html =
         render_component(
@@ -83,10 +85,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
     end
 
     test "message_body with stream_type 'tool_result' renders through output widget" do
-      message = msg(
-        body: "command result",
-        metadata: %{"stream_type" => "tool_result"}
-      )
+      message =
+        msg(
+          body: "command result",
+          metadata: %{"stream_type" => "tool_result"}
+        )
 
       html =
         render_component(
@@ -108,10 +111,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "bash stream type routing" do
     test "message_body with stream_type 'bash' and tool-call body renders call widget" do
-      message = msg(
-        body: ~s(> `Bash` {"command":"echo hello"}),
-        metadata: %{"stream_type" => "bash"}
-      )
+      message =
+        msg(
+          body: ~s(> `Bash` {"command":"echo hello"}),
+          metadata: %{"stream_type" => "bash"}
+        )
 
       html =
         render_component(
@@ -126,6 +130,75 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
       assert html =~ "Bash",
              "stream_type='bash' with call body must route to call widget"
     end
+
+    test "bash tool JSON renders exit code and output" do
+      html =
+        render_component(
+          &ToolWidget.tool_widget/1,
+          name: "Bash",
+          rest: Jason.encode!(%{"command" => "mix test", "exit_code" => 2, "output" => "failed"}),
+          compact: false,
+          flat: false
+        )
+
+      assert html =~ "exit 2"
+      assert html =~ "Output"
+      assert html =~ "failed"
+    end
+  end
+
+  describe "thinking and Codex failure rendering" do
+    test "thinking metadata is hidden unless show_thinking_blocks is true" do
+      message =
+        msg(
+          body: "answer",
+          metadata: %{"thinking" => "private reasoning"}
+        )
+
+      hidden =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          show_thinking_blocks: false
+        )
+
+      visible =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          show_thinking_blocks: true
+        )
+
+      refute hidden =~ "private reasoning"
+      assert visible =~ "private reasoning"
+    end
+
+    test "Codex failure card renders normalized metadata badges" do
+      message =
+        msg(
+          body: "The 'gpt-5.2' model is not supported.",
+          metadata: %{
+            "stream_type" => "codex_error",
+            "error_title" => "Codex error",
+            "status" => 400,
+            "error_type" => "invalid_request_error",
+            "model" => "gpt-5.2"
+          }
+        )
+
+      html =
+        render_component(
+          &DmMessageComponents.message_body/1,
+          message: message,
+          compact: false,
+          flat: false
+        )
+
+      assert html =~ "Codex error"
+      assert html =~ "HTTP 400"
+      assert html =~ "invalid_request_error"
+      assert html =~ "model gpt-5.2"
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -134,10 +207,11 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolRenderingRegressionT
 
   describe "tool_use stream type routes to call widget" do
     test "message_body with stream_type 'tool_use' and parsed segments renders call widget" do
-      message = msg(
-        body: ~s(> `Write` {"file_path":"/tmp/x","content":"hello"}),
-        metadata: %{"stream_type" => "tool_use"}
-      )
+      message =
+        msg(
+          body: ~s(> `Write` {"file_path":"/tmp/x","content":"hello"}),
+          metadata: %{"stream_type" => "tool_use"}
+        )
 
       html =
         render_component(

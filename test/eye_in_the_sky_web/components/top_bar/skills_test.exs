@@ -22,21 +22,21 @@ defmodule EyeInTheSkyWeb.TopBar.SkillsTest do
       html = render_component(&Skills.toolbar/1, %{})
 
       assert html =~ "Type:"
-      assert html =~ "skills-type-dropdown"
+      assert html =~ "skills-type-relative"
     end
 
     test "renders scope filter dropdown" do
       html = render_component(&Skills.toolbar/1, %{})
 
       assert html =~ "Source:"
-      assert html =~ "skills-scope-dropdown"
+      assert html =~ "skills-scope-relative"
     end
 
     test "renders sort dropdown" do
       html = render_component(&Skills.toolbar/1, %{})
 
       assert html =~ "Sort:"
-      assert html =~ "skills-sort-dropdown"
+      assert html =~ "skills-sort-relative"
     end
 
     test "renders all type options" do
@@ -106,7 +106,7 @@ defmodule EyeInTheSkyWeb.TopBar.SkillsTest do
     test "renders dropdown elements" do
       html = render_component(&Skills.toolbar/1, %{})
 
-      assert html =~ "dropdown"
+      assert html =~ "eits-menu"
     end
 
     test "renders with default type, scope, and sort labels when no props passed" do

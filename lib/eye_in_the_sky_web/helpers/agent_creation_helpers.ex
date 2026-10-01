@@ -28,6 +28,7 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
   def build_opts(params, overrides \\ []) do
     max_turns = parse_int(params["max_turns"])
     project_path = Keyword.get(overrides, :project_path)
+    agent_type = params["agent_type"] || "claude"
 
     worktree =
       case params["worktree"] do
@@ -39,37 +40,46 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
     from_pr = parse_int(params["from_pr"])
 
     advanced_opts =
-      []
-      |> maybe_opt(:permission_mode, params["permission_mode"])
-      |> maybe_opt(:max_turns, if(is_integer(max_turns) and max_turns > 0, do: max_turns))
-      |> maybe_opt(:fallback_model, params["fallback_model"])
-      |> maybe_opt(:from_pr, if(is_integer(from_pr) and from_pr > 0, do: from_pr))
-      |> maybe_opt(:output_format, params["output_format"])
-      |> maybe_opt(:input_format, params["input_format"])
-      |> maybe_opt(:json_schema, params["json_schema"])
-      |> maybe_opt(:allowed_tools, params["allowed_tools"])
-      |> maybe_opt(:permission_prompt_tool, params["permission_prompt_tool"])
-      |> maybe_opt(:add_dir, params["add_dir"])
-      |> maybe_opt(:mcp_config, params["mcp_config"])
-      |> maybe_opt(:plugin_dir, params["plugin_dir"])
-      |> maybe_opt(:settings_file, params["settings_file"])
-      |> maybe_opt(:agents_json, params["agents_json"])
-      |> maybe_opt(:agent, params["agent_flag"])
-      |> maybe_opt(:system_prompt, params["system_prompt"])
-      |> maybe_opt(:system_prompt_file, params["system_prompt_file"])
-      |> maybe_opt(:append_system_prompt, params["append_system_prompt"])
-      |> maybe_opt(:append_system_prompt_file, params["append_system_prompt_file"])
-      |> maybe_opt(:debug, params["debug"])
-      |> maybe_opt(:bare, bool_param(params, "bare"))
-      |> maybe_opt(:verbose, bool_param(params, "verbose"))
-      |> maybe_opt(:include_partial_messages, bool_param(params, "include_partial_messages"))
-      |> maybe_opt(:no_session_persistence, bool_param(params, "no_session_persistence"))
-      |> maybe_opt(:chrome, bool_param(params, "chrome"))
-      |> maybe_opt(:sandbox, bool_param(params, "sandbox"))
-      |> maybe_opt(:skip_permissions, bool_param(params, "dangerously_skip_permissions"))
+      case agent_type do
+        "codex" ->
+          []
+          |> maybe_opt(:sandbox, params["sandbox"])
+          |> maybe_opt(:ask_for_approval, params["ask_for_approval"])
+          |> maybe_opt(:bypass_sandbox, bool_param(params, "bypass_sandbox"))
+
+        _ ->
+          []
+          |> maybe_opt(:permission_mode, params["permission_mode"])
+          |> maybe_opt(:max_turns, if(is_integer(max_turns) and max_turns > 0, do: max_turns))
+          |> maybe_opt(:fallback_model, params["fallback_model"])
+          |> maybe_opt(:from_pr, if(is_integer(from_pr) and from_pr > 0, do: from_pr))
+          |> maybe_opt(:output_format, params["output_format"])
+          |> maybe_opt(:input_format, params["input_format"])
+          |> maybe_opt(:json_schema, params["json_schema"])
+          |> maybe_opt(:allowed_tools, params["allowed_tools"])
+          |> maybe_opt(:permission_prompt_tool, params["permission_prompt_tool"])
+          |> maybe_opt(:add_dir, params["add_dir"])
+          |> maybe_opt(:mcp_config, params["mcp_config"])
+          |> maybe_opt(:plugin_dir, params["plugin_dir"])
+          |> maybe_opt(:settings_file, params["settings_file"])
+          |> maybe_opt(:agents_json, params["agents_json"])
+          |> maybe_opt(:agent, params["agent_flag"])
+          |> maybe_opt(:system_prompt, params["system_prompt"])
+          |> maybe_opt(:system_prompt_file, params["system_prompt_file"])
+          |> maybe_opt(:append_system_prompt, params["append_system_prompt"])
+          |> maybe_opt(:append_system_prompt_file, params["append_system_prompt_file"])
+          |> maybe_opt(:debug, params["debug"])
+          |> maybe_opt(:bare, bool_param(params, "bare"))
+          |> maybe_opt(:verbose, bool_param(params, "verbose"))
+          |> maybe_opt(:include_partial_messages, bool_param(params, "include_partial_messages"))
+          |> maybe_opt(:no_session_persistence, bool_param(params, "no_session_persistence"))
+          |> maybe_opt(:chrome, bool_param(params, "chrome"))
+          |> maybe_opt(:sandbox, bool_param(params, "sandbox"))
+          |> maybe_opt(:skip_permissions, bool_param(params, "dangerously_skip_permissions"))
+      end
 
     base = [
-      agent_type: params["agent_type"] || "claude",
+      agent_type: agent_type,
       model: params["model"] || Settings.default_model(),
       effort_level: params["effort_level"],
       max_budget_usd: parse_budget(params["max_budget_usd"]),
@@ -86,7 +96,13 @@ defmodule EyeInTheSkyWeb.Helpers.AgentCreationHelpers do
   end
 
   defp bool_param(params, key) do
-    if params[key] == "true", do: true
+    case params[key] do
+      "true" -> true
+      true -> true
+      "false" -> false
+      false -> false
+      _ -> nil
+    end
   end
 
   # Accepts the submitted agent slug only if it matches a known agent definition

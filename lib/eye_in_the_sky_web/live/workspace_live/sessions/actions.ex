@@ -3,7 +3,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
   Session creation action for the workspace sessions LiveView.
 
   The key difference from ProjectLive.Sessions.Actions: project_id comes from
-  form params (user selected it from the workspace project dropdown), not from
+  form params (user selected it from the workspace project relative), not from
   socket.assigns.project.
   """
 
@@ -58,12 +58,6 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions.Actions do
 
     case create_fn.(opts) do
       {:ok, %{session: session}} ->
-        if description && description != "" do
-          Task.start(fn ->
-            EyeInTheSky.Sessions.Naming.try_auto_name(session.id, description, session.name)
-          end)
-        end
-
         session = Sessions.preload_project(session)
 
         socket =

@@ -17,7 +17,7 @@
 //                           owned by Rail (its own live_render'd LiveView) —
 //                           bridged via a `tauri:rail-action` CustomEvent
 //   flash(msg)              info toast via phx:flash
-//   prompt(opts)            DaisyUI text-input dialog; resolves trimmed
+//   prompt(opts)            local text-input dialog; resolves trimmed
 //                           value or null on cancel
 //
 // Keep builders pure: read dataset, return items. No DOM work here.
@@ -31,11 +31,10 @@ const TASK_STATES = [
 ]
 
 export const REGISTRY = {
-  // Project rows live in the ProjectSwitcher popup, which is part of Rail's
-  // own live_render'd LiveView — actions push through the ctx.push() Rail
-  // bridge (see hooks/context_menu.js), not the page LiveView. Rename/open
-  // terminal/open editor all resolve the project's path server-side; the
-  // client never sends a path back for a mutating or shell-launching action.
+  // Project actions push through the ctx.push() Rail bridge (see
+  // hooks/context_menu.js), not the page LiveView. Rename/open terminal/open
+  // editor all resolve the project's path server-side; the client never sends
+  // a path back for a mutating or shell-launching action.
   project: (d) => [
     { label: 'Open', icon: 'hero-arrow-up-right', run: (c) => c.navigate(`/projects/${d.ctxId}`) },
     {
@@ -338,7 +337,7 @@ export function itemsFor(type, dataset, isTauri) {
   const builder = REGISTRY[type]
   if (!builder) return null
   const items = builder(dataset).filter((it) => !it.tauri || isTauri)
-  // collapse leading/trailing/doubled separators after filtering
+  // disclosure leading/trailing/doubled separators after filtering
   const out = []
   for (const it of items) {
     if (it.sep && (out.length === 0 || out[out.length - 1].sep)) continue

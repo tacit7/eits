@@ -10,6 +10,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INPUT_JSON="$(timeout 2 cat 2>/dev/null || true)"
 [ -z "$INPUT_JSON" ] && exit 0
 
+load_codex_env() {
+  local env_file="${EITS_CODEX_ENV_FILE:-}"
+
+  if [ -z "$env_file" ]; then
+    local session_id="${EITS_CODEX_SESSION_ID:-${CODEX_THREAD_ID:-${CODEX_SESSION_ID:-}}}"
+    [ -n "$session_id" ] && env_file="$HOME/.eits/codex/sessions/$session_id.env"
+  fi
+
+  [ -f "$env_file" ] || return 0
+  # shellcheck disable=SC1090
+  . "$env_file"
+}
+
+load_codex_env
+
 hook_event_name="$(echo "$INPUT_JSON" | jq -r '.hook_event_name // .hook_event // empty' 2>/dev/null || true)"
 hook_source="$(echo "$INPUT_JSON" | jq -r '.source // empty' 2>/dev/null || true)"
 tool_name="$(echo "$INPUT_JSON" | jq -r '.tool_name // empty' 2>/dev/null || true)"
@@ -41,20 +56,20 @@ case "$hook_event_name" in
   SessionStart)
     case "$hook_source" in
       startup|clear)
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
       resume)
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-resume.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
       compact)
         run_hook "$SCRIPT_DIR/eits-session-compact.sh"
-        run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         run_hook "$SCRIPT_DIR/eits-agent-working.sh"
         ;;
       *)
         # Default to startup semantics when source is omitted/unknown, but do
         # not mark Codex busy until UserPromptSubmit arrives.
-        EITS_SESSION_START_STATUS=idle run_hook "$SCRIPT_DIR/eits-session-startup.sh"
+        run_hook "$SCRIPT_DIR/codex-session-startup.sh"
         ;;
     esac
     ;;
@@ -64,7 +79,7 @@ case "$hook_event_name" in
   PreToolUse)
     # Claude parity: enforce EITS workflow on Edit/Write and run worktree guard for Bash.
     case "$tool_name" in
-      Edit|Write)
+      Edit|Write|apply_patch)
         run_hook "$SCRIPT_DIR/eits-pre-tool-use.sh"
         ;;
       Bash)
@@ -80,6 +95,9 @@ case "$hook_event_name" in
     ;;
   PreCompact)
     run_hook "$SCRIPT_DIR/eits-pre-compact.sh"
+    ;;
+  PostCompact)
+    run_hook "$SCRIPT_DIR/eits-post-compact.sh"
     ;;
   SessionEnd)
     run_hook "$SCRIPT_DIR/eits-session-end.sh"

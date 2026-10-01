@@ -63,8 +63,10 @@ defmodule EyeInTheSky.Sessions.Session do
     field :parent_agent_id, :integer
     field :parent_session_id, :integer
     field :entrypoint, :string
+    field :managed_by_app, :boolean, default: true
     field :status_reason, :string
     field :read_only, :boolean, default: false
+    field :compact_summary, :string
     # Cached token and cost totals — incremented atomically on each message insert.
     # Avoids full aggregate scans over the messages table for per-session usage display.
     # Source of truth for display; fall back to aggregate query only when nil (pre-migration rows).
@@ -136,9 +138,11 @@ defmodule EyeInTheSky.Sessions.Session do
       :parent_agent_id,
       :parent_session_id,
       :entrypoint,
+      :managed_by_app,
       :status_reason,
       :read_only,
-      :settings
+      :settings,
+      :compact_summary
     ])
     |> validate_required([:agent_id, :started_at])
     |> validate_inclusion(:status, [
@@ -159,6 +163,7 @@ defmodule EyeInTheSky.Sessions.Session do
       "billing_error",
       "authentication_error",
       "rate_limit_error",
+      "cli_exit_error",
       "watchdog_timeout",
       "retry_exhausted"
     ])

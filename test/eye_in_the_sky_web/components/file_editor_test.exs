@@ -70,7 +70,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorTest do
         })
 
       assert html =~ "border border-base-300"
-      assert html =~ "rounded-lg"
+      assert html =~ "rounded-box"
       assert html =~ "overflow-hidden"
       assert html =~ "min-h-64"
     end
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.Components.FileEditorTest do
           file_error: "File not found"
         })
 
-      assert html =~ "alert alert-error"
+      assert html =~ "eits-alert eits-alert--error"
     end
 
     test "shows error message" do

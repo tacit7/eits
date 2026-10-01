@@ -1,0 +1,140 @@
+{
+  "description": "Project-scoped Codex hooks for EITS lifecycle tracking and IAM guardrails.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Updating EITS session status..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Updating EITS session status..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Checking EITS tool guard..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM guard..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 15,
+            "statusMessage": "Updating EITS tool state..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM result..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \".agents/skills/impeccable/scripts/hook.mjs\" ] || ! { node -e \"process.exit(Math.min(parseInt(process.versions.node,10),22)===22?0:1)\" 2>/dev/null || { D=\"$HOME/.impeccable\"; [ -f \"$D/node-unsupported\" ] || { mkdir -p \"$D\" 2>/dev/null && : > \"$D/node-unsupported\" 2>/dev/null && printf '%s' '{\"systemMessage\":\"The impeccable design hook is not running: no Node 22 or newer on PATH. Install one, or remove the impeccable hook from your harness settings.\"}'; }; exit 0; }; } || node \".agents/skills/impeccable/scripts/hook.mjs\"",
+            "commandWindows": "if exist \".agents/skills/impeccable/scripts/hook.mjs\" (node \".agents/skills/impeccable/scripts/hook.mjs\" & exit /b)",
+            "timeout": 5,
+            "statusMessage": "Checking UI changes"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Marking EITS session compacting..."
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 10,
+            "statusMessage": "Saving EITS compact summary..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30,
+            "statusMessage": "Completing EITS session..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/eits-codex-notify.sh",
+            "timeout": 30,
+            "statusMessage": "Updating EITS session status..."
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/urielmaldonado/projects/eits/web/priv/scripts/codex-iam-guard.sh",
+            "timeout": 5,
+            "statusMessage": "Checking EITS IAM stop policy..."
+          },
+          {
+            "type": "command",
+            "command": "[ ! -f \".agents/skills/impeccable/scripts/hook.mjs\" ] || ! { node -e \"process.exit(Math.min(parseInt(process.versions.node,10),22)===22?0:1)\" 2>/dev/null || { D=\"$HOME/.impeccable\"; [ -f \"$D/node-unsupported\" ] || { mkdir -p \"$D\" 2>/dev/null && : > \"$D/node-unsupported\" 2>/dev/null && printf '%s' '{\"systemMessage\":\"The impeccable design hook is not running: no Node 22 or newer on PATH. Install one, or remove the impeccable hook from your harness settings.\"}'; }; exit 0; }; } || node \".agents/skills/impeccable/scripts/hook.mjs\"",
+            "commandWindows": "if exist \".agents/skills/impeccable/scripts/hook.mjs\" (node \".agents/skills/impeccable/scripts/hook.mjs\" & exit /b)",
+            "timeout": 30,
+            "statusMessage": "Design deep pass"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,6 +6,32 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenterTest do
   alias EyeInTheSky.Teams.TeamMember
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
+  test "session detail exposes the actual start timestamp for all session providers" do
+    for {provider, entrypoint, managed} <- [
+          {"codex", "cli", false},
+          {"claude", "cli", false},
+          {"codex", nil, true},
+          {"claude", nil, true}
+        ] do
+      session = %Session{
+        provider: provider,
+        entrypoint: entrypoint,
+        managed_by_app: managed,
+        started_at: ~U[2026-09-01 12:30:00.123456Z]
+      }
+
+      payload =
+        session |> ApiPresenter.present_session_detail() |> Jason.encode!() |> Jason.decode!()
+
+      assert payload["started_at"] == "2026-09-01T12:30:00.123456Z"
+      assert Map.has_key?(payload, "uuid")
+    end
+
+    payload = ApiPresenter.present_session_detail(%Session{})
+    assert Map.has_key?(payload, :started_at)
+    assert payload.started_at == nil
+  end
+
   describe "present_member/1" do
     test "includes all required payload fields with loaded associations" do
       agent = struct(Agent, id: 42, uuid: "agent-uuid-abc")

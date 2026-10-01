@@ -5,7 +5,6 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
-    "daisyui": "^5.5.8",
     "heroicons": "^2.2.0",
     "jsdom": "^29.0.1",
     "phoenix_vite": "file:../deps/phoenix_vite",

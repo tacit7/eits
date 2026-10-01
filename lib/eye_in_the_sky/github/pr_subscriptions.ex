@@ -46,5 +46,4 @@ defmodule EyeInTheSky.Github.PrSubscriptions do
         limit: 200
     )
   end
-
 end

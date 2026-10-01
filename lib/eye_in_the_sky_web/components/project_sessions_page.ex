@@ -3,9 +3,9 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
   use Phoenix.Component
 
   import EyeInTheSkyWeb.CoreComponents
+  import EyeInTheSkyWeb.Components.ArchiveConfirmModal
   import EyeInTheSkyWeb.Components.ProjectSessionsFilters
   import EyeInTheSkyWeb.Components.ProjectSessionsTable
-  import EyeInTheSkyWeb.Components.AgentList, only: [archive_confirm_modal: 1]
 
   @doc "Full sessions page layout. Pass `{assigns}` from the LiveView render."
   attr :has_more, :boolean, required: true
@@ -40,34 +40,34 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       <div class="w-full max-w-3xl mx-auto">
         <%!-- Mobile-only action bar (desktop controls are in top bar) --%>
         <div class="md:hidden flex items-center gap-2 mb-4">
-            <button
-              :if={!@select_mode && @agents != []}
-              phx-click="enter_select_mode"
-              class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/40 hover:text-base-content/70"
-            >
-              <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
-            </button>
-            <button
-              phx-click="open_filter_sheet"
-              aria-label="Open filters"
-              aria-haspopup="dialog"
-              class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
-            >
-              <.icon name="hero-funnel-mini" class="size-4" />
-              <%= if @session_filter != "all" || @sort_by != "last_message" do %>
-                <span
-                  class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
-                  aria-hidden="true"
-                >
-                </span>
-              <% end %>
-            </button>
-            <button
-              phx-click="toggle_new_session_drawer"
-              class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
-            >
-              <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
-            </button>
+          <button
+            :if={!@select_mode && @agents != []}
+            phx-click="enter_select_mode"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/75"
+          >
+            <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
+          </button>
+          <button
+            phx-click="open_filter_sheet"
+            aria-label="Open filters"
+            aria-haspopup="dialog"
+            class="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-box text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+          >
+            <.icon name="hero-funnel-mini" class="size-4" />
+            <%= if @session_filter != "all" || @sort_by != "last_message" do %>
+              <span
+                class="absolute top-0.5 right-0.5 w-2 h-2 bg-primary rounded-full"
+                aria-hidden="true"
+              >
+              </span>
+            <% end %>
+          </button>
+          <button
+            phx-click="toggle_new_session_drawer"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1.5 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+          >
+            <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
+          </button>
         </div>
 
         <%= if @show_filter_sheet do %>
@@ -104,7 +104,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
           class="py-4 flex justify-center"
         >
           <%= if @has_more do %>
-            <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+            <span class=" spinner spinner--sm text-base-content/30"></span>
           <% end %>
         </div>
       </div>
@@ -120,8 +120,13 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsPage do
       submit_event="create_new_session"
     />
     <.archive_confirm_modal
-      show_archive_confirm={@show_archive_confirm}
-      selected_ids={@selected_ids}
+      id="sessions-archive-confirm-modal"
+      show={@show_archive_confirm}
+      count={MapSet.size(@selected_ids)}
+      entity="session"
+      entity_plural="sessions"
+      cancel_event="cancel_archive_selected"
+      confirm_event="archive_selected"
     />
     """
   end

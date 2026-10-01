@@ -1,6 +1,6 @@
 Resolve and print session/agent identity (mirrors bash `eits whoami`)
 
-Usage: eitsr whoami [OPTIONS]
+Usage: eits whoami [OPTIONS]
 
 Options:
       --pretty  Pretty-print JSON output (default: compact; or EITS_PRETTY=1)

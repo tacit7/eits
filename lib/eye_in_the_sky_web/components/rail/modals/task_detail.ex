@@ -9,24 +9,19 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
   attr :total, :integer, required: true
 
   def task_detail_modal(assigns) do
-    task_link =
-      if assigns.task && assigns.task.project_id do
-        "/projects/#{assigns.task.project_id}/tasks?task_id=#{assigns.task.id}"
-      else
-        "/projects"
-      end
-
-    assigns = assign(assigns, :task_link, task_link)
+    assigns = assign(assigns, :task_link, task_link(assigns.task))
 
     ~H"""
-    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-lg shadow-xl p-4 flex flex-col gap-3">
+    <div class="fixed left-[296px] top-[48px] z-[100] w-[420px] h-[480px] bg-base-100 border border-base-content/10 rounded-box shadow-xl p-4 flex flex-col gap-3">
       <%!-- Header --%>
       <div class="flex items-start justify-between gap-2 flex-shrink-0">
-        <span class="text-sm font-semibold text-base-content/85 leading-snug">{@task.title}</span>
+        <span class="text-message font-semibold text-base-content/85 leading-snug">
+          {@task.title}
+        </span>
         <button
           type="button"
           phx-click="close_rail_modal"
-          class="size-5 flex-shrink-0 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
+          class="focus-ring size-5 flex-shrink-0 flex items-center justify-center rounded-box text-base-content/40 hover:text-base-content/70 hover:bg-base-content/8 transition-colors"
         >
           <.icon name="hero-x-mark-mini" class="size-3.5" />
         </button>
@@ -38,15 +33,17 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           "w-1.5 h-1.5 rounded-full flex-shrink-0",
           TasksSection.task_state_dot(@task.state_id)
         ]} />
-        <span class="text-xs text-base-content/55">{task_state_label(@task.state_id)}</span>
+        <span class="text-mini text-base-content/55">{task_state_label(@task.state_id)}</span>
       </div>
 
       <%!-- Description --%>
       <div class="flex-1 min-h-0 overflow-y-auto">
         <%= if @task.description && @task.description != "" do %>
-          <p class="text-xs text-base-content/60 leading-relaxed whitespace-pre-wrap break-words">{@task.description}</p>
+          <p class="text-message text-base-content/60 leading-relaxed break-words">
+            <span class="whitespace-pre-wrap">{@task.description}</span>
+          </p>
         <% else %>
-          <p class="text-xs text-base-content/30 italic">No description.</p>
+          <p class="text-mini text-base-content/30 italic">No description.</p>
         <% end %>
       </div>
 
@@ -57,8 +54,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="prev"            disabled={@total <= 1}
-            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            phx-value-dir="prev"
+            disabled={@total <= 1}
+            class="focus-ring size-6 flex items-center justify-center rounded-box text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-left-mini" class="size-3.5" />
           </button>
@@ -68,8 +66,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
           <button
             type="button"
             phx-click="task_detail_nav"
-            phx-value-dir="next"            disabled={@total <= 1}
-            class="size-6 flex items-center justify-center rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
+            phx-value-dir="next"
+            disabled={@total <= 1}
+            class="focus-ring size-6 flex items-center justify-center rounded-box text-base-content/40 hover:text-base-content/80 hover:bg-base-content/8 transition-colors disabled:opacity-25"
           >
             <.icon name="hero-chevron-right-mini" class="size-3.5" />
           </button>
@@ -78,9 +77,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
         <%!-- Open link --%>
         <.link
           navigate={@task_link}
-          class="px-3 py-1 text-xs bg-primary text-primary-content rounded hover:opacity-90 transition-opacity font-medium"
+          class="focus-ring inline-flex items-center gap-1 px-3 py-1 text-mini bg-primary text-primary-content rounded-box hover:opacity-90 transition-opacity font-medium"
         >
-          Open task →
+          <span>Open task</span>
+          <.icon name="hero-arrow-top-right-on-square-mini" class="size-3.5" />
         </.link>
       </div>
     </div>
@@ -92,4 +92,14 @@ defmodule EyeInTheSkyWeb.Components.Rail.Modals.TaskDetail do
   defp task_state_label(3), do: "Done"
   defp task_state_label(4), do: "In Review"
   defp task_state_label(_), do: "Unknown"
+
+  defp task_link(%{project_id: project_id, id: id}) when not is_nil(project_id) do
+    "/projects/#{project_id}/tasks?task_id=#{id}"
+  end
+
+  defp task_link(%{uuid: uuid}) when is_binary(uuid) and uuid != "" do
+    "/workspace/tasks?uuid=#{uuid}"
+  end
+
+  defp task_link(%{id: id}), do: "/workspace/tasks?uuid=#{id}"
 end

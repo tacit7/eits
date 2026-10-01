@@ -6,27 +6,31 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
   import EyeInTheSkyWeb.ControllerHelpers
 
   alias EyeInTheSky.ScheduledJobs
+  alias EyeInTheSkyWeb.Api.V1.ProjectScope
   alias EyeInTheSkyWeb.Presenters.ApiPresenter
 
   @doc "GET /api/v1/jobs - List all scheduled jobs."
   def index(conn, params) do
-    jobs =
-      cond do
-        params["project_id"] ->
-          ScheduledJobs.list_jobs(project_id: parse_int(params["project_id"]))
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      jobs =
+        cond do
+          project_id ->
+            ScheduledJobs.list_jobs(project_id: project_id)
 
-        params["global"] == "true" ->
-          ScheduledJobs.list_jobs(global_only: true)
+          params["global"] == "true" ->
+            ScheduledJobs.list_jobs(global_only: true)
 
-        true ->
-          ScheduledJobs.list_jobs()
-      end
+          true ->
+            ScheduledJobs.list_jobs()
+        end
 
-    json(conn, %{
-      success: true,
-      count: length(jobs),
-      jobs: Enum.map(jobs, &ApiPresenter.present_job/1)
-    })
+      json(conn, %{
+        success: true,
+        count: length(jobs),
+        jobs: Enum.map(jobs, &ApiPresenter.present_job/1)
+      })
+    end
   end
 
   @doc "GET /api/v1/jobs/:id - Get a single job."
@@ -39,25 +43,28 @@ defmodule EyeInTheSkyWeb.Api.V1.JobController do
 
   @doc "POST /api/v1/jobs - Create a scheduled job."
   def create(conn, params) do
-    attrs = %{
-      "name" => params["name"],
-      "description" => params["description"],
-      "job_type" => params["job_type"],
-      "schedule_type" => params["schedule_type"],
-      "schedule_value" => params["schedule_value"],
-      "config" => encode_config(params["config"]),
-      "enabled" => if(is_nil(params["enabled"]), do: true, else: params["enabled"]),
-      "project_id" => params["project_id"]
-    }
+    with {:ok, project_id} <-
+           ProjectScope.authorize_project_id(conn, params, params["project_id"]) do
+      attrs = %{
+        "name" => params["name"],
+        "description" => params["description"],
+        "job_type" => params["job_type"],
+        "schedule_type" => params["schedule_type"],
+        "schedule_value" => params["schedule_value"],
+        "config" => encode_config(params["config"]),
+        "enabled" => if(is_nil(params["enabled"]), do: true, else: params["enabled"]),
+        "project_id" => project_id
+      }
 
-    case ScheduledJobs.create_job(attrs) do
-      {:ok, job} ->
-        conn |> put_status(:created) |> json(ApiPresenter.present_job(job))
+      case ScheduledJobs.create_job(attrs) do
+        {:ok, job} ->
+          conn |> put_status(:created) |> json(ApiPresenter.present_job(job))
 
-      {:error, %Ecto.Changeset{} = cs} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Validation failed", details: translate_errors(cs)})
+        {:error, %Ecto.Changeset{} = cs} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Validation failed", details: translate_errors(cs)})
+      end
     end
   end
 

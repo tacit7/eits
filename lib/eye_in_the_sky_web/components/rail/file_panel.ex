@@ -29,8 +29,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
             ]}>
               <button
                 phx-click="file_switch_tab"
-                phx-value-path={tab.path}                class={[
-                  "px-3 py-1.5 text-xs truncate max-w-[160px]",
+                phx-value-path={tab.path}
+                class={[
+                  "px-3 py-1.5 text-mini truncate max-w-[160px]",
                   if(active,
                     do: "text-base-content/90 font-medium",
                     else: "text-base-content/45 hover:text-base-content/70"
@@ -42,7 +43,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
               </button>
               <button
                 phx-click="file_close_tab"
-                phx-value-path={tab.path}                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
+                phx-value-path={tab.path}
+                class="pr-2 py-1.5 text-base-content/25 hover:text-base-content/60 transition-colors"
                 title="Close"
               >
                 <.icon name="hero-x-mark-mini" class="size-3" />
@@ -93,7 +95,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
           />
         </div>
       <% else %>
-        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-sm text-base-content/50">
+        <div class="flex-1 flex flex-col items-center justify-center p-6 text-center text-message text-base-content/50">
           <.icon name="hero-document-text" class="w-8 h-8 mb-2 opacity-40" />
           <p class="font-medium text-base-content/70">No file selected</p>
           <p class="mt-1">Choose a file from the file explorer to open it here.</p>
@@ -122,7 +124,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.FilePanel do
         class={[
           "w-8 h-8 flex items-center justify-center transition-colors",
           if(@active_section == @section && @flyout_open,
-            do: "bg-primary/[0.18] text-primary shadow-[inset_2px_0_0_oklch(var(--p)/0.8)]",
+            do:
+              "bg-primary/[0.18] text-primary shadow-[inset_2px_0_0_color-mix(in_oklch,var(--color-primary)_80%,transparent)]",
             else: "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/8"
           )
         ]}

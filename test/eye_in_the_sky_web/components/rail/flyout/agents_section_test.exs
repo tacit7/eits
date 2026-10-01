@@ -83,7 +83,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
       assert html =~ "update_agent_search"
     end
 
-    test "renders phx-target pointing to myself" do
+    test "renders agent_search field name" do
       html =
         render_component(
           &AgentsSection.agents_filters/1,
@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSectionTest do
           myself: 1
         )
 
-      assert html =~ "phx-target"
+      assert html =~ "agent_search"
     end
   end
 

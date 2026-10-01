@@ -7,12 +7,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   alias EyeInTheSky.ModelEntry
   alias EyeInTheSky.Pi.ModelDiscoveryCache
 
-  @claude_primary_slugs ~w(claude-opus-4-8 claude-fable-5 claude-sonnet-5 claude-haiku-4-5-20251001)
+  @claude_primary_slugs ~w(claude-opus-5-5 claude-sonnet-5 claude-fable-5-1 claude-haiku-4-5-20251001)
   @claude_premium_aliases ["opus[1m]", "sonnet[1m]"]
-  @claude_default_slug "claude-opus-4-8"
+  @claude_default_slug "claude-opus-5-5"
 
-  @codex_primary_slugs ~w(gpt-5.6-sol gpt-5.6-terra gpt-5.6-luna)
-  @codex_default_slug "gpt-5.6-sol"
+  @codex_primary_slugs ~w(gpt-6-astra gpt-6-sol gpt-6-luna)
+  @codex_default_slug "gpt-6-astra"
 
   defdelegate valid_model_combos, to: ModelConfig
 
@@ -21,16 +21,15 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models do
     [
-      {"claude-opus-4-8", "Opus 4.8"},
-      {"claude-fable-5", "Fable 5"},
+      {"claude-opus-5-5", "Opus 5.5"},
       {"claude-sonnet-5", "Sonnet 5"},
+      {"claude-fable-5-1", "Fable 5.1"},
+      {"claude-opus-4-8", "Opus 5"},
       {"claude-haiku-4-5-20251001", "Haiku 4.5"},
       {"claude-opus-4-7", "Opus 4.7"},
       {"claude-opus-4-6", "Opus 4.6"},
       {"claude-opus-4-5-20251101", "Opus 4.5"},
-      {"claude-opus-4-1-20250805", "Opus 4.1"},
-      {"claude-sonnet-4-6", "Sonnet 4.6"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5"}
+      {"claude-sonnet-4-6", "Sonnet 4.6"}
     ]
   end
 
@@ -39,19 +38,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def claude_models_with_meta do
     [
-      {"claude-opus-4-8", "Opus 4.8", "Best for everyday, complex tasks · 1M context",
-       "text-warning"},
-      {"claude-fable-5", "Fable 5", "Most capable for your hardest and longest-running tasks",
-       "text-warning"},
+      {"claude-opus-5-5", "Opus 5.5", "Most capable for ambitious work", "text-warning"},
       {"claude-sonnet-5", "Sonnet 5", "Efficient for routine tasks", "text-info"},
+      {"claude-fable-5-1", "Fable 5.1", "For your toughest challenges", "text-warning"},
+      {"claude-opus-4-8", "Opus 5", "Best for everyday, complex tasks", "text-warning"},
       {"claude-haiku-4-5-20251001", "Haiku 4.5", "Fastest for quick answers", "text-success"},
-      {"claude-opus-4-7", "Opus 4.7", "Previous generation · 1M context", "text-warning"},
-      {"claude-opus-4-6", "Opus 4.6", "Previous generation · 1M context · extended thinking",
+      {"claude-opus-4-7", "Opus 4.7", "Best for everyday, complex tasks", "text-warning"},
+      {"claude-opus-4-6", "Opus 4.6", "Best for everyday, complex tasks", "text-warning"},
+      {"claude-opus-4-5-20251101", "Opus 4.5", "Best for everyday, complex tasks",
        "text-warning"},
-      {"claude-opus-4-5-20251101", "Opus 4.5", "api", "text-warning"},
-      {"claude-opus-4-1-20250805", "Opus 4.1", "api", "text-warning"},
-      {"claude-sonnet-4-6", "Sonnet 4.6", "Previous generation", "text-info"},
-      {"claude-sonnet-4-5-20250929", "Sonnet 4.5", "api", "text-info"}
+      {"claude-sonnet-4-6", "Sonnet 4.6", "Efficient for routine tasks", "text-info"}
     ]
   end
 
@@ -60,12 +56,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models do
     [
+      {"gpt-6-astra", "GPT-6-Astra"},
+      {"gpt-6-sol", "GPT-6-Sol"},
+      {"gpt-6-luna", "GPT-6-Luna"},
       {"gpt-5.6-sol", "GPT-5.6 Sol"},
       {"gpt-5.6-terra", "GPT-5.6 Terra"},
-      {"gpt-5.6-luna", "GPT-5.6 Luna"},
-      {"gpt-5.5", "GPT-5.5"},
-      {"gpt-5.4", "GPT-5.4"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini"}
+      {"gpt-5.6-luna", "GPT-5.6 Luna"}
     ]
   end
 
@@ -74,16 +70,14 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
   """
   def codex_models_with_meta do
     [
-      {"gpt-5.6-sol", "GPT-5.6 Sol", "Latest frontier agentic coding model (default)",
+      {"gpt-6-astra", "GPT-6-Astra", "Frontier intelligence for the most demanding work",
        "text-warning"},
-      {"gpt-5.6-terra", "GPT-5.6 Terra", "Balanced agentic coding model for everyday work",
-       "text-warning"},
-      {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model", "text-info"},
-      {"gpt-5.5", "GPT-5.5", "Frontier model for complex coding, research, and real-world work",
+      {"gpt-6-sol", "GPT-6-Sol", "Workhorse model for coding and everyday work", "text-warning"},
+      {"gpt-6-luna", "GPT-6-Luna", "Fast and affordable model for easier tasks", "text-info"},
+      {"gpt-5.6-sol", "GPT-5.6 Sol", "Older coding model for complex work", "text-info"},
+      {"gpt-5.6-terra", "GPT-5.6 Terra", "Older balanced model for straightforward work",
        "text-info"},
-      {"gpt-5.4", "GPT-5.4", "Strong model for everyday coding", "text-info"},
-      {"gpt-5.4-mini", "GPT-5.4 Mini", "Small, fast, and cost-efficient for simpler tasks",
-       "text-success"}
+      {"gpt-5.6-luna", "GPT-5.6 Luna", "Older fast and efficient model", "text-info"}
     ]
   end
 
@@ -212,19 +206,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
     case String.downcase(model) do
       "haiku" -> "claude-haiku-4-5-20251001"
       "sonnet" -> "claude-sonnet-5"
-      "opus" -> "claude-opus-4-8"
+      "opus" -> "claude-opus-5-5"
       _ -> model
     end
   end
 
-  def normalize_model_alias(nil), do: "claude-sonnet-5"
+  def normalize_model_alias(nil), do: "claude-opus-5-5"
 
   @doc """
   Returns the default model slug for a provider.
   """
-  def default_model_for("codex"), do: "gpt-5.6-sol"
+  def default_model_for("codex"), do: "gpt-6-astra"
   def default_model_for("pi"), do: nil
-  def default_model_for(_), do: "claude-opus-4-8"
+  def default_model_for(_), do: "claude-opus-5-5"
 
   @doc """
   Returns a human-readable display name for any supported model slug,
@@ -269,11 +263,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpers do
     end
   end
 
-  defp short_alias_display("opus"), do: "Opus 4.8"
+  defp short_alias_display("opus"), do: "Opus 5.5"
   defp short_alias_display("opus[1m]"), do: "Opus (1M)"
   defp short_alias_display("sonnet"), do: "Sonnet 5"
   defp short_alias_display("sonnet[1m]"), do: "Sonnet (1M)"
   defp short_alias_display("haiku"), do: "Haiku 4.5"
   defp short_alias_display("claude-opus-4-6"), do: "Opus 4.6"
+  defp short_alias_display("gpt-5.5"), do: "GPT-5.5"
   defp short_alias_display(other), do: other
 end

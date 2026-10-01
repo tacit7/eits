@@ -76,7 +76,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     |> assign(:context_window, context_window || 0)
     |> assign(:current_task, current_task)
     |> then(fn s ->
-      # Only reset the stream when loading the messages tab. Other tab loads
+      # Only reset the stream when  the messages tab. Other tab loads
       # reuse the current @messages assign (cache hit) and must not blow away
       # stream items the user is currently viewing.
       if tab == "messages" do
@@ -159,7 +159,7 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     else
       # Messages are kept live via PubSub handle_info — skip the DB round-trip
       # only when switching back to the messages tab. Mutations must call
-      # force_reload_messages/2 instead, which clears the cache before loading.
+      # force_reload_messages/2 instead, which clears the cache before .
       existing = socket.assigns[:messages]
 
       if existing != nil do

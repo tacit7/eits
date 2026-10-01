@@ -49,6 +49,9 @@ defmodule EyeInTheSkyWeb.ChatLiveE2ETest do
         session_id: web_execution_agent.id
       })
 
+    # Deliberately NOT adding the web UI session as a channel member: the web
+    # operator must be able to post to any existing channel.
+
     %{
       conn: conn,
       project: project,
@@ -82,6 +85,36 @@ defmodule EyeInTheSkyWeb.ChatLiveE2ETest do
       # Verify message was saved to the database
       messages = Messages.list_messages_for_channel(channel.id)
       assert Enum.any?(messages, fn m -> m.body == "Hello from E2E test" end)
+    end
+
+    test "web UI session that is not a channel member can send", %{conn: conn, channel: channel} do
+      {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
+
+      html =
+        render_hook(view, "send_channel_message", %{
+          "channel_id" => to_string(channel.id),
+          "body" => "non-member send"
+        })
+
+      refute html =~ "not a member"
+      refute html =~ "Channel not found"
+
+      assert Enum.any?(
+               Messages.list_messages_for_channel(channel.id),
+               &(&1.body == "non-member send")
+             )
+    end
+
+    test "send_channel_message to a nonexistent channel is rejected", %{
+      conn: conn,
+      channel: channel
+    } do
+      {:ok, view, _html} = live(conn, ~p"/chat?channel_id=#{channel.id}")
+
+      html =
+        render_hook(view, "send_channel_message", %{"channel_id" => "999999999", "body" => "x"})
+
+      assert html =~ "Channel not found"
     end
 
     test "send_channel_message with empty body is ignored", %{

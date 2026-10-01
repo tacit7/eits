@@ -360,7 +360,9 @@ defmodule EyeInTheSky.SDK.MessageHandler do
     case parser.parse_stream_line(line) do
       {:ok, message} ->
         case module.handle_message(message, state) do
-          {:continue, new_state} -> {:cont, new_state}
+          {:continue, new_state} ->
+            {:cont, new_state}
+
           :stop ->
             stop_and_unregister(sdk_ref)
             :stop

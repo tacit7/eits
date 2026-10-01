@@ -243,6 +243,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
   defp delete_confirm_text(doc) do
     n = length(doc.agent_type_documents)
+
     "Deleting this document removes it from #{n} agent type(s). The underlying policies are not deleted."
   end
 
@@ -258,7 +259,10 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         <%!-- Header --%>
         <div class="flex items-center justify-between gap-3 flex-wrap">
           <div class="flex items-center gap-3">
-            <.link navigate={~p"/iam/documents"} class="btn btn-ghost btn-sm">
+            <.link
+              navigate={~p"/iam/documents"}
+              class="eits-action eits-action--ghost eits-action--icon"
+            >
               <.icon name="hero-arrow-left" class="size-4" />
             </.link>
             <.icon name="hero-document-text" class="size-6 text-primary" />
@@ -266,15 +270,18 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
           </div>
 
           <div class="flex items-center gap-2">
-            <.link navigate={simulator_path(@document)} class="btn btn-ghost btn-sm">
+            <.link navigate={simulator_path(@document)} class="eits-action eits-action--ghost gap-1.5">
               <.icon name="hero-beaker" class="size-4" /> Test in simulator
             </.link>
-            <.link navigate={~p"/iam/documents/#{@document.id}/edit"} class="btn btn-ghost btn-sm">
+            <.link
+              navigate={~p"/iam/documents/#{@document.id}/edit"}
+              class="eits-action eits-action--ghost gap-1.5"
+            >
               <.icon name="hero-pencil-square" class="size-4" /> Edit
             </.link>
             <button
               type="button"
-              class="btn btn-ghost btn-sm text-error"
+              class="eits-action eits-action--danger gap-1.5"
               phx-click="delete_document"
               data-confirm={delete_confirm_text(@document)}
             >
@@ -288,7 +295,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         <% end %>
 
         <%!-- Agent-type bypass note --%>
-        <div class="alert alert-info">
+        <div class="eits-alert eits-alert--info">
           <.icon name="hero-information-circle" class="size-5 shrink-0" />
           <span>
             When policies run from a document, the policy-level agent type is bypassed.
@@ -298,7 +305,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
 
         <%!-- Conflict notice --%>
         <%= if conflict_detected?(@document) do %>
-          <div class="alert alert-warning">
+          <div class="eits-alert eits-alert--warning">
             <.icon name="hero-exclamation-triangle" class="size-5 shrink-0" />
             <span>
               This document contains both allow and deny policies that may overlap.
@@ -308,12 +315,12 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         <% end %>
 
         <%!-- Policies section --%>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
             <div class="flex items-center justify-between gap-3">
               <h2 class="text-lg font-semibold flex items-center gap-2">
                 <.icon name="hero-shield-check" class="size-5" /> Policies in this document
-                <span class="badge badge-ghost text-xs font-mono">
+                <span class="eits-chip eits-chip--muted eits-chip--mono">
                   {attached_count(@document)} policies
                 </span>
               </h2>
@@ -326,7 +333,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                     <th>Name</th>
                     <th>Effect</th>
                     <th>Action</th>
-                    <th>Agent type — ignored in document</th>
+                    <th>Agent type | ignored in document</th>
                     <th>Enabled</th>
                     <th class="text-right">Remove</th>
                   </tr>
@@ -350,25 +357,25 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                         </.link>
                       </td>
                       <td>
-                        <span class={"badge badge-sm " <> effect_badge(dp.policy.effect)}>
+                        <span class={"eits-chip " <> effect_badge(dp.policy.effect)}>
                           {dp.policy.effect}
                         </span>
                       </td>
-                      <td class="font-mono text-xs">{dp.policy.action}</td>
-                      <td class="font-mono text-xs text-base-content/50">
+                      <td class="font-mono text-mini">{dp.policy.action}</td>
+                      <td class="font-mono text-mini text-base-content/50">
                         {dp.policy.agent_type}
                       </td>
                       <td>
                         <%= if dp.policy.enabled do %>
                           <.icon name="hero-check-circle" class="size-4 text-success" />
                         <% else %>
-                          <span class="text-base-content/40">—</span>
+                          <span class="text-base-content/40">-</span>
                         <% end %>
                       </td>
                       <td class="text-right">
                         <button
                           type="button"
-                          class="btn btn-ghost btn-xs text-error"
+                          class="eits-action eits-action--danger h-7 min-h-0 px-2"
                           phx-click="remove_policy"
                           phx-value-policy_id={dp.policy.id}
                           data-confirm={"Remove \"#{dp.policy.name}\" from this document?"}
@@ -386,7 +393,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
             <form phx-submit="add_policy" class="flex items-end gap-2">
               <div class="form-control flex-1">
                 <label class="label">
-                  <span class="label-text text-xs">Add policy</span>
+                  <span class="label-text text-mini">Add policy</span>
                 </label>
                 <select name="policy_id" class="select select-bordered select-sm">
                   <option value="">Select a policy...</option>
@@ -395,7 +402,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                   <% end %>
                 </select>
               </div>
-              <button type="submit" class="btn btn-sm btn-primary">
+              <button type="submit" class="eits-action eits-action--primary gap-1.5">
                 <.icon name="hero-plus" class="size-4" /> Add
               </button>
             </form>
@@ -403,17 +410,17 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
         </section>
 
         <%!-- Attached agent types section --%>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
             <h2 class="text-lg font-semibold flex items-center gap-2">
               <.icon name="hero-cpu-chip" class="size-5" /> Attached agent types
-              <span class="badge badge-ghost text-xs">
+              <span class="eits-chip eits-chip--muted">
                 {length(@document.agent_type_documents)}
               </span>
             </h2>
 
             <%= if @document.agent_type_documents == [] do %>
-              <p class="text-base-content/60 text-sm">
+              <p class="text-base-content/60 text-message">
                 No agent types attached. Add one below.
               </p>
             <% else %>
@@ -431,13 +438,15 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                         <td>
                           <.link
                             navigate={~p"/iam/agent-types/show?agent_type=#{atd.agent_type}"}
-                            class="font-mono text-sm link link-hover"
-                          >{atd.agent_type}</.link>
+                            class="font-mono text-message link link-hover"
+                          >
+                            {atd.agent_type}
+                          </.link>
                         </td>
                         <td class="text-right">
                           <button
                             type="button"
-                            class="btn btn-ghost btn-xs text-error"
+                            class="eits-action eits-action--danger h-7 min-h-0 px-2"
                             phx-click="detach_agent_type"
                             phx-value-agent_type={atd.agent_type}
                             data-confirm={"Detach agent type \"#{atd.agent_type}\" from this document?"}
@@ -456,7 +465,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
             <form phx-submit="attach_agent_type" class="flex items-end gap-2">
               <div class="form-control flex-1">
                 <label class="label">
-                  <span class="label-text text-xs">Attach agent type</span>
+                  <span class="label-text text-mini">Attach agent type</span>
                 </label>
                 <input
                   type="text"
@@ -466,7 +475,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
                   class="input input-bordered input-sm"
                 />
               </div>
-              <button type="submit" class="btn btn-sm btn-primary">
+              <button type="submit" class="eits-action eits-action--primary gap-1.5">
                 <.icon name="hero-plus" class="size-4" /> Attach
               </button>
             </form>
@@ -479,8 +488,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocumentShow do
     """
   end
 
-  defp effect_badge("allow"), do: "badge-success"
-  defp effect_badge("deny"), do: "badge-error"
-  defp effect_badge("instruct"), do: "badge-warning"
-  defp effect_badge(_), do: "badge-ghost"
+  defp effect_badge("allow"), do: "eits-chip--success"
+  defp effect_badge("deny"), do: "eits-chip--error"
+  defp effect_badge("instruct"), do: "eits-chip--warning"
+  defp effect_badge(_), do: "eits-chip--muted"
 end

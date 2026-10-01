@@ -4,7 +4,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
   import Ecto.Query, only: [from: 2]
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.{Repo, Tasks}
+  alias EyeInTheSky.{Projects, Repo, Tasks, Teams, Workspaces}
   alias EyeInTheSky.Tasks.WorkflowState
 
   import EyeInTheSky.Factory
@@ -34,6 +34,25 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       )
 
     task
+  end
+
+  defp create_project_in_workspace(workspace_id, overrides \\ %{}) do
+    n = uniq()
+
+    {:ok, project} =
+      Projects.create_project(
+        Map.merge(
+          %{
+            name: "Task Project #{n}",
+            slug: "task-project-#{n}",
+            path: "/tmp/task-project-#{n}",
+            workspace_id: workspace_id
+          },
+          overrides
+        )
+      )
+
+    project
   end
 
   # ---- GET /api/v1/tasks ----
@@ -86,6 +105,31 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       assert Enum.any?(resp["tasks"], &(&1["id"] == task.id))
     end
 
+    test "filters by team_id and includes linked session ids", %{conn: conn} do
+      {:ok, team} = Teams.create_team(%{name: "task-team-#{uniq()}"})
+      agent = create_agent()
+      session = create_session(agent)
+      team_task = create_task(%{team_id: team.id})
+      other_task = create_task()
+
+      Repo.insert_all(
+        "task_sessions",
+        [%{task_id: team_task.id, session_id: session.id}],
+        on_conflict: :nothing
+      )
+
+      conn = get(conn, ~p"/api/v1/tasks?team_id=#{team.id}")
+      resp = json_response(conn, 200)
+
+      ids = Enum.map(resp["tasks"], & &1["id"])
+      [presented] = resp["tasks"]
+
+      assert team_task.id in ids
+      refute other_task.id in ids
+      assert presented["team_id"] == team.id
+      assert session.id in presented["session_ids"]
+    end
+
     test "respects limit param", %{conn: conn} do
       for _ <- 1..5, do: create_task()
       conn = get(conn, ~p"/api/v1/tasks?limit=2")
@@ -123,7 +167,41 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
           "session_id" => session.uuid
         })
 
-      assert json_response(conn, 201)["success"] == true
+      response = json_response(conn, 201)
+
+      assert response["success"] == true
+      assert Tasks.get_task!(response["task_id"]).created_by_session_id == session.id
+    end
+
+    test "tracks creator separately from the assigned session", %{conn: conn} do
+      creator_agent = create_agent()
+      creator = create_session(creator_agent)
+      worker_agent = create_agent()
+      worker = create_session(worker_agent)
+
+      conn =
+        post(conn, ~p"/api/v1/tasks", %{
+          "title" => "Assigned worker task",
+          "created_by_session_id" => creator.uuid,
+          "session_id" => worker.uuid
+        })
+
+      task_id = json_response(conn, 201)["task_id"]
+      task = Tasks.get_task!(task_id)
+
+      assert task.created_by_session_id == creator.id
+
+      assert Repo.exists?(
+               from(ts in "task_sessions",
+                 where: ts.task_id == ^task.id and ts.session_id == ^worker.id
+               )
+             )
+
+      refute Repo.exists?(
+               from(ts in "task_sessions",
+                 where: ts.task_id == ^task.id and ts.session_id == ^creator.id
+               )
+             )
     end
   end
 
@@ -579,6 +657,32 @@ defmodule EyeInTheSkyWeb.Api.V1.TaskControllerTest do
       resp = json_response(conn, 201)
       assert resp["success"] == true
       assert resp["task_id"] != nil
+    end
+  end
+
+  describe "project scope enforcement" do
+    test "rejects task creation for a project outside the current workspace when session scope is present",
+         %{conn: conn} do
+      current_user = user_fixture()
+      current_workspace = Workspaces.default_workspace_for_user!(current_user)
+      own_project = create_project_in_workspace(current_workspace.id)
+      agent = create_agent()
+      session = create_session(agent, %{project_id: own_project.id})
+
+      foreign_user = user_fixture()
+      foreign_workspace = Workspaces.default_workspace_for_user!(foreign_user)
+      foreign_project = create_project_in_workspace(foreign_workspace.id)
+
+      conn =
+        conn
+        |> put_req_header("x-eits-session", session.uuid)
+        |> post(~p"/api/v1/tasks", %{
+          "title" => "Foreign task",
+          "project_id" => foreign_project.id
+        })
+
+      resp = json_response(conn, 403)
+      assert resp["error"] == "Access denied"
     end
   end
 

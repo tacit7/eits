@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Terminal.PtyServerTest do
 
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
 
+  @tag :host_dependent
   test "echoes typed input back through the PTY" do
     {:ok, pid} = PtySupervisor.start_pty(subscriber: self(), cols: 120, rows: 40)
 

@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
 
     test "renders card with divide-y layout" do
       html = render_tab()
-      assert html =~ "card"
+      assert html =~ "eits-panel"
       assert html =~ "divide-y"
     end
   end
@@ -57,6 +57,18 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
       assert html =~ ~s(phx-value-key="log_codex_raw")
     end
 
+    test "renders Codex App Server Bridge toggle" do
+      html = render_tab(%{"codex_app_server_enabled" => "false"})
+      assert html =~ "Codex App Server Bridge"
+      assert html =~ "Use the feature-flagged Codex JSON-RPC app-server backend for Codex turns"
+      assert html =~ ~s(phx-value-key="codex_app_server_enabled")
+    end
+
+    test "codex_app_server_enabled toggle is checked when value is 'true'" do
+      html = render_tab(%{"codex_app_server_enabled" => "true"})
+      assert Regex.match?(~r/checked[^>]*phx-value-key="codex_app_server_enabled"/, html)
+    end
+
     test "renders Per-session Rate-Limit Bucket toggle" do
       html = render_tab(%{"rate_limit_per_session" => "false"})
       assert html =~ "Per-session Rate-Limit Bucket"
@@ -79,11 +91,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
         render_tab(%{
           "log_claude_raw" => "true",
           "log_codex_raw" => "false",
+          "codex_app_server_enabled" => "false",
           "rate_limit_per_session" => "true"
         })
 
       assert html =~ "log_claude_raw"
       assert html =~ "log_codex_raw"
+      assert html =~ "codex_app_server_enabled"
       assert html =~ "rate_limit_per_session"
     end
   end
@@ -110,8 +124,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTabTest do
     test "renders Table Counts section" do
       html = render_tab(%{}, db_info(table_counts: %{"sessions" => 42, "tasks" => 7}))
       assert html =~ "Table Counts"
-      # Each table/count pair is rendered as a badge element
-      assert html =~ ~s(class="badge badge-ghost badge-sm gap-1")
+      # Each table/count pair is rendered as a chip element
+      assert html =~ ~s(class="eits-chip eits-chip--muted gap-1")
       assert html =~ "sessions"
       assert html =~ "42"
       assert html =~ "tasks"

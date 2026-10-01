@@ -94,8 +94,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
 
   @impl true
   def handle_event("delete_definition_file", %{"path" => path}, socket) do
-    DefinitionFileActions.handle_delete(path, socket, &skill_write_allowed?/2, &load_skills/1,
-      &maybe_clear_selected(&1, path))
+    DefinitionFileActions.handle_delete(
+      path,
+      socket,
+      &skill_write_allowed?/2,
+      &load_skills/1,
+      &maybe_clear_selected(&1, path)
+    )
   end
 
   @impl true
@@ -148,7 +153,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
         <select
           id="proj-skills-sort-mobile"
           name="by"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="name_asc" selected={@sort_by == "name_asc"}>Name A–Z</option>
           <option value="name_desc" selected={@sort_by == "name_desc"}>Name Z–A</option>
@@ -162,7 +167,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
         <select
           id="proj-skills-type-mobile"
           name="filter"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="all" selected={@type_filter == "all"}>All Types</option>
           <option value="skills" selected={@type_filter == "skills"}>Skills</option>
@@ -174,7 +179,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
         <select
           id="proj-skills-scope-mobile"
           name="scope"
-          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-xs"
+          class="select select-xs bg-base-200/50 border-base-content/8 text-base-content/70 min-h-[44px] text-mini"
         >
           <option value="all" selected={@scope_filter == "all"}>All Sources</option>
           <option value="global" selected={@scope_filter == "global"}>Global</option>
@@ -200,7 +205,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
             <%= for skill <- @filtered_skills do %>
               <% selected? = @selected_skill && @selected_skill.id == skill.id %>
               <div class={["py-0.5", selected? && "relative"]}>
-                <div class="collapse overflow-visible">
+                <div class="eits-disclosure overflow-visible">
                   <input
                     type="checkbox"
                     class="min-h-0 p-0"
@@ -209,7 +214,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   />
                   <div
                     class={[
-                      "collapse-title py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-lg",
+                      "eits-disclosure__summary py-2.5 px-3 min-h-0 flex flex-col gap-0.5 cursor-pointer rounded-box",
                       if(selected?,
                         do: "bg-primary/5",
                         else: "hover:bg-base-content/4"
@@ -227,33 +232,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                         class={"size-3.5 flex-shrink-0 " <>
                           if(selected?, do: "text-primary", else: "text-base-content/35")}
                       />
-                      <code class={"text-sm font-semibold " <>
+                      <code class={"text-message font-semibold " <>
                         if(selected?, do: "text-primary", else: "text-base-content/85")}>
                         /{skill.slug}
                       </code>
                     </div>
-                    <p class="text-xs text-base-content/55 leading-snug pl-5 line-clamp-2">
+                    <p class="text-mini text-base-content/55 leading-snug pl-5 line-clamp-2">
                       {skill.description}
                     </p>
                     <div class="flex items-center gap-1.5 pl-5 mt-0.5">
-                      <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                      <span class={"eits-chip " <>
                         source_badge_class(skill.source)}>
                         {source_label(skill.source)}
                       </span>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/40 tabular-nums">
+                      <span class="text-base-content/20 text-mini">|</span>
+                      <span class="text-micro text-base-content/40 tabular-nums">
                         {FileHelpers.format_size(skill.size)}
                       </span>
-                      <span class="text-base-content/20 text-xs">&middot;</span>
-                      <span class="text-[10px] text-base-content/35 font-mono truncate">
+                      <span class="text-base-content/20 text-mini">|</span>
+                      <span class="text-micro text-base-content/35 font-mono truncate">
                         {skill.path}
                       </span>
                     </div>
                   </div>
-                  <div class="collapse-content md:hidden px-3 pb-3">
+                  <div class="eits-disclosure__content md:hidden px-3 pb-3">
                     <div
                       id={"proj-skill-mobile-#{skill.id}"}
-                      class="dm-markdown text-sm text-base-content leading-relaxed mt-2"
+                      class="dm-markdown text-message text-base-content leading-relaxed mt-2"
                       phx-hook="MarkdownMessage"
                       data-raw-body={skill.content}
                     >
@@ -286,25 +291,31 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
         <div class="hidden md:flex flex-col flex-1 overflow-hidden">
           <%= if @detail_tab == :edit do %>
             <div class="flex-shrink-0 px-4 py-2 border-b border-base-content/8 flex items-center gap-3">
-              <code class="text-xs text-base-content/50 font-mono truncate flex-1">{@selected_skill.path}</code>
-              <span class="text-[10px] text-base-content/40">Ctrl+S to save</span>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-xs">Cancel</button>
+              <code class="text-mini text-base-content/50 font-mono truncate flex-1">
+                {@selected_skill.path}
+              </code>
+              <span class="text-micro text-base-content/40">Ctrl+S to save</span>
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost h-7 min-h-0 px-2">
+                Cancel
+              </button>
             </div>
           <% else %>
             <div class="flex-shrink-0 px-6 pt-5 pb-4 border-b border-base-content/8">
               <div class="flex items-start justify-between gap-4">
                 <div class="min-w-0">
                   <div class="flex items-center gap-2 mb-1">
-                    <code class="text-base font-semibold text-base-content">
+                    <code class="text-message font-semibold text-base-content">
                       /{@selected_skill.slug}
                     </code>
-                    <span class={"inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium " <>
+                    <span class={"eits-chip " <>
                       source_badge_class(@selected_skill.source)}>
                       {source_label(@selected_skill.source)}
                     </span>
                   </div>
-                  <p class="text-xs text-base-content/45 font-mono truncate">{@selected_skill.path}</p>
-                  <p class="text-sm text-base-content/60 mt-1.5 leading-snug">
+                  <p class="text-mini text-base-content/45 font-mono truncate">
+                    {@selected_skill.path}
+                  </p>
+                  <p class="text-message text-base-content/60 mt-1.5 leading-snug">
                     {@selected_skill.description}
                   </p>
                 </div>
@@ -316,7 +327,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                   />
                   <button
                     phx-click="close_viewer"
-                    class="btn btn-ghost btn-xs btn-circle flex-shrink-0 min-h-[36px] min-w-[36px]"
+                    class="eits-action eits-action--ghost eits-action--icon h-9 min-h-0 min-w-9 flex-shrink-0"
                   >
                     <.icon name="hero-x-mark" class="size-4" />
                   </button>
@@ -326,32 +337,32 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="preview"
-                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :preview,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Preview
                 </button>
                 <button
                   phx-click="set_detail_tab"
                   phx-value-tab="raw"
-                  class={"px-3 py-1 rounded text-xs font-medium " <>
+                  class={"eits-action h-7 min-h-0 px-3 " <>
                     if(@detail_tab == :raw,
-                      do: "bg-base-content/8 text-base-content",
-                      else: "text-base-content/50 hover:text-base-content")}
+                      do: "eits-action--primary",
+                      else: "eits-action--ghost")}
                 >
                   Raw
                 </button>
                 <%= if is_binary(@selected_skill.abs_path) do %>
                   <button
                     phx-click="edit_content"
-                    class="px-3 py-1 rounded text-xs font-medium text-base-content/50 hover:text-base-content"
+                    class="eits-action eits-action--ghost h-7 min-h-0 px-3"
                   >
                     Edit
                   </button>
                 <% end %>
-                <span class="ml-auto text-[10px] text-base-content/35 tabular-nums">
+                <span class="ml-auto text-micro text-base-content/35 tabular-nums">
                   {FileHelpers.format_size(@selected_skill.size)}
                 </span>
               </div>
@@ -365,19 +376,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.Skills do
               data-content={Base.encode64(@selected_skill.content || "")}
               data-lang={edit_language(@selected_skill)}
               class="flex-1 overflow-hidden min-h-0"
-            ></div>
+            >
+            </div>
           <% else %>
             <div class="flex-1 overflow-y-auto">
               <%= if @detail_tab == :preview do %>
                 <div
                   id={"proj-skill-viewer-#{@selected_skill.id}"}
-                  class="dm-markdown px-6 py-4 text-sm text-base-content leading-relaxed"
+                  class="dm-markdown px-6 py-4 text-message text-base-content leading-relaxed"
                   phx-hook="MarkdownMessage"
                   data-raw-body={@selected_skill.content}
                 >
                 </div>
               <% else %>
-                <pre class="px-6 py-4 text-xs font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_skill.content}</pre>
+                <pre class="px-6 py-4 text-mini font-mono text-base-content/75 whitespace-pre-wrap break-words leading-relaxed">{@selected_skill.content}</pre>
               <% end %>
             </div>
           <% end %>

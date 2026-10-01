@@ -5,34 +5,26 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
   alias EyeInTheSky.Commits
   alias EyeInTheSky.Events
   alias EyeInTheSky.Notes
-  alias EyeInTheSky.Projects
   alias EyeInTheSky.Sessions
   alias EyeInTheSky.Tasks
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
   import EyeInTheSkyWeb.Helpers.ViewHelpers, only: [relative_time: 1, truncate_text: 1]
   import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
 
     socket =
-      if project_id do
-        project = Projects.get_project!(project_id)
-
-        socket =
-          socket
-          |> assign(:page_title, "Project: #{project.name}")
-          |> assign(:project, project)
-          |> assign(:sidebar_tab, :overview)
-          |> assign(:sidebar_project, project)
-          |> assign_empty_project_data()
-
-        if connected?(socket) do
-          load_project_data(socket, project)
-        else
-          socket
-        end
+      if project do
+        socket
+        |> assign(:page_title, "Project: #{project.name}")
+        |> assign(:project, project)
+        |> assign(:sidebar_tab, :overview)
+        |> assign(:sidebar_project, project)
+        |> assign_empty_project_data()
       else
         socket
         |> assign(:page_title, "Project Not Found")
@@ -40,7 +32,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
         |> assign(:sidebar_tab, :overview)
         |> assign(:sidebar_project, nil)
         |> assign_empty_project_data()
-        |> put_flash(:error, "Invalid project ID")
+        |> put_flash(:error, "Project not found")
+      end
+
+    socket =
+      if project && connected?(socket) do
+        load_project_data(socket, project)
+      else
+        socket
       end
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
@@ -122,50 +121,50 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-4">
       <div class="max-w-7xl mx-auto">
-        <!-- Stats bar -->
+        <%!-- Stats bar --%>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
-              <p class="text-xs text-base-content/50 uppercase tracking-wider">Sessions</p>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
+              <p class="text-mini text-base-content/50 uppercase tracking-normal">Sessions</p>
               <p class="text-2xl font-semibold text-base-content">{@session_count}</p>
-              <p class="text-xs text-base-content/40">{length(@active_sessions)} active</p>
+              <p class="text-mini text-base-content/40">{length(@active_sessions)} active</p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
-              <p class="text-xs text-base-content/50 uppercase tracking-wider">Tasks</p>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
+              <p class="text-mini text-base-content/50 uppercase tracking-normal">Tasks</p>
               <p class="text-2xl font-semibold text-base-content">{length(@tasks)}</p>
-              <p class="text-xs text-base-content/40">{@open_tasks} open · {@done_tasks} done</p>
+              <p class="text-mini text-base-content/40">{@open_tasks} open · {@done_tasks} done</p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
-              <p class="text-xs text-base-content/50 uppercase tracking-wider">Agents</p>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
+              <p class="text-mini text-base-content/50 uppercase tracking-normal">Agents</p>
               <p class="text-2xl font-semibold text-base-content">{@agent_count}</p>
-              <p class="text-xs text-base-content/40">
+              <p class="text-mini text-base-content/40">
                 {@working_agent_count} running
               </p>
             </div>
           </div>
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-3">
-              <p class="text-xs text-base-content/50 uppercase tracking-wider">Commits</p>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-3">
+              <p class="text-mini text-base-content/50 uppercase tracking-normal">Commits</p>
               <p class="text-2xl font-semibold text-base-content">{length(@recent_commits)}</p>
-              <p class="text-xs text-base-content/40">recent</p>
+              <p class="text-mini text-base-content/40">recent</p>
             </div>
           </div>
         </div>
-        
-    <!-- Responsive Grid Layout -->
+
+        <%!-- Responsive Grid Layout --%>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <!-- Claude Files -->
-          <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-4">
-              <h2 class="card-title text-base mb-2">Claude Files</h2>
+          <%!-- Claude Files --%>
+          <div class="eits-panel bg-base-100 shadow-sm">
+            <div class="eits-panel__body p-4">
+              <h2 class="eits-panel__title text-message mb-2">Claude Files</h2>
               <%= if @project && @project.path do %>
                 <div class="mb-2 pb-2 border-b border-base-300">
-                  <p class="text-xs text-base-content/60 mb-1">Project Path</p>
-                  <p class="text-xs font-mono text-base-content/90 break-all">{@project.path}</p>
+                  <p class="text-mini text-base-content/60 mb-1">Project Path</p>
+                  <p class="text-mini font-mono text-base-content/90 break-all">{@project.path}</p>
                 </div>
               <% end %>
               <%= if @claude_files != [] do %>
@@ -173,41 +172,41 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                   <%= for entry <- @claude_files do %>
                     <a
                       href={~p"/projects/#{@project.id}/files?path=#{entry.rel_path}"}
-                      class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors"
+                      class="flex items-center gap-2 p-2 rounded-box hover:bg-base-200 transition-colors"
                     >
                       <.icon
                         name={if entry.type == :dir, do: "hero-folder", else: "hero-document-text"}
                         class={"size-4 flex-shrink-0 #{if entry.type == :dir, do: "text-secondary", else: "text-primary"}"}
                       />
                       <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-base-content">
+                        <p class="text-message font-medium text-base-content">
                           {entry.rel_path}{if entry.type == :dir, do: "/"}
                         </p>
-                        <p class="text-xs text-base-content/60">{entry.detail}</p>
+                        <p class="text-mini text-base-content/60">{entry.detail}</p>
                       </div>
                     </a>
                   <% end %>
                 </div>
               <% else %>
-                <p class="text-sm text-base-content/50">No Claude files found</p>
+                <p class="text-message text-base-content/50">No Claude files found</p>
               <% end %>
             </div>
           </div>
-          
-    <!-- Active Sessions -->
+
+          <%!-- Active Sessions --%>
           <%= if @active_sessions != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-base mb-3">Active Sessions</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-3">Active Sessions</h2>
                 <div class="space-y-2">
                   <%= for session <- @active_sessions do %>
-                    <div class="flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors">
+                    <div class="flex items-center justify-between gap-3 p-2 rounded-box hover:bg-base-200 transition-colors">
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
-                          <code class="text-xs font-mono text-base-content/70">
+                          <code class="text-mini font-mono text-base-content/70">
                             {String.slice(session.uuid || to_string(session.id), 0..7)}
                           </code>
-                          <span class="text-sm text-base-content/80 truncate">
+                          <span class="text-message text-base-content/80 truncate">
                             {session.name ||
                               truncate_text(if session.agent, do: session.agent.description) ||
                               "Unnamed"}
@@ -217,7 +216,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                       <%= if session.id do %>
                         <.link
                           navigate={~p"/dm/#{session.id}"}
-                          class="btn btn-ghost btn-xs text-base-content/60 hover:text-primary transition-colors min-h-[44px] min-w-[44px]"
+                          class="eits-action eits-action--ghost eits-action--icon hover:text-primary"
                           title="Direct message"
                           onclick="event.stopPropagation()"
                         >
@@ -230,15 +229,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </div>
             </div>
           <% end %>
-          
-    <!-- Recent Tasks -->
+
+          <%!-- Recent Tasks --%>
           <%= if @tasks != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-base mb-2">Recent Tasks</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Tasks</h2>
                 <div class="space-y-1">
                   <%= for task <- @recent_tasks do %>
-                    <div class="flex items-center gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
+                    <div class="flex items-center gap-2 p-2 rounded-box hover:bg-base-200 transition-colors">
                       <div class="flex-shrink-0">
                         <%= if task.completed_at do %>
                           <.icon name="hero-check-circle-solid" class="size-4 text-success" />
@@ -247,13 +246,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
                         <% end %>
                       </div>
                       <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-base-content truncate">{task.title}</p>
+                        <p class="text-message font-medium text-base-content truncate">
+                          {task.title}
+                        </p>
                         <%= if task.description do %>
-                          <p class="text-xs text-base-content/60 truncate">{task.description}</p>
+                          <p class="text-mini text-base-content/60 truncate">{task.description}</p>
                         <% end %>
                       </div>
                       <%= if not is_nil(task.priority) && task.priority > 0 do %>
-                        <span class="badge badge-xs">P{task.priority}</span>
+                        <span class="eits-chip eits-chip--warning">P{task.priority}</span>
                       <% end %>
                     </div>
                   <% end %>
@@ -261,44 +262,44 @@ defmodule EyeInTheSkyWeb.ProjectLive.Show do
               </div>
             </div>
           <% end %>
-          
-    <!-- Recent Notes -->
+
+          <%!-- Recent Notes --%>
           <%= if @recent_notes != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-base mb-2">Recent Notes</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Notes</h2>
                 <div class="space-y-2 max-h-64 overflow-y-auto">
                   <%= for note <- @recent_notes do %>
-                    <div class="p-2 rounded-lg bg-base-200/30 border border-base-300">
-                      <p class="text-xs text-base-content/60 mb-1">
+                    <div class="p-2 rounded-box bg-base-200/30 border border-base-300">
+                      <p class="text-mini text-base-content/60 mb-1">
                         <%= if note.created_at do %>
                           {relative_time(note.created_at)}
                         <% end %>
                       </p>
-                      <p class="text-sm text-base-content line-clamp-3">{note.body}</p>
+                      <p class="text-message text-base-content line-clamp-3">{note.body}</p>
                     </div>
                   <% end %>
                 </div>
               </div>
             </div>
           <% end %>
-          <!-- Recent Commits -->
+          <%!-- Recent Commits --%>
           <%= if @recent_commits != [] do %>
-            <div class="card bg-base-100 shadow-sm">
-              <div class="card-body p-4">
-                <h2 class="card-title text-base mb-2">Recent Commits</h2>
+            <div class="eits-panel bg-base-100 shadow-sm">
+              <div class="eits-panel__body p-4">
+                <h2 class="eits-panel__title text-message mb-2">Recent Commits</h2>
                 <div class="space-y-1">
                   <%= for commit <- @recent_commits do %>
-                    <div class="flex items-start gap-2 p-2 rounded-lg hover:bg-base-200 transition-colors">
+                    <div class="flex items-start gap-2 p-2 rounded-box hover:bg-base-200 transition-colors">
                       <.icon
                         name="hero-code-bracket"
                         class="size-3.5 text-base-content/30 flex-shrink-0 mt-0.5"
                       />
                       <div class="flex-1 min-w-0">
-                        <p class="text-xs font-mono text-base-content/40 mb-0.5">
+                        <p class="text-mini font-mono text-base-content/40 mb-0.5">
                           {String.slice(commit.commit_hash || "", 0, 7)}
                         </p>
-                        <p class="text-sm text-base-content truncate">
+                        <p class="text-message text-base-content truncate">
                           {commit.commit_message}
                         </p>
                       </div>

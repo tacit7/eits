@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
 
   def action_menu(assigns) do
     ~H"""
-    <div class="dropdown dropdown-end" id={@wrapper_id}>
+    <div class="eits-dropdown" id={@wrapper_id}>
       <button
         tabindex="0"
         class={@button_class}
@@ -30,8 +30,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
         <.icon name="hero-ellipsis-horizontal" class="size-5" />
       </button>
       <ul
+        id={if @wrapper_id, do: "#{@wrapper_id}-panel"}
         tabindex="0"
-        class="dropdown-content menu bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-xs"
+        class="eits-menu absolute right-0 eits-menu-list bg-base-100 rounded-box border border-base-content/10 shadow-lg z-50 p-1 w-48 text-mini"
       >
         <%= if @show_tabs do %>
           <%= for {tab, icon, label} <- @tabs do %>
@@ -60,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ActionMenu do
               class="flex items-center gap-2 px-3 py-2 w-full text-left hover:bg-base-content/5 rounded font-mono text-mini"
             >
               <.icon name="hero-clipboard-document" class="size-3.5 flex-shrink-0" />
-              Copy {String.slice(@session_uuid, 0..7)}…
+              Copy {String.slice(@session_uuid, 0..7)}...
             </button>
           </li>
           <li><hr class="border-base-content/10 my-1" /></li>

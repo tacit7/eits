@@ -19,6 +19,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   require Logger
 
   alias EyeInTheSky.{Agents, Channels, Messages, Notifications, Sessions, Settings}
+  alias EyeInTheSky.Codex.Error, as: CodexError
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
   alias EyeInTheSky.Claude.{ChannelFanout, ChannelProtocol}
@@ -113,7 +114,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
   """
   def on_session_failed(session_id, provider_conversation_id, reason) do
     error_text = provider_error_text(reason)
-    Messages.record_incoming_reply(session_id, "system", "[provider error] " <> error_text)
+    record_provider_error_message(session_id, reason, error_text)
     Events.stream_error(session_id, provider_conversation_id, error_text)
 
     case update_session_status(session_id, "failed", ErrorClassifier.status_reason(reason)) do
@@ -182,30 +183,89 @@ defmodule EyeInTheSky.AgentWorkerEvents do
 
   defp provider_error_text({:pi_turn_error, msg}) when is_binary(msg), do: Redaction.redact(msg)
 
+  defp provider_error_text({:codex_error, payload}),
+    do: CodexError.normalize(payload, "Codex error").message
+
+  defp provider_error_text({:turn_failed, payload}),
+    do: CodexError.normalize(payload, "Codex turn failed").message
+
   defp provider_error_text({:claude_result_error, %{result: result}}) when is_binary(result),
     do: Redaction.redact(result)
 
   defp provider_error_text(reason), do: Redaction.redact_inspect(reason, limit: 500)
 
+  defp record_provider_error_message(session_id, {:codex_error, payload}, _error_text) do
+    record_codex_error_message(
+      session_id,
+      CodexError.normalize(payload, "Codex error"),
+      "codex_error"
+    )
+  end
+
+  defp record_provider_error_message(session_id, {:turn_failed, payload}, _error_text) do
+    record_codex_error_message(
+      session_id,
+      CodexError.normalize(payload, "Codex turn failed"),
+      "codex_turn_failed"
+    )
+  end
+
+  defp record_provider_error_message(session_id, _reason, error_text) do
+    Messages.record_incoming_reply(session_id, "system", "[provider error] " <> error_text)
+  end
+
+  defp record_codex_error_message(session_id, normalized, stream_type) do
+    title =
+      case stream_type do
+        "codex_turn_failed" -> "Codex turn failed"
+        _ -> "Codex error"
+      end
+
+    metadata =
+      %{
+        "stream_type" => stream_type,
+        "error_title" => title,
+        "error_message" => normalized.message,
+        "status" => normalized.status,
+        "error_type" => normalized.error_type,
+        "model" => normalized.model
+      }
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Map.new()
+
+    Messages.record_incoming_reply(session_id, "codex", normalized.message, metadata: metadata)
+  end
+
   # --- Data Events ---
 
   @doc "Result received from SDK — save to DB synchronously so the message is committed before claude_complete fires."
-  def on_result_received(session_id, %{
-        provider: provider,
-        text: text,
-        metadata: metadata,
-        channel_id: channel_id,
-        source_uuid: source_uuid,
-        job_context: job_context
-      })
+  def on_result_received(
+        session_id,
+        %{
+          provider: provider,
+          text: text,
+          metadata: metadata,
+          channel_id: channel_id,
+          source_uuid: source_uuid
+        } = params
+      )
       when is_binary(text) do
+    job_context = Map.get(params, :job_context)
+
     if String.trim(text) in ["", "[NO_RESPONSE]"] do
       Logger.info("[#{session_id}] Skipping DB save — empty or suppressed response")
     else
       if get_in(job_context, ["reply_mode"]) == "cli_required" do
-        save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)
+        save_result(session_id, provider, text, metadata,
+          visibility: :session_only,
+          context: job_context
+        )
       else
-        save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)
+        save_result(session_id, provider, text, metadata,
+          channel_id: channel_id,
+          source_uuid: source_uuid
+        )
+
         maybe_fanout_mentions(channel_id, text, session_id)
       end
     end
@@ -235,9 +295,7 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         Logger.warning("[#{session_id}] Hook failure stored: #{hook_name} exit=#{exit_code}")
 
       {:error, reason} ->
-        Logger.warning(
-          "[#{session_id}] Failed to store hook failure: #{inspect(reason)}"
-        )
+        Logger.warning("[#{session_id}] Failed to store hook failure: #{inspect(reason)}")
     end
   end
 
@@ -344,7 +402,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
           })
 
         {[metadata: full_metadata],
-         fn -> Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only") end,
+         fn ->
+           Logger.info("[#{session_id}] Saved channel-prompt reply to session transcript only")
+         end,
          fn r -> Logger.warning("[#{session_id}] Transcript-only save failed: #{inspect(r)}") end}
       else
         channel_id = opts[:channel_id]
@@ -352,7 +412,9 @@ defmodule EyeInTheSky.AgentWorkerEvents do
         base = [metadata: db_metadata]
         base = if channel_id, do: Keyword.put(base, :channel_id, channel_id), else: base
         base = if source_uuid, do: Keyword.put(base, :source_uuid, source_uuid), else: base
-        {base, fn -> :ok end, fn r -> Logger.warning("[#{session_id}] DB save failed: #{inspect(r)}") end}
+
+        {base, fn -> :ok end,
+         fn r -> Logger.warning("[#{session_id}] DB save failed: #{inspect(r)}") end}
       end
 
     case Messages.record_incoming_reply(session_id, provider, text, reply_opts) do

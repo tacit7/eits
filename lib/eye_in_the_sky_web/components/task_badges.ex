@@ -20,11 +20,11 @@ defmodule EyeInTheSkyWeb.TaskBadges do
     ~H"""
     <%= cond do %>
       <% is_integer(@priority) && @priority >= 3 -> %>
-        <span class="badge badge-error badge-sm flex-shrink-0">High</span>
+        <span class="eits-chip eits-chip--error">High</span>
       <% @priority == 2 -> %>
-        <span class="badge badge-warning badge-sm flex-shrink-0">Med</span>
+        <span class="eits-chip eits-chip--warning">Med</span>
       <% @priority == 1 -> %>
-        <span class="badge badge-info badge-sm flex-shrink-0">Low</span>
+        <span class="eits-chip eits-chip--info">Low</span>
       <% true -> %>
         <span></span>
     <% end %>
@@ -39,15 +39,15 @@ defmodule EyeInTheSkyWeb.TaskBadges do
 
   def state_badge(assigns) do
     ~H"""
-    <span class={["badge badge-sm flex-shrink-0", state_badge_class(@state_id)]}>
+    <span class={["eits-chip", state_badge_class(@state_id)]}>
       {@state_name}
     </span>
     """
   end
 
-  defp state_badge_class(@state_todo), do: "badge-ghost"
-  defp state_badge_class(@state_in_progress), do: "badge-info"
-  defp state_badge_class(@state_in_review), do: "badge-warning"
-  defp state_badge_class(@state_done), do: "badge-success"
-  defp state_badge_class(_), do: "badge-ghost"
+  defp state_badge_class(@state_todo), do: "eits-chip--neutral"
+  defp state_badge_class(@state_in_progress), do: "eits-chip--info"
+  defp state_badge_class(@state_in_review), do: "eits-chip--warning"
+  defp state_badge_class(@state_done), do: "eits-chip--success"
+  defp state_badge_class(_), do: "eits-chip--neutral"
 end

@@ -7,7 +7,7 @@ How EITS creates, runs, streams, and resumes sessions across multiple providers:
 | Provider | Binary | SDK | Stream Handler | Assembler | Status on Completion |
 |----------|--------|-----|-----------------|-----------|----------------------|
 | Claude | `claude` | `Claude.SDK` | Direct SSE | `StreamAssembler` | `idle` |
-| Codex | `codex` | `Codex.SDK` | JSONL via `MessageHandler` | `CodexStreamAssembler` | `idle` |
+| Codex | `codex` | `Codex.SDK` | JSONL via `MessageHandler`, or feature-flagged JSON-RPC app-server | `CodexStreamAssembler` | `idle` |
 | Gemini | `gemini` | `gemini_cli_sdk` | ETS-based `StreamHandler` | `StreamAssembler` (default) | `idle` |
 
 This document focuses on Codex and Gemini integration patterns. For Claude-specific details, see `AGENT_WORKER_QUEUE.md`.
@@ -20,16 +20,16 @@ The following Claude models are available for agent spawning and DM sessions:
 
 | Model | Display Name | Description |
 |-------|--------------|-------------|
-| `claude-opus-4-8` | Opus 4.8 (Default) | Most capable model for complex work · 1M context |
-| `claude-sonnet-4-6` | Sonnet 4.6 | Efficient for routine tasks · 1M context |
-| `sonnet[1m]` | Sonnet 4.6 (1M context) | Extended context version · $3/$15 per Mtok (usage credits) |
+| `claude-sonnet-5` | Sonnet 5 (Default) | Efficient for routine tasks |
+| `claude-fable-5` | Fable 5 | Most capable for your hardest and longest-running tasks |
+| `claude-opus-4-8` | Opus 5 | Best for everyday, complex tasks |
 | `claude-haiku-4-5-20251001` | Haiku 4.5 | Fastest for quick answers |
 
-The `claude-opus-4-8`, `claude-sonnet-4-6`, and `claude-haiku-4-5-20251001` are the recommended production-ready models. The `sonnet[1m]` variant provides an extended 1M token context window for tasks requiring larger context, though it draws from usage credits instead of Max plan benefits.
+The curated UI list follows the current Claude picker, but EITS spawn validation accepts new `claude-*` slugs as they appear. The `opus[1m]` and `sonnet[1m]` aliases remain available for extended-context sessions.
 
 **Model Aliasing**: Short aliases like `"opus"`, `"sonnet"`, `"haiku"` are normalized to their full slugs at spawn time. The alias resolution is:
 - `"opus"` → `claude-opus-4-8`
-- `"sonnet"` → `claude-sonnet-4-6`
+- `"sonnet"` → `claude-sonnet-5`
 - `"haiku"` → `claude-haiku-4-5-20251001`
 
 Older Claude models (Opus 4.7, 4.6, 4.5, Sonnet 4.5, etc.) remain in `ModelConfig.claude_models/0` for backward compatibility with stored sessions but are not shown in the new agent form or DM model menu.
@@ -40,23 +40,25 @@ The following Codex models are available for agent spawning:
 
 | Model | Display Name | Context Window | Max Output | Description |
 |-------|--------------|-----------------|------------|-------------|
+| `gpt-5.6-sol` | GPT-5.6 Sol (Default) | 1,050,000 tokens | 128k tokens | Latest frontier agentic coding model |
+| `gpt-5.6-tenna` | GPT-5.6 Tenna | 1,050,000 tokens | 128k tokens | Balanced agentic coding model for everyday work |
+| `gpt-5.6-luna` | GPT-5.6 Luna | 1,050,000 tokens | 128k tokens | Fast and affordable agentic coding model |
 | `gpt-5.5` | GPT-5.5 | 1,050,000 tokens | 128k tokens | Frontier model for complex coding, research, and real-world work |
-| `gpt-5.3-codex` | GPT-5.3 Codex (Default) | 400,000 tokens | 128k tokens | Coding-optimized model · recommended for code generation and review |
-| `gpt-5.4` | GPT-5.4 | 1,000,000 tokens | — | Strong model for everyday coding |
-| `gpt-5.2` | GPT-5.2 | 400,000 tokens | 128k tokens | Optimized for professional work and long-running agents |
+| `gpt-5.4` | GPT-5.4 | 1,050,000 tokens | 128k tokens | Strong model for everyday coding |
 | `gpt-5.4-mini` | GPT-5.4 Mini | — | — | Small, fast, and cost-efficient for simpler tasks |
 
-The display list is curated to five production models. Older models (GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
+The display list is curated to current production models. Spawn validation accepts new `gpt-*` slugs as they appear; older models (GPT-5.3 Codex, GPT-5.2 Codex, GPT-5.1 variants, etc.) remain in `ModelConfig.codex_models/0` for backward compatibility but are not shown in new agent forms.
 
-**When adding a new Codex model**, update both:
+**When adding a new Codex model to the curated display catalog**, update:
 - `lib/eye_in_the_sky/codex/models.ex` — add context window and max output token metadata to `@context_windows` and `@max_output_tokens` maps
-- `scripts/eits` — add the model to the valid models list (line ~1610 in help text, line ~1683 in case pattern for validation)
+- `lib/eye_in_the_sky_web/helpers/model_helpers.ex` — add label, description, and primary/legacy placement
+- `scripts/eits` — update help text examples if the current recommended set changes
 
 ### Model Defaults
 
 When a session is spawned without an explicit model choice:
-- **Claude sessions**: Default to `claude-opus-4-8` (via `ModelHelpers.default_model_for/1`)
-- **Codex sessions**: Default to `gpt-5.3-codex` (via `ModelHelpers.default_model_for/1`)
+- **Claude sessions**: Default to `claude-sonnet-5` in UI helpers; API spawns use the user-configured `Settings.default_model()` alias, which defaults to `sonnet`
+- **Codex sessions**: Default to `gpt-5.6-sol` (via `ModelHelpers.default_model_for/1` / `ModelConfig.default_model/1`)
 - **Gemini sessions**: Default to `gemini-2.5-flash`
 
 ## Architecture
@@ -71,9 +73,107 @@ UI (new agent form, agent_type="codex")
           -> AgentWorker.init/1  (stream = CodexStreamAssembler.new())
             -> start_codex_sdk/2
               -> Codex.SDK.start/2
-                -> Codex.CLI.spawn_new_session/2
+                -> default: Codex.CLI.spawn_new_session/2
                   -> Port.open (codex exec --json ...)
+                -> opt-in: Codex.AppServer.lookup_or_start/2
+                  -> Port.open (codex app-server --listen stdio://)
+                  -> JSON-RPC initialize/thread/start/turn/start
 ```
+
+The app-server bridge is gated by `codex_app_server_enabled` and remains off by
+default. When enabled, `EyeInTheSky.Codex.AppServer` is a supervised long-lived
+GenServer registered per EITS AgentWorker/session. It owns the Codex
+`app-server` Port, JSON-RPC request IDs, pending call timeouts, thread and
+active-turn IDs, server-request replies, cancellation via `turn/interrupt`, and
+text/reasoning buffers. AgentWorker remains the queue and persistence owner and
+continues to receive the same per-turn tuple protocol:
+`claude_message`, `codex_session_id`, `claude_complete`, and `claude_error`
+keyed by a fresh `sdk_ref`.
+
+### Supervision Tree
+
+`AppServerRegistry` (`:unique` Registry) and `AppServerSupervisor`
+(`DynamicSupervisor`) are unconditionally added to the `EyeInTheSky.Application`
+supervision tree at startup. Individual `AppServer` processes are started on
+demand inside the supervisor when the feature flag is on and the capability gate
+passes; stopping the owning AgentWorker terminates the corresponding
+`AppServer` child via `stop_owner/1`.
+
+`stop_owner/1` guards against test or early-shutdown scenarios where the registry
+or supervisor may not yet be running: it uses `named_process?/1` to verify both
+OTP names are live before touching the registry, and catches any
+`ArgumentError` or `:exit` to return `:ok` without raising.
+
+### Terminal Race Hardening
+
+Two race conditions are hardened:
+
+- **Stale responses**: `thread/start` and `turn/start` JSON-RPC responses that
+  arrive after the active turn has already been cleared (e.g., timeout followed
+  by a late reply) are discarded. `handle_request_result/3` pattern-matches
+  `active_turn: nil` for both request kinds and logs a debug message instead of
+  applying the result.
+
+- **Cancel routing**: When `Codex.SDK.cancel/2` is called, it must not call
+  `cli.cancel/1` on a pid that belongs to the app-server (doing so would send a
+  raw OS signal to a long-lived process). `AppServer.app_server_pid?/1` probes
+  the registry to distinguish app-server pids from plain CLI pids; CLI cancel
+  is only invoked for the non-app-server case.
+
+### Codex App-Server Rollout
+
+The bridge is intentionally canary-first:
+
+- Global switch: `codex_app_server_enabled` in Settings, exposed on the Settings
+  -> System tab.
+- Per-call switch: pass `codex_app_server: true` to `EyeInTheSky.Codex.SDK`.
+- Capability gate: non-test app-server starts require a discoverable Codex
+  binary with version `0.149.1` or newer. The version probe is cached briefly so
+  repeated turns do not shell out every time.
+- Safe fallback: gate failures and app-server lookup/startup failures fall back
+  to the existing `codex exec` backend before any turn is accepted. Failures
+  after `turn/start` is in flight stay on the app-server path to avoid duplicate
+  execution.
+- AgentWorker path: Codex workers use the same `Codex.SDK` flag gate. The
+  app-server owner key is the EITS session id, so one supervised
+  `Codex.AppServer` process is reused across turns for that AgentWorker and is
+  stopped when the worker terminates.
+- Normal CI: the real app-server smoke test is excluded by the `:integration`
+  tag.
+- Manual smoke test:
+
+```bash
+EITS_CODEX_APP_SERVER_SMOKE=1 PHX_SERVER=false mix test --include integration test/eye_in_the_sky/codex/app_server/smoke_test.exs
+```
+
+The smoke test starts a real `codex app-server --listen stdio://`, completes two
+turns through the same app-server owner, and requires Codex hooks to write EITS
+environment context to a temporary hook log. It also calls `hooks/list` on the
+same app-server process and captures `hook/started` / `hook/completed`
+notifications so hook failures report whether hooks were undiscovered, untrusted,
+or executed without the expected EITS environment.
+
+For hook parity, the smoke test creates an isolated temporary `CODEX_HOME`,
+symlinks the existing Codex auth file, writes a temp project trust entry, probes
+`hooks/list` for the current hook keys and hashes, then writes matching
+`hooks.state` trust entries before running the two-turn app-server session. It
+does not mutate the user's global `~/.codex/config.toml`.
+
+The bridge emits telemetry under `[:eits, :codex, :app_server, event]` for
+`started`, `start_failed`, `lookup`, `turn_accepted`, `turn_completed`,
+`turn_failed`, `turn_canceled`, `turn_error`, `interrupt`, `request_timeout`,
+`cancel_timeout`, `hooks_list`, `hook_started`, `hook_completed`,
+`server_request_replied`, `server_request_resolved`, `gate_passed`,
+`gate_failed`, `fallback`, and `exit`.
+
+Server-initiated app-server requests are always answered so the long-lived
+bridge cannot hang waiting for host UI that EITS does not yet expose. Command
+and file-change approvals are declined, permission requests grant an empty
+turn-scoped subset, `tool/requestUserInput` and the older
+`item/tool/requestUserInput` form return empty answers, MCP elicitation is
+declined, and unknown request methods receive JSON-RPC method errors. This keeps
+the turn lifecycle terminal and observable without silently approving new
+capabilities.
 
 ## Session UUID Lifecycle
 
@@ -401,13 +501,50 @@ By default, all Codex sessions bypass sandbox approval checks and tooling restri
 
 2. **Codex.CLI.build_args/1**: Defaults `bypass_sandbox` option to `true`:
    ```elixir
-   if Keyword.get(opts, :bypass_sandbox, true) do
-     args ++ ["--dangerously-bypass-approvals-and-sandbox"]
-   else
-     full_auto = Keyword.get(opts, :full_auto, true)
+   cond do
+     Keyword.get(opts, :bypass_sandbox, true) ->
+       args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+     full_auto ->
+       args |> add_sandbox("workspace-write") |> add_approval_policy("on-request")
+     true ->
+       args |> add_sandbox(opts[:sandbox]) |> add_approval_policy(opts[:ask_for_approval])
+   end
    ```
 
 This allows Codex agents to use file modifications, shell commands, and other restricted operations by default. To opt out (use approval requirements), explicitly pass `bypass_sandbox: false` when starting a session.
+
+### `--full-auto` Removed
+
+Current Codex releases removed the `--full-auto` shortcut flag. `Codex.CLI` now expands the legacy `:full_auto` setting to its current equivalent:
+
+- `--sandbox workspace-write` — allows the agent to read/write within the workspace
+- `-c approval_policy="on-request"` — requests approval only when the agent needs it
+
+The `:full_auto` option in `build_args/1` is computed lazily: if neither `:sandbox` nor `:ask_for_approval` is explicitly provided, `full_auto` defaults to `true` (preserving prior behavior). When `:full_auto` is explicitly `false`, neither sandbox nor approval policy flags are added, so callers must supply `:sandbox` and `:ask_for_approval` directly.
+
+The deprecated `"on-failure"` approval policy is transparently upgraded to `"on-request"` to handle legacy saved settings.
+
+### Supported `build_args/1` Options
+
+| Option | CLI flag | Notes |
+|--------|----------|-------|
+| `:bypass_sandbox` | `--dangerously-bypass-approvals-and-sandbox` | Default `true`; takes precedence over all other sandbox/approval opts |
+| `:full_auto` | Expands to `--sandbox workspace-write` + `-c approval_policy="on-request"` | Computed `true` when neither `:sandbox` nor `:ask_for_approval` is set |
+| `:sandbox` | `--sandbox <mode>` | Applied when `bypass_sandbox: false` and `full_auto: false` |
+| `:ask_for_approval` | `-c approval_policy="<policy>"` | Applied when `bypass_sandbox: false` and `full_auto: false`; `"on-failure"` is normalized to `"on-request"` |
+
+### DM-Scoped Provider Settings
+
+`DmSettings.to_provider_opts/2` maps `openai.*` keys from the DM settings store to Codex CLI keyword opts at session start time. The following keys are now forwarded:
+
+| Settings key | Keyword opt | Description |
+|--------------|-------------|-------------|
+| `openai.sandbox` | `:sandbox` | Sandbox mode (e.g. `"read-only"`, `"workspace-write"`) |
+| `openai.ask_for_approval` | `:ask_for_approval` | Approval policy (e.g. `"on-request"`, `"never"`) |
+| `openai.full_auto` | `:full_auto` | Legacy full-auto shortcut |
+| `openai.dangerously_bypass_approvals_and_sandbox` | `:bypass_sandbox` | Full bypass |
+
+These opts are merged into `extra_cli_opts` via `RuntimeContext.build/3` and forwarded through `ProviderStrategy.Codex.build_opts/2` using `Keyword.merge/2`, so DM-scoped settings override strategy defaults. The `"claude"` provider maps `anthropic.*` keys instead; unknown providers return `[]`.
 
 ## JSONL Event Types
 
@@ -422,6 +559,8 @@ Events emitted by `codex exec --json`:
 | `turn.completed` | Turn finished | `usage.input_tokens`, `usage.output_tokens` |
 | `turn.failed` | Turn failed | `message` or `error` |
 | `error` | Top-level error | `message` |
+
+**`turn.completed` is the only terminal-success signal.** If the Codex process exits cleanly (status 0) without ever emitting `turn.completed`, `Codex.SDK.on_clean_exit/1` returns `{:error, {:codex_incomplete_turn, message}}` instead of treating the exit as success — a clean exit is not proof the turn finished. `ErrorClassifier.classify/1` maps `{:codex_incomplete_turn, _}` to `:cli_exit_error`, so the session (and its AgentWorker) transitions to `"failed"` with `status_reason: "cli_exit_error"` rather than silently completing. This surfaces cases where Codex was killed, crashed, or lost its stream mid-turn.
 
 ### Item Types
 
@@ -509,24 +648,64 @@ Without this flag, `.codex/hooks.json` is ignored and sessions run without EITS 
 
 ### Hook Configuration (.codex/hooks.json)
 
-All lifecycle hooks are consolidated through a single script `eits-codex-notify.sh`, which routes events to session-specific helper scripts and status updates:
+The `hooks.json` file uses a nested `"hooks"` object at the top level (not a flat structure) and requires `"type": "command"` on each hook entry. A top-level `"description"` field documents the file's purpose:
 
-| Hook | Trigger | Script | Purpose |
-|------|---------|--------|---------|
-| `SessionStart` | Session initialization (startup/resume/compact) | `eits-codex-notify.sh` | Route startup/resume bookkeeping; mark session idle unless resuming after a crashed agent |
-| `UserPromptSubmit` | User submits a prompt to Codex | `eits-codex-notify.sh` | Mark session as `"working"` |
-| `PreToolUse` | Before a tool is invoked | `eits-codex-notify.sh` | Check tool guards (e.g., block `rm` on unsafe paths) |
-| `PostToolUse` | After a Bash tool completes | `eits-codex-notify.sh` | Log git commits and record tool activity |
-| `PreCompact` | Before context compaction | `eits-codex-notify.sh` | Mark session as `"compacting"` |
-| `Stop` | Session ends (user stop, error, etc.) | `eits-codex-notify.sh` | Mark session `"idle"`, enforce final annotation |
+```json
+{
+  "description": "Project-scoped Codex hooks for EITS lifecycle tracking and IAM guardrails.",
+  "hooks": { ... }
+}
+```
 
-All hooks call the same `eits-codex-notify.sh` dispatcher script, which:
+`SessionStart` runs the dedicated `codex-session-startup.sh` script. Most other lifecycle events route through `eits-codex-notify.sh`. `PreToolUse`, `PostToolUse`, and `Stop` additionally run `codex-iam-guard.sh` as a second command in the same hook array.
+
+| Hook | Matcher | Scripts | Purpose |
+|------|---------|---------|---------|
+| `SessionStart` | — | `codex-session-startup.sh` | Register/resolve session, write Codex env file, mark session idle |
+| `UserPromptSubmit` | — | `eits-codex-notify.sh` | Mark session as `"working"` |
+| `PreToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Tool guards + IAM deny check |
+| `PostToolUse` | `Bash\|apply_patch\|Edit\|Write` | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Commit logging + IAM post-check |
+| `PreCompact` | — | `eits-codex-notify.sh` | Mark session as `"compacting"` |
+| `PostCompact` | — | `eits-codex-notify.sh` | Save compact summary via `eits-post-compact.sh` |
+| `SessionEnd` | — | `eits-codex-notify.sh` | Run `eits-session-end.sh` on session termination |
+| `Stop` | — | `eits-codex-notify.sh`, `codex-iam-guard.sh` | Mark session `"idle"`, enforce final annotation + IAM stop policy |
+
+`eits-codex-notify.sh` also dispatches `apply_patch` into the `Edit|Write` guard path for `PreToolUse`.
+
+For non-startup events, hooks call the `eits-codex-notify.sh` dispatcher script, which:
 1. Parses the JSON input from Codex to extract the hook event name
-2. Routes to the appropriate session-specific helper script (e.g., `eits-session-startup.sh` for SessionStart)
+2. Routes to the appropriate event-specific helper script
 3. Updates session status via `eits sessions update`
 4. Runs guards and validation checks (PreToolUse)
 
 This design allows all hook responsibilities to be managed and tested in one place while delegating session-specific logic to focused helper scripts.
+
+### IAM Guard (codex-iam-guard.sh)
+
+`priv/scripts/codex-iam-guard.sh` adapts the EITS IAM decision endpoint for Codex hooks. The Claude Code IAM hook returns a response shape that includes Claude-specific allow/fail-open fields that Codex may not support; this script translates it into the minimal output Codex expects.
+
+**Request flow:**
+1. Reads the hook payload from stdin (5 s timeout)
+2. Validates JSON and extracts `hook_event_name`
+3. POSTs the payload to `$EITS_URL/api/v1/iam/decide` (3 s curl timeout)
+4. Translates the IAM response into Codex-compatible output
+
+**Fail-open conditions** — exits 0 without output on:
+- `EITS_WORKFLOW=0` env var
+- `curl` or `jq` not on PATH
+- Stdin timeout or empty/non-JSON payload
+- Missing `hook_event_name` field
+- Non-2xx HTTP response or non-JSON body
+
+**Response translation by event:**
+
+| Event | IAM `deny` / `continue: false` | IAM `additionalContext` present | Otherwise |
+|-------|---------------------------------|---------------------------------|-----------|
+| `PreToolUse` | Emits `permissionDecision: "deny"` with reason | Emits `additionalContext` only | No output (allow) |
+| `PostToolUse` | Emits `decision: "block"` with reason | Emits `additionalContext` as advisory | No output |
+| `Stop` | Emits `decision: "block"` with reason | Emits `additionalContext` as block reason | No output |
+
+The adapter never forwards Claude-only allow/fail-open fields, preventing Codex from treating unsupported hook output as an error.
 
 ## Key Modules
 
@@ -534,7 +713,10 @@ This design allows all hook responsibilities to be managed and tested in one pla
 | Module | File | Role |
 |--------|------|------|
 | `Codex.CLI` | `lib/eye_in_the_sky/codex/cli.ex` | Port spawning, arg building, env setup; defaults `bypass_sandbox` to `true` |
+| `Codex.AppServer` | `lib/eye_in_the_sky/codex/app_server.ex` | Default-off JSON-RPC app-server owner; one supervised process per AgentWorker/session |
 | `Codex.SDK` | `lib/eye_in_the_sky/codex/sdk.ex` | High-level API; message protocol adapter; init prompt with EITS CLI reference |
+| `Codex.AppServer.Protocol` | `lib/eye_in_the_sky/codex/app_server/protocol.ex` | JSON-RPC request/response/server-request helpers for app-server |
+| `Codex.AppServer.TurnBuffer` | `lib/eye_in_the_sky/codex/app_server/turn_buffer.ex` | Buffers app-server text and reasoning by item ID and emits final result text |
 | `Codex.ToolMapper` | `lib/eye_in_the_sky/codex/tool_mapper.ex` | Normalize Codex tool calls to canonical format (command_execution→Bash, web_search→WebSearch, etc.) |
 | `Codex.Parser` | `lib/eye_in_the_sky/codex/parser.ex` | JSONL line -> Message struct |
 | `Codex.StreamAssembler` | `lib/eye_in_the_sky/codex/stream_assembler.ex` | Stream state for Codex PubSub events |
@@ -565,12 +747,12 @@ Codex session status transitions are driven by JSONL events emitted by `codex ex
 | Codex Event | Handler | Status Set |
 |-------------|---------|------------|
 | `thread.started` | `on_codex_thread_started/1` | `"working"` |
-| `turn.completed` | `on_sdk_completed/3` (provider="codex") | `"waiting"` |
+| `turn.completed` | `on_sdk_completed/3` (provider="codex") | `"idle"` |
 | SDK error | `on_sdk_errored/2` | `"idle"` |
 
 **`thread.started`**: Fires when Codex creates a new thread. The worker calls `on_codex_thread_started/1` immediately (not waiting for turn end) to promote the session to `"working"` and sync the real `thread_id` to `sessions.uuid`. Also sends a `"working"` status notification.
 
-**`turn.completed`**: Codex sessions transition to `"waiting"` on completion, not `"idle"`. This allows the session to be resumed with `codex exec resume <thread_id>`. A resumable status notification is sent. Unlike Claude sessions which go to `"idle"`, Codex sessions remain resumable.
+**`turn.completed`**: Codex sessions transition to `"idle"` on completion. The persisted Codex thread id still allows future turns to resume the provider conversation.
 
 **SDK error**: Failed turns transition to `"idle"` so the UI can display the failure and allow retry.
 
@@ -607,7 +789,9 @@ The `notify_agent_status/3` function in `AgentWorkerEvents` handles both notific
 ## Known Issues and Gotchas
 
 - **TOML quoting**: All `-c shell_environment_policy.set.*` values must be double-quoted. Bare integers cause Codex to exit with code 1 and no output.
-- **No stderr separation**: Codex CLI merges stderr into stdout (`:stderr_to_stdout`). Parse errors or startup failures appear as raw text lines, not structured JSONL.
+- **No stderr separation**: Codex CLI merges stderr into stdout (`:stderr_to_stdout`). Parse errors or startup failures appear as raw text lines, not structured JSONL. `Codex.Parser.parse_stream_line/1` now returns `{:protocol, %{type: :provider_diagnostic, message: line}}` for any non-JSON or malformed-JSON line (instead of silently `:skip`-ping it), so this output isn't lost.
 - **Singular/plural item types**: Codex docs reference singular names (`file_change`) but some builds emit plural (`file_changes`). Parser accepts both.
 - **thread_id vs session UUID**: The auto-generated fallback UUID is temporary. After `thread.started` fires, the real thread_id replaces it. Any external reference to the session UUID may see the old value if captured before sync.
 - **Exit code 1 with no output**: Usually means a config error (bad model name, TOML parse failure, missing API key). The Codex binary validates config before producing any JSONL.
+- **Incomplete turns are failures, not successes**: A clean process exit (status 0) without a `turn.completed` event is classified as `:cli_exit_error` (see JSONL Event Types above), not silently treated as done.
+- **Abnormal exits carry provider diagnostics**: `Codex.SDK.on_abnormal_exit/2` retains up to 5 redacted, 1000-char-capped non-JSON lines seen via `handle_protocol_event/2` (state key `provider_diagnostics`) and joins them into the `{:codex_error, %{"type" => "cli_exit_error", "status" => status, "message" => message}}` returned on non-zero exit. Secrets are stripped via `Redaction.redact/1` before storage. `ErrorClassifier` maps `error_type == "cli_exit_error"` straight to `:cli_exit_error`, so these are treated as systemic/terminal failures rather than generic exit codes. If no diagnostic output was captured, the message says so explicitly ("No provider diagnostic output was captured.").

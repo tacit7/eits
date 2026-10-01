@@ -94,7 +94,8 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperRegressionTest do
       events_16 = events_15 ++ [tool_msg(16)]
       {changed_16, _new_tail_16} = MessageGrouper.diff_from_cached_tail(cached_tail_15, events_16)
 
-      new_cluster_ids = Enum.map(changed_16, & &1.id) |> Enum.filter(&String.starts_with?(&1, "cluster-row-"))
+      new_cluster_ids =
+        Enum.map(changed_16, & &1.id) |> Enum.filter(&String.starts_with?(&1, "cluster-row-"))
 
       # The only changed cluster row id must be the same stable id (no shift).
       # Baseline will emit a NEW cluster-row-7 while cluster-row-6 becomes stale.
@@ -207,6 +208,37 @@ defmodule EyeInTheSkyWeb.DmLive.MessageGrouperRegressionTest do
       # Any positive number is truthful; the label in the component can say "results".
       refute cluster.meta.count == 0,
              "result-only cluster must have count > 0, not #{cluster.meta.count}"
+    end
+
+    test "cluster meta summarizes failed commands and Codex file change paths" do
+      events = [
+        msg(1,
+          sender_role: "assistant",
+          metadata: %{
+            "stream_type" => "tool_use",
+            "tool_name" => "Bash",
+            "input" => %{"command" => "mix test", "exit_code" => 2},
+            "exit_code" => 2
+          }
+        ),
+        msg(2,
+          sender_role: "assistant",
+          body:
+            "Tool: File Changes\n" <>
+              Jason.encode!(%{"files" => [%{"path" => "lib/example.ex"}]}),
+          metadata: %{"stream_type" => "tool_use", "tool_name" => "File Changes"}
+        )
+      ]
+
+      rows = MessageGrouper.grouped_rows(events)
+      cluster = Enum.find(rows, &(&1.type == :cluster))
+      summary = Enum.find(rows, &(&1.type == :cluster_summary))
+
+      assert cluster.meta.failed_count == 1
+      assert cluster.meta.file_count == 1
+      assert "Bash" in cluster.meta.tool_labels
+      assert "File Changes" in cluster.meta.tool_labels
+      assert summary.data.files == ["lib/example.ex"]
     end
   end
 

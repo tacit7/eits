@@ -113,7 +113,10 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp route_cmd("dm", args, sid, _agent_id), do: DmHandler.dispatch(args, sid)
   defp route_cmd("task", args, sid, _agent_id), do: TaskHandler.dispatch(args, sid)
   defp route_cmd("note", args, sid, _agent_id), do: dispatch_note(args, sid)
-  defp route_cmd("commit", hash, sid, agent_id), do: dispatch_commit(String.trim(hash), sid, agent_id)
+
+  defp route_cmd("commit", hash, sid, agent_id),
+    do: dispatch_commit(String.trim(hash), sid, agent_id)
+
   defp route_cmd("spawn", args, sid, _agent_id), do: dispatch_spawn(args, sid)
   defp route_cmd("channel", args, sid, _agent_id), do: dispatch_channel(args, sid)
   defp route_cmd(unknown, _args, sid, _agent_id), do: notify_error(sid, unknown, :unknown_command)
@@ -150,7 +153,11 @@ defmodule EyeInTheSky.Agents.CmdDispatcher do
   defp dispatch_commit(hash, from_session_id, agent_id) when hash != "" do
     case validate_session_exists(from_session_id) do
       :ok ->
-        case Commits.create_commit(%{commit_hash: hash, session_id: from_session_id, agent_id: agent_id}) do
+        case Commits.create_commit(%{
+               commit_hash: hash,
+               session_id: from_session_id,
+               agent_id: agent_id
+             }) do
           {:ok, _} -> notify_success(from_session_id, "commit #{hash} logged")
           {:error, reason} -> notify_error(from_session_id, "commit", reason)
         end

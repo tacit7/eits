@@ -79,7 +79,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
     assign(socket, :documents, docs)
   end
 
-  defp agent_types_string([]), do: "—"
+  defp agent_types_string([]), do: "-"
 
   defp agent_types_string(agent_type_docs) do
     Enum.map_join(agent_type_docs, ", ", & &1.agent_type)
@@ -91,6 +91,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
 
   defp delete_confirm_text(doc) do
     n = length(doc.agent_type_documents)
+
     "Deleting this document removes it from #{n} agent type(s). The underlying policies are not deleted."
   end
 
@@ -105,16 +106,16 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
         <div class="flex items-center gap-3">
           <.icon name="hero-document-text" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">Policy Documents</h1>
-          <span class="badge badge-ghost">{length(@documents)}</span>
+          <span class="eits-chip eits-chip--muted">{length(@documents)}</span>
         </div>
 
-        <.link navigate={~p"/iam/documents/new"} class="btn btn-primary btn-sm">
+        <.link navigate={~p"/iam/documents/new"} class="eits-action eits-action--primary gap-1.5">
           <.icon name="hero-plus" class="size-4" /> New document
         </.link>
       </div>
 
-      <section class="card bg-base-200">
-        <div class="card-body p-0">
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-0">
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>
@@ -148,26 +149,26 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyDocuments do
                       </.link>
                     </td>
                     <td class="text-base-content/70 max-w-xs truncate">
-                      {doc.description || "—"}
+                      {doc.description || "-"}
                     </td>
-                    <td class="font-mono text-xs">{policy_count(doc)}</td>
-                    <td class="text-xs">{agent_types_string(doc.agent_type_documents)}</td>
+                    <td class="font-mono text-mini">{policy_count(doc)}</td>
+                    <td class="text-mini">{agent_types_string(doc.agent_type_documents)}</td>
                     <td class="text-right whitespace-nowrap">
                       <.link
                         navigate={~p"/iam/documents/#{doc.id}"}
-                        class="btn btn-ghost btn-xs"
+                        class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
                       >
                         <.icon name="hero-eye" class="size-4" /> Show
                       </.link>
                       <.link
                         navigate={~p"/iam/documents/#{doc.id}/edit"}
-                        class="btn btn-ghost btn-xs"
+                        class="eits-action eits-action--ghost h-7 min-h-0 gap-1 px-2"
                       >
                         <.icon name="hero-pencil-square" class="size-4" /> Edit
                       </.link>
                       <button
                         type="button"
-                        class="btn btn-ghost btn-xs text-error"
+                        class="eits-action eits-action--danger h-7 min-h-0 px-2"
                         phx-click="delete"
                         phx-value-id={doc.id}
                         data-confirm={delete_confirm_text(doc)}

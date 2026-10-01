@@ -15,7 +15,6 @@ defmodule EyeInTheSkyWeb.Api.V1.PrSubscriptionController do
     if is_nil(pr_number) do
       conn |> put_status(400) |> json(%{error: "pr_number must be an integer"})
     else
-
       case PrSubscriptions.subscribe(session_uuid, pr_number, repo) do
         {:ok, sub} ->
           conn

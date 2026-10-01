@@ -16,15 +16,15 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
   def side_by_side(assigns) do
     ~H"""
     <%= if @diff.is_binary do %>
-      <div class="px-4 py-3 text-xs text-base-content/40 italic">Binary file</div>
+      <div class="px-4 py-3 text-mini text-base-content/40 italic">Binary file</div>
     <% else %>
-      <div class="overflow-x-auto font-mono text-[11px] leading-5">
+      <div class="overflow-x-auto font-mono text-mini leading-5">
         <%= if @diff.hunks == [] do %>
-          <div class="px-4 py-3 text-xs text-base-content/40 italic">No changes</div>
+          <div class="px-4 py-3 text-mini text-base-content/40 italic">No changes</div>
         <% else %>
           <%= for hunk <- @diff.hunks do %>
             <%!-- Hunk header --%>
-            <div class="px-3 py-0.5 bg-info/10 text-info/70 text-[10px] border-y border-info/10 select-none">
+            <div class="px-3 py-0.5 bg-info/10 text-info/70 text-micro border-y border-info/10 select-none">
               {hunk.header}
             </div>
             <%!-- Side-by-side rows --%>
@@ -60,7 +60,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.new_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-success/70 select-none">+</span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">{@side.content}</span>
+      <span class="flex-1 px-2 overflow-hidden text-base-content/90">
+        <span class="whitespace-pre">{@side.content}</span>
+      </span>
     </div>
     """
   end
@@ -72,7 +74,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.old_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-error/70 select-none">-</span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/90">{@side.content}</span>
+      <span class="flex-1 px-2 overflow-hidden text-base-content/90">
+        <span class="whitespace-pre">{@side.content}</span>
+      </span>
     </div>
     """
   end
@@ -84,7 +88,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.DiffSideBySide do
         {@side.old_line_number}
       </span>
       <span class="w-3 flex-shrink-0 text-center text-base-content/20 select-none"></span>
-      <span class="flex-1 px-2 whitespace-pre overflow-hidden text-base-content/60">{@side.content}</span>
+      <span class="flex-1 px-2 overflow-hidden text-base-content/60">
+        <span class="whitespace-pre">{@side.content}</span>
+      </span>
     </div>
     """
   end

@@ -49,8 +49,6 @@ defmodule EyeInTheSky.Messages.Sync do
 
   # Private: Load messages from database
   defp list_messages_for_session_db(session_id) do
-    QueryHelpers.for_session_direct(Message, session_id,
-      order_by: [asc: :inserted_at, asc: :id]
-    )
+    QueryHelpers.for_session_direct(Message, session_id, order_by: [asc: :inserted_at, asc: :id])
   end
 end

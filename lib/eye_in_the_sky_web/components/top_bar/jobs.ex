@@ -15,14 +15,14 @@ defmodule EyeInTheSkyWeb.TopBar.Jobs do
         active={@active_tab in [:all_jobs, nil]}
         on_click="switch_tab"
         value="all_jobs"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
       <:item
         label="Recurring Agents"
         active={@active_tab == :agent_schedules}
         on_click="switch_tab"
         value="agent_schedules"
-        active_class="bg-primary/10 rounded-md px-3 py-1 text-primary font-medium"
+        active_class="bg-primary/10 rounded-box px-3 py-1 text-primary font-medium"
       />
     </.tab_pills>
     <div class="flex-1" />
@@ -30,7 +30,7 @@ defmodule EyeInTheSkyWeb.TopBar.Jobs do
       id="jobs-top-bar-search"
       size="xs"
       label="Search jobs"
-      placeholder="Search jobs…"
+      placeholder="Search jobs..."
       value={@search_query || ""}
       on_change="filter_jobs"
       on_submit="filter_jobs"
@@ -39,21 +39,26 @@ defmodule EyeInTheSkyWeb.TopBar.Jobs do
     <%= if is_nil(@project_id) do %>
       <.link
         navigate="/oban"
-        class="btn btn-ghost btn-xs text-base-content/50"
+        class="focus-ring flex h-7 items-center justify-center rounded-box px-2 text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
         title="Oban queue dashboard"
       >
         <.icon name="hero-queue-list" class="size-3.5" />
       </.link>
     <% end %>
-    <button phx-click="toggle_claude_drawer" class="btn btn-outline btn-xs gap-1">
-      <.icon name="hero-sparkles" class="size-3" /> Create with Claude
+    <button
+      phx-click="toggle_claude_drawer"
+      class="focus-ring flex h-7 items-center gap-1 rounded-box border border-base-content/10 px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+    >
+      <.icon name="hero-sparkles" class="size-3" />
+      <span>Create with Claude</span>
     </button>
     <button
       phx-click="new_job"
       phx-value-scope={if @project_id, do: "project", else: "global"}
-      class="btn btn-primary btn-xs"
+      class="focus-ring flex h-7 items-center gap-1 rounded-box bg-primary px-2 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
     >
-      + New Job
+      <.icon name="hero-plus-mini" class="size-3.5" />
+      <span>New Job</span>
     </button>
     """
   end

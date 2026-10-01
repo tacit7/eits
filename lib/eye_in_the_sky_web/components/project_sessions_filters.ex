@@ -24,7 +24,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         />
 
         <%!-- Desktop filter pills --%>
-        <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+        <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-box p-0.5">
           <%= for {label, filter, active_class} <- [
             {"All", "all", "bg-base-100 text-base-content shadow-sm"},
             {"Active", "working", "bg-base-100 text-success shadow-sm"},
@@ -34,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
               phx-click="filter_session"
               phx-value-filter={filter}
               aria-pressed={@session_filter == filter}
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+              class={"focus-ring px-3 py-1 rounded-box text-mini font-medium transition-all duration-150 " <>
                 if(@session_filter == filter,
                   do: active_class,
                   else: "text-base-content/60 hover:text-base-content/85"
@@ -46,7 +46,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         </div>
 
         <%!-- Desktop sort pills --%>
-        <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-lg p-0.5">
+        <div class="hidden sm:flex items-center gap-1 bg-base-200/40 rounded-box p-0.5">
           <%= for {label, sort} <- [
             {"Last msg", "last_message"},
             {"Name", "name"},
@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
               phx-click="sort"
               phx-value-by={sort}
               aria-pressed={@sort_by == sort}
-              class={"px-3 py-1 rounded-md text-xs font-medium transition-all duration-150 " <>
+              class={"focus-ring px-3 py-1 rounded-box text-mini font-medium transition-all duration-150 " <>
                 if(@sort_by == sort,
                   do: "bg-base-100 text-base-content shadow-sm",
                   else: "text-base-content/60 hover:text-base-content/85"
@@ -73,7 +73,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
           phx-click="open_filter_sheet"
           aria-label="Open filters"
           aria-haspopup="dialog"
-          class="sm:hidden relative btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
+          class="focus-ring relative inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80 sm:hidden"
         >
           <.icon name="hero-funnel-mini" class="size-4" />
           <%= if @session_filter != "all" || @sort_by != "last_message" do %>
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
     >
     </div>
     <div
-      class="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-base-100 shadow-xl safe-bottom-sheet"
+      class="fixed inset-x-0 bottom-0 z-50 rounded-t-box bg-base-100 shadow-xl safe-bottom-sheet"
       role="dialog"
       aria-modal="true"
       aria-label="Filter sessions"
@@ -115,10 +115,10 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
       </div>
       <div class="px-5 pb-6 pt-2">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold">Filter &amp; Sort</h2>
+          <h2 class="text-message font-semibold">Filter &amp; Sort</h2>
           <button
             phx-click="close_filter_sheet"
-            class="btn btn-ghost btn-xs btn-square min-h-[44px] min-w-[44px]"
+            class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
             aria-label="Close filter panel"
           >
             <.icon name="hero-x-mark-mini" class="size-4" />
@@ -126,7 +126,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         </div>
 
         <fieldset class="mb-5">
-          <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">
+          <legend class="text-mini font-medium text-base-content/50 uppercase tracking-normal mb-2">
             Status
           </legend>
           <div class="flex flex-wrap gap-2">
@@ -139,11 +139,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
                 phx-click="filter_session"
                 phx-value-filter={filter}
                 aria-pressed={@session_filter == filter}
-                class={"btn btn-sm " <>
-                  if(@session_filter == filter,
-                    do: "btn-primary",
-                    else: "btn-ghost border border-base-content/15"
-                  )}
+                class={filter_option_class(@session_filter == filter)}
               >
                 {label}
               </button>
@@ -152,7 +148,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         </fieldset>
 
         <fieldset class="mb-6">
-          <legend class="text-xs font-medium text-base-content/50 uppercase tracking-wider mb-2">
+          <legend class="text-mini font-medium text-base-content/50 uppercase tracking-normal mb-2">
             Sort by
           </legend>
           <div class="flex flex-wrap gap-2">
@@ -161,11 +157,7 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
                 phx-click="sort"
                 phx-value-by={sort}
                 aria-pressed={@sort_by == sort}
-                class={"btn btn-sm " <>
-                  if(@sort_by == sort,
-                    do: "btn-primary",
-                    else: "btn-ghost border border-base-content/15"
-                  )}
+                class={filter_option_class(@sort_by == sort)}
               >
                 {label}
               </button>
@@ -174,11 +166,16 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
         </fieldset>
 
         <div class="flex gap-3">
-          <button phx-click="close_filter_sheet" class="btn btn-primary flex-1">Apply</button>
+          <button
+            phx-click="close_filter_sheet"
+            class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+          >
+            Apply
+          </button>
           <button
             phx-click="filter_session"
             phx-value-filter="all"
-            class="btn btn-ghost"
+            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
             aria-label="Reset filters"
           >
             Reset
@@ -187,5 +184,13 @@ defmodule EyeInTheSkyWeb.Components.ProjectSessionsFilters do
       </div>
     </div>
     """
+  end
+
+  defp filter_option_class(true) do
+    "focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+  end
+
+  defp filter_option_class(false) do
+    "focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box border border-base-content/15 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
   end
 end

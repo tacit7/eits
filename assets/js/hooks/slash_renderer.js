@@ -13,22 +13,22 @@ export function highlightMatch(text, query) {
   if (idx === -1) return escapeHtml(text)
   return (
     escapeHtml(text.slice(0, idx)) +
-    `<mark class="bg-primary/20 text-primary rounded px-0.5">${escapeHtml(text.slice(idx, idx + q.length))}</mark>` +
+    `<mark class="bg-primary/20 text-primary rounded-box px-0.5">${escapeHtml(text.slice(idx, idx + q.length))}</mark>` +
     escapeHtml(text.slice(idx + q.length))
   )
 }
 
 function rowClass() {
-  return 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-sm'
+  return 'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors text-message'
 }
 
 function rowHTML(item, query, activeFlags, triggerChar) {
   const badge = {
-    skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">skill</span>',
-    command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-secondary/10 text-secondary">cmd</span>',
-    flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-info/10 text-info">flag</span>',
-    agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-accent/10 text-accent">agent</span>',
-    prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning">prompt</span>',
+    skill: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-primary/10 text-primary">skill</span>',
+    command: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-secondary/10 text-secondary">cmd</span>',
+    flag: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-info/10 text-info">flag</span>',
+    agent: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-accent/10 text-accent">agent</span>',
+    prompt: '<span class="shrink-0 mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-warning/10 text-warning">prompt</span>',
   }[item.type] || ''
 
   let prefix = '/'
@@ -41,11 +41,11 @@ function rowHTML(item, query, activeFlags, triggerChar) {
   const isActive = item.type === 'flag' && activeFlags && activeFlags[item.slug] !== undefined
   const activeVal = isActive ? activeFlags[item.slug] : null
   const activeBadge = isActive
-    ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : escapeHtml(String(activeVal))}</span>`
+    ? `<span class="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-box text-mini font-medium bg-success/10 text-success ml-1">${activeVal === true ? 'on' : activeVal === false ? 'off' : escapeHtml(String(activeVal))}</span>`
     : ''
 
   const desc = item.description
-    ? `<span class="text-xs text-base-content/50 truncate">${escapeHtml(item.description)}</span>`
+    ? `<span class="text-mini text-base-content/50 truncate">${escapeHtml(item.description)}</span>`
     : ''
 
   return `
@@ -83,7 +83,7 @@ export function renderItems(container, items, activeIndex, query, activeFlags, o
     if (!groups[type]) continue
 
     const header = document.createElement('div')
-    header.className = 'px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
+    header.className = 'px-3 py-1 text-mini font-semibold uppercase tracking-normal text-base-content/40 bg-base-content/[0.02] sticky top-0'
     header.textContent = typeLabels[type] || type
     container.appendChild(header)
 
@@ -106,7 +106,7 @@ export function renderItems(container, items, activeIndex, query, activeFlags, o
   }
 
   const hint = document.createElement('div')
-  hint.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+  hint.className = 'px-3 py-1.5 text-mini text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
   hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
   container.appendChild(hint)
 

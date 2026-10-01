@@ -162,6 +162,21 @@ is the safety net, not a substitute for capacity.
 > the predicate excludes `:running`/`:retry_wait`/queued work, and `evict_if_parked`
 > stops a parked worker but replies `:busy` for one that has started work.
 
+## on_result_received/2 — job_context is Optional
+
+`AgentWorkerEvents.on_result_received/2` accepts a params map containing the fields needed to persist an agent result (session ID, text, metadata, channel ID, source UUID). As of commit `0b3b6085`, **`job_context` is optional** in that map.
+
+Previously the function pattern-matched `:job_context` strictly — callers that omitted the key caused a `FunctionClauseError`. The fix replaces the strict match with `Map.get(params, :job_context)`, so `job_context` defaults to `nil` when absent. Callers that do not have a job context available (e.g., test helpers, programmatic result injection) no longer need to supply it.
+
+```elixir
+# Before — strict match; job_context required
+%{..., source_uuid: source_uuid, job_context: job_context} = params
+
+# After — optional; defaults to nil
+%{..., source_uuid: source_uuid} = params
+job_context = Map.get(params, :job_context)
+```
+
 ## Agent Result Save Timing
 
 `AgentWorkerEvents.on_sdk_completed/3` saves the agent result **synchronously** via a direct call, not via `Task.start/1` or other async dispatch.

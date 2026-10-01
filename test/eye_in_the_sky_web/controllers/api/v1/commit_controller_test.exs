@@ -2,7 +2,10 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
   alias EyeInTheSky.Accounts.ApiKey
-  alias EyeInTheSky.Commits
+  alias EyeInTheSky.{Commits, Tasks}
+  alias EyeInTheSky.Repo
+
+  import Ecto.Query
 
   import EyeInTheSky.Factory
 
@@ -62,7 +65,7 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
     test "filters by agent_id", %{conn: conn} do
       agent = create_agent()
       session = create_session(agent)
-      commit = create_commit(session)
+      commit = create_commit(session, %{agent_id: agent.id})
 
       conn = get(conn, ~p"/api/v1/commits?agent_id=#{agent.uuid}")
       resp = json_response(conn, 200)
@@ -136,6 +139,71 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
       assert length(resp["commits"]) == 1
     end
 
+    test "creates commits for explicit session_id without agent_id", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.uuid,
+          "commit_hashes" => ["sessionhash123"]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert commit["commit_hash"] == "sessionhash123"
+      assert commit["session_id"] == session.id
+      assert commit["agent_id"] == agent.id
+    end
+
+    test "creates commits for explicit integer session_id", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.id,
+          "commit_hashes" => ["integer-session-hash"]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert commit["commit_hash"] == "integer-session-hash"
+      assert commit["session_id"] == session.id
+      assert commit["agent_id"] == agent.id
+    end
+
+    test "links created commits to task_ids", %{conn: conn} do
+      agent = create_agent()
+      session = create_session(agent)
+
+      {:ok, task} =
+        Tasks.create_task(%{
+          title: "Commit-linked task",
+          session_id: session.id,
+          state_id: 2
+        })
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => session.uuid,
+          "commit_hashes" => ["task-linked-hash"],
+          "task_ids" => [to_string(task.id)]
+        })
+
+      resp = json_response(conn, 201)
+      [commit] = resp["commits"]
+      assert resp["link_errors"] == []
+
+      linked? =
+        Repo.exists?(
+          from ct in "commit_tasks",
+            where: ct.commit_id == ^commit["id"] and ct.task_id == ^task.id
+        )
+
+      assert linked?
+    end
+
     test "returns 400 when commit_hashes is not a list", %{conn: conn} do
       agent = create_agent()
       _session = create_session(agent)
@@ -149,9 +217,33 @@ defmodule EyeInTheSkyWeb.Api.V1.CommitControllerTest do
       assert json_response(conn, 400)["error"] == "commit_hashes must be a list"
     end
 
+    test "returns 400 when task_ids is not a list", %{conn: conn} do
+      agent = create_agent()
+      _session = create_session(agent)
+
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "agent_id" => agent.uuid,
+          "commit_hashes" => ["abc123"],
+          "task_ids" => "not-a-list"
+        })
+
+      assert json_response(conn, 400)["error"] == "task_ids must be a list"
+    end
+
     test "returns 400 when agent_id is missing", %{conn: conn} do
       conn = post(conn, ~p"/api/v1/commits", %{"commit_hashes" => ["abc"]})
-      assert json_response(conn, 400)["error"] == "agent_id is required"
+      assert json_response(conn, 400)["error"] == "session_id or agent_id is required"
+    end
+
+    test "returns 404 when explicit session_id is unknown", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v1/commits", %{
+          "session_id" => Ecto.UUID.generate(),
+          "commit_hashes" => ["abc"]
+        })
+
+      assert json_response(conn, 404)["error"] == "Session not found"
     end
 
     test "returns 400 when commit_hashes is empty", %{conn: conn} do

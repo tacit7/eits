@@ -101,9 +101,9 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
   defp category_icon("job"), do: "hero-calendar-days"
   defp category_icon(_), do: "hero-bell"
 
-  defp category_badge_class("agent"), do: "badge-primary"
-  defp category_badge_class("job"), do: "badge-warning"
-  defp category_badge_class(_), do: "badge-info"
+  defp category_chip_class("agent"), do: "bg-primary/10 text-primary"
+  defp category_chip_class("job"), do: "bg-warning/15 text-warning"
+  defp category_chip_class(_), do: "bg-info/10 text-info"
 
   @impl true
   def render(assigns) do
@@ -113,30 +113,30 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
         <h1 class="text-xl font-semibold">Notifications</h1>
         <div class="flex items-center gap-2 flex-wrap">
           <%!-- Category filter --%>
-          <div class="join">
+          <div class="inline-flex items-center gap-1 rounded-box bg-base-200/45 p-0.5">
             <button
-              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "all", do: "btn-active"}"}
+              class={filter_button_class(@filter == "all")}
               phx-click="filter"
               phx-value-category="all"
             >
               All
             </button>
             <button
-              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "agent", do: "btn-active"}"}
+              class={filter_button_class(@filter == "agent")}
               phx-click="filter"
               phx-value-category="agent"
             >
               Agent
             </button>
             <button
-              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "job", do: "btn-active"}"}
+              class={filter_button_class(@filter == "job")}
               phx-click="filter"
               phx-value-category="job"
             >
               Job
             </button>
             <button
-              class={"join-item btn btn-sm min-h-[44px] #{if @filter == "system", do: "btn-active"}"}
+              class={filter_button_class(@filter == "system")}
               phx-click="filter"
               phx-value-category="system"
             >
@@ -144,8 +144,12 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
             </button>
           </div>
 
-          <button class="btn btn-ghost btn-sm min-h-[44px]" phx-click="mark_all_read">
-            <.icon name="hero-check" class="size-4" /> Mark all read
+          <button
+            class="focus-ring inline-flex min-h-[44px] items-center gap-1 rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+            phx-click="mark_all_read"
+          >
+            <.icon name="hero-check" class="size-4" />
+            <span>Mark all read</span>
           </button>
         </div>
       </div>
@@ -155,7 +159,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
           <%= for n <- @notifications do %>
             <% link = resource_link(n) %>
             <div class={[
-              "flex items-start gap-3 px-4 py-3 rounded-lg transition-colors",
+              "flex items-start gap-3 px-4 py-3 rounded-box transition-colors",
               if(!n.read, do: "bg-base-200/60", else: "hover:bg-base-200/30")
             ]}>
               <%!-- Category icon --%>
@@ -170,24 +174,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
                     <span class="w-2 h-2 rounded-full bg-primary flex-shrink-0"></span>
                   <% end %>
                   <span class={[
-                    "text-sm",
+                    "text-message",
                     if(!n.read, do: "font-medium", else: "text-base-content/70")
                   ]}>
                     {n.title}
                   </span>
-                  <span class={"badge badge-xs #{category_badge_class(n.category)}"}>
+                  <span class={[
+                    "inline-flex items-center rounded-box px-1.5 py-0.5 text-micro font-medium",
+                    category_chip_class(n.category)
+                  ]}>
                     {n.category}
                   </span>
                 </div>
                 <%= if n.body do %>
-                  <p class="text-xs text-base-content/50 mt-0.5 line-clamp-2">{n.body}</p>
+                  <p class="text-mini text-base-content/50 mt-0.5 line-clamp-2">{n.body}</p>
                 <% end %>
                 <div class="flex items-center gap-3 mt-1">
-                  <span class="text-xs text-base-content/35">{relative_time(n.inserted_at)}</span>
+                  <span class="text-mini text-base-content/35">{relative_time(n.inserted_at)}</span>
                   <%= if link do %>
                     <.link
                       navigate={link}
-                      class="text-xs text-primary hover:underline inline-flex items-center min-h-[44px] px-1"
+                      class="text-mini text-primary hover:underline inline-flex items-center min-h-[44px] px-1"
                     >
                       View
                     </.link>
@@ -198,7 +205,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
               <%!-- Actions --%>
               <%= if !n.read do %>
                 <button
-                  class="btn btn-ghost btn-xs min-h-[44px] min-w-[44px] text-base-content/40"
+                  class="focus-ring inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-box text-base-content/40 transition-colors hover:bg-base-content/5 hover:text-base-content/70"
                   phx-click="mark_read"
                   phx-value-id={n.id}
                   title="Mark as read"
@@ -225,5 +232,13 @@ defmodule EyeInTheSkyWeb.OverviewLive.Notifications do
       <% end %>
     </div>
     """
+  end
+
+  defp filter_button_class(true) do
+    "focus-ring min-h-[44px] rounded-box px-3 text-mini font-medium bg-base-100 text-base-content shadow-sm transition-colors"
+  end
+
+  defp filter_button_class(false) do
+    "focus-ring min-h-[44px] rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:text-base-content/70"
   end
 end

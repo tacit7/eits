@@ -19,7 +19,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
       Map.merge(assigns, %{status: display_status, badge_variant: badge_variant, label: label})
 
     ~H"""
-    <span class={"badge #{@badge_variant}"}>
+    <span class={"eits-chip #{@badge_variant}"}>
       {@label}
     </span>
     """
@@ -113,7 +113,7 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
     assigns = %{project_name: project_name}
 
     ~H"""
-    <span class="badge badge-primary">
+    <span class="eits-chip eits-chip--primary">
       {@project_name}
     </span>
     """
@@ -134,28 +134,28 @@ defmodule EyeInTheSkyWeb.Helpers.StatusHelpers do
   defp status_label("failed_model"), do: "Model not found"
   defp status_label(s), do: s
 
-  def status_to_badge("working"), do: "badge-success"
-  def status_to_badge("compacting"), do: "badge-warning"
-  def status_to_badge("idle"), do: "badge-ghost"
-  def status_to_badge("idle_stale"), do: "badge-warning badge-outline"
-  def status_to_badge("idle_dead"), do: "badge-error badge-outline"
-  def status_to_badge("completed"), do: "badge-ghost"
-  def status_to_badge("failed"), do: "badge-error"
+  def status_to_badge("working"), do: "eits-chip--success"
+  def status_to_badge("compacting"), do: "eits-chip--warning"
+  def status_to_badge("idle"), do: "eits-chip--muted"
+  def status_to_badge("idle_stale"), do: "eits-chip--warning"
+  def status_to_badge("idle_dead"), do: "eits-chip--error"
+  def status_to_badge("completed"), do: "eits-chip--muted"
+  def status_to_badge("failed"), do: "eits-chip--error"
   # All systemic-failure tiers render red. Rate-limit uses an outline to hint
   # it is recoverable by waiting rather than a dead crash.
-  def status_to_badge("failed_billing"), do: "badge-error"
-  def status_to_badge("failed_auth"), do: "badge-error"
-  def status_to_badge("failed_rate_limit"), do: "badge-error badge-outline"
-  def status_to_badge("failed_timeout"), do: "badge-error"
-  def status_to_badge("failed_retry_exhausted"), do: "badge-error"
-  def status_to_badge("failed_model"), do: "badge-error"
-  def status_to_badge(_), do: "badge-ghost"
+  def status_to_badge("failed_billing"), do: "eits-chip--error"
+  def status_to_badge("failed_auth"), do: "eits-chip--error"
+  def status_to_badge("failed_rate_limit"), do: "eits-chip--error"
+  def status_to_badge("failed_timeout"), do: "eits-chip--error"
+  def status_to_badge("failed_retry_exhausted"), do: "eits-chip--error"
+  def status_to_badge("failed_model"), do: "eits-chip--error"
+  def status_to_badge(_), do: "eits-chip--muted"
 
   defp render_no_project do
     assigns = %{}
 
     ~H"""
-    <span class="badge badge-ghost">
+    <span class="eits-chip eits-chip--muted">
       Unassigned
     </span>
     """

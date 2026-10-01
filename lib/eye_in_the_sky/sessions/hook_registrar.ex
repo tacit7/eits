@@ -25,6 +25,7 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
     case Agents.find_or_create_agent(agent_attrs) do
       {:ok, agent} ->
         {model_provider, model_name} = ModelInfo.parse_model_string(params["model"])
+        provider = params["provider"] || runtime_provider_for_model_provider(model_provider)
 
         session_attrs = %{
           uuid: session_uuid,
@@ -34,13 +35,14 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
           status: "working",
           started_at: DateTime.utc_now(),
           last_activity_at: DateTime.utc_now(),
-          provider: params["provider"] || "claude",
+          provider: provider,
           model: params["model"],
           model_provider: model_provider,
           model_name: model_name,
           project_id: project_id,
           git_worktree_path: params["worktree_path"],
           entrypoint: params["entrypoint"],
+          managed_by_app: managed_by_app_from_hook(params),
           read_only: params["read_only"] == true or params["read_only"] == "true"
         }
 
@@ -52,6 +54,13 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
         case result do
           {:ok, session} ->
             Events.session_started(session)
+
+            if body = params["description"] do
+              Task.start(fn ->
+                EyeInTheSky.Sessions.Naming.try_auto_name(session.id, body, session.name)
+              end)
+            end
+
             {:ok, %{session: session, agent: agent}}
 
           {:error, changeset} ->
@@ -62,4 +71,21 @@ defmodule EyeInTheSky.Sessions.HookRegistrar do
         {:error, :agent, changeset}
     end
   end
+
+  defp runtime_provider_for_model_provider("openai"), do: "codex"
+  defp runtime_provider_for_model_provider("anthropic"), do: "claude"
+  defp runtime_provider_for_model_provider("claude"), do: "claude"
+  defp runtime_provider_for_model_provider("gemini"), do: "gemini"
+  defp runtime_provider_for_model_provider("pi"), do: "pi"
+  defp runtime_provider_for_model_provider(_), do: "claude"
+
+  defp managed_by_app_from_hook(%{"managed_by_app" => value}), do: managed_by_app_value(value)
+  defp managed_by_app_from_hook(%{"process_owner" => "app"}), do: true
+  defp managed_by_app_from_hook(%{"process_owner" => "terminal"}), do: false
+  defp managed_by_app_from_hook(%{"entrypoint" => "cli"}), do: false
+  defp managed_by_app_from_hook(_params), do: true
+
+  defp managed_by_app_value(value) when value in [true, "true", "1", 1], do: true
+  defp managed_by_app_value(value) when value in [false, "false", "0", 0], do: false
+  defp managed_by_app_value(_value), do: true
 end

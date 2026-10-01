@@ -2,11 +2,8 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
   @moduledoc """
   New Task modal dialog component.
 
-  Renders conditionally (not via native dialog element) to avoid DaisyUI 5's
-  top-layer exit transition bug: showModal/close keeps the dialog in the
-  browser top layer for ~300ms, during which the native ::backdrop blocks
-  all pointer events on the page. Using a conditional div removes the element
-  from the DOM entirely when closed.
+  Renders conditionally rather than through a native dialog element, so closing
+  removes the overlay from the DOM immediately.
   """
 
   use EyeInTheSkyWeb, :html
@@ -37,7 +34,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="title"
-                  class="input input-bordered text-base"
+                  class="eits-field eits-field--bordered text-message"
                   placeholder="Task title"
                   required
                   autofocus={@show}
@@ -47,13 +44,13 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
               <.form_field label="Description">
                 <textarea
                   name="description"
-                  class="textarea textarea-bordered h-24 text-base"
+                  class="eits-textarea eits-textarea--bordered h-24 text-message"
                   placeholder="Task description (optional)"
                 ></textarea>
               </.form_field>
 
               <.form_field label="Status">
-                <select name="state_id" class="select select-bordered" required>
+                <select name="state_id" class="eits-select eits-select--bordered" required>
                   <%= for state <- @workflow_states do %>
                     <option value={state.id} selected={state.name == "todo"}>
                       {String.capitalize(state.name)}
@@ -63,7 +60,7 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
               </.form_field>
 
               <.form_field label="Priority">
-                <select name="priority" class="select select-bordered">
+                <select name="priority" class="eits-select eits-select--bordered">
                   <option value="0">None</option>
                   <option value="1" selected>Low</option>
                   <option value="2">Medium</option>
@@ -75,11 +72,11 @@ defmodule EyeInTheSkyWeb.Components.NewTaskDrawer do
                 <input
                   type="text"
                   name="tags"
-                  class="input input-bordered text-base"
+                  class="eits-field eits-field--bordered text-message"
                   placeholder="tag1, tag2, tag3"
                 />
-                <label class="label">
-                  <span class="label-text-alt">Comma-separated</span>
+                <label class="eits-label">
+                  <span class="eits-label__hint">Comma-separated</span>
                 </label>
               </.form_field>
 

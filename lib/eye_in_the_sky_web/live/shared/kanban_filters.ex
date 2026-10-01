@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.KanbanFilters do
   def state_dot_color(_), do: "#6B7280"
 
   # ---------------------------------------------------------------------------
-  # Task loading
+  # Task
   # ---------------------------------------------------------------------------
 
   def load_tasks(socket) do

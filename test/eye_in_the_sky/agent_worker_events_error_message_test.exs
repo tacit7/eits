@@ -77,4 +77,33 @@ defmodule EyeInTheSky.AgentWorkerEventsErrorMessageTest do
              m.provider == "system" and m.body =~ "provider error"
            end)
   end
+
+  test "on_session_failed persists Codex errors as structured Codex messages" do
+    session = insert_session_fixture()
+
+    payload =
+      Jason.encode!(%{
+        "type" => "error",
+        "status" => 400,
+        "error" => %{
+          "type" => "invalid_request_error",
+          "message" =>
+            "The 'gpt-5.2' model is not supported when using Codex with a ChatGPT account."
+        }
+      })
+
+    AgentWorkerEvents.on_session_failed(session.id, "pcid-codex", {:codex_error, payload})
+
+    message =
+      session.id
+      |> Messages.list_messages_for_session()
+      |> Enum.find(&(&1.provider == "codex"))
+
+    assert message
+    assert message.body =~ "not supported"
+    assert message.metadata["stream_type"] == "codex_error"
+    assert message.metadata["status"] == 400
+    assert message.metadata["error_type"] == "invalid_request_error"
+    assert message.metadata["model"] == "gpt-5.2"
+  end
 end

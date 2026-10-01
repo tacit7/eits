@@ -1,17 +1,17 @@
 /**
- * ChatModal — shared factory class for in-page chat modals.
+ * ChatModal - shared factory class for in-page chat modals.
  *
  * Config:
- *   id              {string}   — DOM id for the modal root (required)
- *   title           {string}   — header title text
- *   initials        {string}   — avatar letters (1–2 chars)
- *   subtitle        {string=}  — status label shown next to title
- *   subtitleClass   {string=}  — extra CSS classes for the subtitle span
- *   placeholder     {string=}  — input placeholder text
- *   dmHref          {string=}  — URL for the "open full DM" link button
- *   errorCloseButton {boolean=} — show a Close button inside error bubbles
- *   onSend          {fn(body)} — called with trimmed body when user sends
- *   onClose         {fn()}     — called when the close button is clicked
+ *   id              {string}   - DOM id for the modal root (required)
+ *   title           {string}   - header title text
+ *   initials        {string}   - avatar letters (1-2 chars)
+ *   subtitle        {string=}  - status label shown next to title
+ *   subtitleClass   {string=}  - extra CSS classes for the subtitle span
+ *   placeholder     {string=}  - input placeholder text
+ *   dmHref          {string=}  - URL for the "open full DM" link button
+ *   errorCloseButton {boolean=} - show a Close button inside error bubbles
+ *   onSend          {fn(body)} - called with trimmed body when user sends
+ *   onClose         {fn()}     - called when the close button is clicked
  */
 export class FloatingChatModal {
   constructor(config) {
@@ -37,7 +37,7 @@ export class FloatingChatModal {
   /** Append a single message bubble and scroll to bottom. */
   appendMessage(msg) {
     if (!this._messagesEl) return
-    this._messagesEl.querySelector(`#${this._id}-loading, #${this._id}-empty`)?.remove()
+    this._messagesEl.querySelector(`#${this._id}-, #${this._id}-empty`)?.remove()
     const div = document.createElement('div')
     div.innerHTML = this._messageHtml(msg)
     this._messagesEl.appendChild(div.firstChild)
@@ -48,7 +48,7 @@ export class FloatingChatModal {
   setMessages(messages, emptyText = 'No messages yet') {
     if (!this._messagesEl) return
     if (messages.length === 0) {
-      this._messagesEl.innerHTML = `<div id="${this._id}-empty" class="text-center text-base-content/25 text-xs py-10">${emptyText}</div>`
+      this._messagesEl.innerHTML = `<div id="${this._id}-empty" class="text-center text-base-content/25 text-mini py-10">${emptyText}</div>`
     } else {
       this._messagesEl.innerHTML = messages.map(m => this._messageHtml(m)).join('')
     }
@@ -79,17 +79,17 @@ export class FloatingChatModal {
     return div.innerHTML
   }
 
-  // ── private ────────────────────────────────────────────────────────────────
+  // Private helpers.
 
   _buildHtml() {
     const { title, initials, subtitle, subtitleClass, placeholder, dmHref } = this._cfg
 
     const subtitleHtml = subtitle != null
-      ? `<span id="${this._id}-subtitle" class="text-xs font-medium uppercase tracking-wider ml-1.5 ${subtitleClass || ''}">${FloatingChatModal.escape(subtitle)}</span>`
+      ? `<span id="${this._id}-subtitle" class="text-mini font-medium uppercase tracking-normal ml-1.5 ${subtitleClass || ''}">${FloatingChatModal.escape(subtitle)}</span>`
       : ''
 
     const dmLinkHtml = dmHref
-      ? `<a href="${FloatingChatModal.escape(dmHref)}" class="btn btn-ghost btn-xs btn-square text-base-content/30 hover:text-primary" title="Open full DM">
+      ? `<a href="${FloatingChatModal.escape(dmHref)}" class="eits-action eits-action--ghost eits-action--icon h-8 min-h-0 min-w-8 hover:text-primary" title="Open full DM">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
             <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 0 0-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-4a.75.75 0 0 1 1.5 0v4A2.25 2.25 0 0 1 12.75 17h-8.5A2.25 2.25 0 0 1 2 14.75v-8.5A2.25 2.25 0 0 1 4.25 4h5a.75.75 0 0 1 0 1.5h-5Z" clip-rule="evenodd" />
             <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 0 0 1.06.053L16.5 4.44v2.81a.75.75 0 0 0 1.5 0v-4.5a.75.75 0 0 0-.75-.75h-4.5a.75.75 0 0 0 0 1.5h2.553l-9.056 8.194a.75.75 0 0 0-.053 1.06Z" clip-rule="evenodd" />
@@ -98,18 +98,18 @@ export class FloatingChatModal {
       : ''
 
     return `
-      <div class="fixed bottom-24 right-4 w-[520px] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-xl shadow-2xl max-h-[850px] overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
+      <div class="fixed bottom-24 right-4 w-[520px] max-w-[calc(100vw-2rem)] z-[1000] flex flex-col bg-base-100 border border-base-content/10 rounded-box shadow-2xl h-[600px] max-h-[calc(100dvh-7rem)] overflow-hidden">
+        <div class="flex shrink-0 items-center justify-between px-4 py-2.5 border-b border-base-content/5 bg-base-200/30">
           <div class="flex items-center gap-2">
-            <span class="font-bold text-xs bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
+            <span class="font-bold text-nano bg-primary/10 text-primary rounded-full w-7 h-7 flex items-center justify-center">${FloatingChatModal.escape(initials)}</span>
             <div>
-              <span class="text-xs font-semibold text-base-content/70">${FloatingChatModal.escape(title)}</span>
+              <span class="text-mini font-semibold text-base-content/70">${FloatingChatModal.escape(title)}</span>
               ${subtitleHtml}
             </div>
           </div>
           <div class="flex items-center gap-1">
             ${dmLinkHtml}
-            <button id="${this._id}-close" class="btn btn-ghost btn-xs btn-square text-base-content/30" title="Close">
+            <button id="${this._id}-close" class="eits-action eits-action--ghost eits-action--icon h-8 min-h-0 min-w-8" title="Close">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
                 <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
               </svg>
@@ -117,22 +117,22 @@ export class FloatingChatModal {
           </div>
         </div>
 
-        <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-[400px] max-h-[720px]">
-          <div id="${this._id}-loading" class="text-center text-base-content/25 text-xs py-10">
+        <div id="${this._id}-messages" class="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0">
+          <div id="${this._id}-" class="text-center text-base-content/25 text-mini py-10">
             Loading messages...
           </div>
         </div>
 
-        <div class="px-3 py-2.5 border-t border-base-content/5">
+        <div class="shrink-0 px-3 py-2.5 border-t border-base-content/5">
           <div class="flex gap-2">
             <input
               type="text"
               id="${this._id}-input"
               placeholder="${FloatingChatModal.escape(placeholder || '')}"
-              class="input input-sm flex-1 bg-base-200/50 border-base-content/8 text-base placeholder:text-base-content/25"
+              class="input input-sm min-w-0 flex-1 bg-base-200/50 border-base-content/8 text-message placeholder:text-base-content/25"
               autocomplete="off"
             />
-            <button id="${this._id}-send" class="btn btn-primary btn-sm btn-square">
+            <button id="${this._id}-send" class="eits-action eits-action--primary eits-action--icon h-8 min-h-0 min-w-8">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3.5">
                 <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.154.75.75 0 0 0 0-1.115A28.897 28.897 0 0 0 3.105 2.289Z" />
               </svg>
@@ -145,13 +145,13 @@ export class FloatingChatModal {
   _messageHtml(m) {
     if (m.sender_role === 'error') {
       const closeBtn = this._cfg.errorCloseButton
-        ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-xs underline mt-1 opacity-70">Close</button>`
+        ? `<button onclick="document.getElementById('${this._id}')?.remove()" class="text-mini underline mt-1 opacity-70">Close</button>`
         : ''
       return `<div class="flex items-start gap-2 px-1 py-1.5">
         <div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-error/20 flex items-center justify-center">
           <div class="w-1 h-1 rounded-full bg-error"></div>
         </div>
-        <div class="min-w-0 flex-1 text-sm text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
+        <div class="min-w-0 flex-1 text-message text-error whitespace-pre-wrap break-words">${FloatingChatModal.escape(m.body)}${closeBtn ? '<br>' + closeBtn : ''}</div>
       </div>`
     }
     const isUser = m.sender_role === 'user'
@@ -160,11 +160,11 @@ export class FloatingChatModal {
       : `<div class="size-3.5 rounded-full mt-0.5 flex-shrink-0 bg-primary/20 flex items-center justify-center"><div class="w-1 h-1 rounded-full bg-primary/60"></div></div>`
     const nameColor = isUser ? 'text-base-content/60' : 'text-primary/70'
     const label = isUser ? 'You' : 'Agent'
-    return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+    return `<div class="flex items-start gap-2 px-1 py-1.5 rounded-box hover:bg-base-content/[0.02] transition-colors">
       ${dotInner}
       <div class="min-w-0 flex-1">
         <span class="text-mini font-semibold ${nameColor} mr-1">${label}</span>
-        <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
+        <p class="text-message leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">${FloatingChatModal.escape(m.body)}</p>
       </div>
     </div>`
   }

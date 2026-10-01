@@ -96,7 +96,7 @@ i-start-session({
 
 YOUR TASK: ${INSTRUCTIONS}
 
-After completing the task, call i-end-session to mark your work complete.
+After completing the task, call eits-end-session to mark your work complete.
 EOF
 
 # Build command

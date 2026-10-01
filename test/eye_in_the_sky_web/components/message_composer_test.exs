@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     Map.merge(
       %{
         uploads: %{files: %Phoenix.LiveView.UploadConfig{ref: "test-upload-ref", entries: []}},
-        selected_model: "claude-opus-4-8",
+        selected_model: "claude-opus-5-5",
         selected_effort: "medium",
         active_overlay: nil,
         processing: false,
@@ -32,18 +32,50 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     html = render_component(&MessageComposer.message_composer/1, base_assigns())
     assert html =~ ~s(data-event="select_model")
     assert html =~ ~s(data-allow-provider-switch="false")
-    assert html =~ "Opus 4.8"
+    assert html =~ "Opus 5.5"
   end
 
   test "pi provider sessions get Pi entries, not the Claude fallback (bug being fixed)" do
-    html = render_component(&MessageComposer.message_composer/1, base_assigns(%{provider: "pi", selected_model: "ollama-lan/qwen3.6:27b"}))
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "pi", selected_model: "ollama-lan/qwen3.6:27b"})
+      )
+
     assert html =~ ~s(data-allow-provider-switch="false")
     # The trigger must not silently fall through to a Claude label.
     refute html =~ "Claude Code"
   end
 
+  test "codex composer does not offer unsupported gpt-5.2" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "codex", selected_model: "gpt-6-astra"})
+      )
+
+    assert html =~ "GPT-6-Astra"
+    refute html =~ "gpt-5.2"
+    refute html =~ "GPT-5.2"
+  end
+
+  test "codex composer replaces stale selected gpt-5.2 with the default option" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "codex", selected_model: "gpt-5.2"})
+      )
+
+    assert html =~ ~s(data-selected-model="gpt-6-astra")
+    assert html =~ ~s(id="composer-model-adjustment-notice")
+    assert html =~ "gpt-5.2 unavailable"
+    refute html =~ "GPT-5.2"
+  end
+
   test "trigger is disabled while processing" do
-    html = render_component(&MessageComposer.message_composer/1, base_assigns(%{processing: true}))
+    html =
+      render_component(&MessageComposer.message_composer/1, base_assigns(%{processing: true}))
+
     assert html =~ "disabled"
   end
 end

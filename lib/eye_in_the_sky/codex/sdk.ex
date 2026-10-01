@@ -21,8 +21,10 @@ defmodule EyeInTheSky.Codex.SDK do
 
   alias EyeInTheSky.Claude.{Message, Utils}
   alias EyeInTheSky.Claude.SDK.Registry
-  alias EyeInTheSky.Codex.{Parser, ToolMapper}
+  alias EyeInTheSky.Codex.{AppServer, Parser, ToolMapper}
+  alias EyeInTheSky.Redaction
   alias EyeInTheSky.SDK.MessageHandler
+  alias EyeInTheSky.Settings
 
   require Logger
 
@@ -36,6 +38,9 @@ defmodule EyeInTheSky.Codex.SDK do
     log_raw_prefix: "codex.raw",
     forward_raw_lines: true
   ]
+  @app_server_min_version Version.parse!("0.149.1")
+  @app_server_gate_cache_key {__MODULE__, :app_server_gate_cache}
+  @app_server_gate_ttl_ms 60_000
 
   @eits_cli_reference """
     eits tasks begin --title "<title>"
@@ -94,7 +99,20 @@ defmodule EyeInTheSky.Codex.SDK do
       "[telemetry] codex.sdk.start session_id=#{opts[:session_id]} model=#{opts[:model]}"
     )
 
-    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+    if app_server_enabled?(opts) do
+      run_app_server_or_fallback(
+        sdk_ref,
+        prompt,
+        Keyword.delete(opts, :resume_thread_id),
+        fn ref, p, o ->
+          run_codex_session(ref, p, o, fn cli, prompt, cli_opts ->
+            cli.spawn_new_session(prompt, cli_opts)
+          end)
+        end
+      )
+    else
+      run_codex_session(sdk_ref, prompt, opts, fn cli, p, o -> cli.spawn_new_session(p, o) end)
+    end
   end
 
   @doc """
@@ -107,9 +125,22 @@ defmodule EyeInTheSky.Codex.SDK do
     sdk_ref = make_ref()
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
 
-    run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
-      cli.resume_session(session_id, p, o)
-    end)
+    if app_server_enabled?(opts) do
+      run_app_server_or_fallback(
+        sdk_ref,
+        prompt,
+        Keyword.put(opts, :resume_thread_id, session_id),
+        fn ref, p, o ->
+          run_codex_session(ref, p, o, fn cli, prompt, cli_opts ->
+            cli.resume_session(session_id, prompt, cli_opts)
+          end)
+        end
+      )
+    else
+      run_codex_session(sdk_ref, prompt, opts, fn cli, p, o ->
+        cli.resume_session(session_id, p, o)
+      end)
+    end
   end
 
   @doc """
@@ -128,8 +159,23 @@ defmodule EyeInTheSky.Codex.SDK do
         :ok
 
       pid when is_pid(pid) ->
-        send(pid, :cancel)
-        :ok
+        cancel_pid(pid, cli)
+    end
+  end
+
+  defp cancel_pid(pid, cli) do
+    if AppServer.app_server_pid?(pid) do
+      case AppServer.interrupt(pid) do
+        :ok ->
+          :ok
+
+        {:error, _reason} ->
+          send(pid, :cancel)
+          :ok
+      end
+    else
+      cli.cancel(pid)
+      :ok
     end
   end
 
@@ -184,6 +230,172 @@ defmodule EyeInTheSky.Codex.SDK do
     end
   end
 
+  defp run_app_server_or_fallback(sdk_ref, prompt, opts, fallback_fun) do
+    case app_server_gate(opts) do
+      {:ok, gate_meta} ->
+        emit_app_server_gate(:gate_passed, opts, gate_meta)
+
+        case run_app_server_turn(sdk_ref, prompt, opts) do
+          {:ok, ^sdk_ref, _pid} = result ->
+            result
+
+          {:error, {:app_server_lookup_failed, reason}} ->
+            emit_app_server_gate(:fallback, opts, %{reason: reason, phase: :lookup})
+            fallback_fun.(sdk_ref, prompt, opts)
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, {:app_server_gate_failed, reason}} ->
+        emit_app_server_gate(:gate_failed, opts, %{reason: reason})
+        fallback_fun.(sdk_ref, prompt, opts)
+    end
+  end
+
+  defp run_app_server_turn(sdk_ref, prompt, opts) do
+    to = Keyword.fetch!(opts, :to)
+    owner_key = app_server_owner_key(opts, to)
+
+    meta = %{session_id: opts[:session_id], model: opts[:model], owner_key: owner_key}
+
+    :telemetry.execute(
+      [:eits, :codex, :app_server, :start],
+      %{system_time: System.system_time()},
+      meta
+    )
+
+    case AppServer.lookup_or_start(owner_key, opts) do
+      {:ok, pid} ->
+        Registry.register(sdk_ref, pid)
+
+        case AppServer.start_turn(pid, sdk_ref, to, prompt, opts) do
+          {:ok, ^sdk_ref, ^pid} ->
+            {:ok, sdk_ref, pid}
+
+          {:error, reason} ->
+            Registry.unregister(sdk_ref)
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, {:app_server_lookup_failed, reason}}
+    end
+  end
+
+  defp app_server_enabled?(opts) do
+    Keyword.get(opts, :codex_app_server, false) ||
+      Application.get_env(:eye_in_the_sky, :codex_app_server_enabled, false) ||
+      Settings.get_boolean("codex_app_server_enabled")
+  rescue
+    _ -> false
+  end
+
+  defp app_server_owner_key(opts, to) do
+    opts[:eits_session_id] || opts[:session_id] || {:caller, to}
+  end
+
+  defp app_server_gate(opts) do
+    cond do
+      Keyword.get(opts, :transport_pid) ->
+        {:ok, %{source: :injected_transport}}
+
+      executable = codex_executable(opts) ->
+        cached_app_server_gate(executable, opts)
+
+      true ->
+        {:error, {:app_server_gate_failed, :codex_executable_not_found}}
+    end
+  end
+
+  defp cached_app_server_gate(executable, opts) do
+    now = System.monotonic_time(:millisecond)
+    cache_key = {executable, @app_server_min_version}
+    cache = :persistent_term.get(@app_server_gate_cache_key, %{})
+
+    case Map.get(cache, cache_key) do
+      {deadline, result} when deadline > now ->
+        result
+
+      _ ->
+        result = probe_app_server_gate(executable, opts)
+
+        :persistent_term.put(
+          @app_server_gate_cache_key,
+          Map.put(cache, cache_key, {now + @app_server_gate_ttl_ms, result})
+        )
+
+        result
+    end
+  end
+
+  defp probe_app_server_gate(executable, opts) do
+    runner = Keyword.get(opts, :app_server_command_runner, &System.cmd/3)
+
+    case runner.(executable, ["--version"], stderr_to_stdout: true) do
+      {output, 0} ->
+        case parse_codex_version(output) do
+          {:ok, version} ->
+            if Version.compare(version, @app_server_min_version) == :lt do
+              {:error,
+               {:app_server_gate_failed, {:codex_version_too_old, Version.to_string(version)}}}
+            else
+              {:ok,
+               %{
+                 source: :version_probe,
+                 executable: executable,
+                 version: Version.to_string(version)
+               }}
+            end
+
+          {:error, reason} ->
+            {:error, {:app_server_gate_failed, reason}}
+        end
+
+      {output, status} ->
+        {:error, {:app_server_gate_failed, {:codex_version_failed, status, String.trim(output)}}}
+    end
+  rescue
+    error ->
+      {:error, {:app_server_gate_failed, {:codex_version_probe_error, error}}}
+  end
+
+  defp codex_executable(opts) do
+    cond do
+      opts[:codex_executable] ->
+        opts[:codex_executable]
+
+      path = System.find_executable("codex") ->
+        path
+
+      true ->
+        [
+          "/usr/local/bin/codex",
+          "/opt/homebrew/bin/codex",
+          Path.expand("~/.local/bin/codex"),
+          Path.expand("~/.cargo/bin/codex")
+        ]
+        |> Enum.find(&File.exists?/1)
+    end
+  end
+
+  defp parse_codex_version(output) when is_binary(output) do
+    case Regex.run(~r/(\d+\.\d+\.\d+(?:[-+][^\s]+)?)/, output) do
+      [_, version] -> Version.parse(version)
+      _ -> {:error, {:codex_version_unparseable, String.trim(output)}}
+    end
+  end
+
+  defp emit_app_server_gate(event, opts, metadata) do
+    :telemetry.execute(
+      [:eits, :codex, :app_server, event],
+      %{system_time: System.system_time()},
+      Map.merge(%{session_id: opts[:session_id], model: opts[:model]}, metadata)
+    )
+
+    :ok
+  end
+
   # ---------------------------------------------------------------------------
   # Handler process
   # ---------------------------------------------------------------------------
@@ -208,6 +420,7 @@ defmodule EyeInTheSky.Codex.SDK do
               session_id: nil,
               accumulated_text: "",
               accumulated_parts: [],
+              provider_diagnostics: [],
               eits_session_id: eits_session_id
             }
 
@@ -346,6 +559,62 @@ defmodule EyeInTheSky.Codex.SDK do
     # Notify the worker immediately so it can sync the provider_conversation_id
     send(state.caller_pid, {:codex_session_id, state.sdk_ref, sid})
     %{state | session_id: sid}
+  end
+
+  @impl MessageHandler
+  def handle_protocol_event(%{type: :provider_diagnostic, message: message}, state)
+      when is_binary(message) do
+    diagnostic = message |> Redaction.redact() |> String.slice(0, 1_000)
+
+    diagnostics =
+      [diagnostic | Map.get(state, :provider_diagnostics, [])]
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.take(5)
+
+    {:continue, Map.put(state, :provider_diagnostics, diagnostics)}
+  end
+
+  def handle_protocol_event(_data, state), do: {:continue, state}
+
+  @impl MessageHandler
+  def on_abnormal_exit(status, state) when is_integer(status) do
+    diagnostics =
+      state
+      |> Map.get(:provider_diagnostics, [])
+      |> Enum.reverse()
+      |> Enum.join("\n")
+
+    message =
+      if diagnostics == "" do
+        "Codex process exited with status #{status}. No provider diagnostic output was captured."
+      else
+        "Codex process exited with status #{status}. Provider output:\n#{diagnostics}"
+      end
+
+    Logger.error(
+      "[telemetry] codex.sdk.provider_exit session_id=#{state[:eits_session_id]} " <>
+        "exit_code=#{status} detail=#{inspect(message, limit: 2_000)}"
+    )
+
+    {:error,
+     {:codex_error,
+      %{
+        "type" => "cli_exit_error",
+        "status" => status,
+        "message" => message
+      }}}
+  end
+
+  def on_abnormal_exit(status, _state),
+    do: {:error, MessageHandler.default_exit_reason(status)}
+
+  @impl MessageHandler
+  def on_clean_exit(_state) do
+    # turn.completed is handled by handle_result/2, which finalizes the handler.
+    # Reaching the receive loop's exit path means that terminal event was absent.
+    {:error,
+     {:codex_incomplete_turn,
+      "Codex exited before emitting turn.completed; the task may be incomplete. Check the provider logs before retrying."}}
   end
 
   @impl MessageHandler

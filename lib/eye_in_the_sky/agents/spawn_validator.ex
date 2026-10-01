@@ -102,7 +102,9 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
     cond do
       not Map.has_key?(combos, provider) ->
         valid_providers = combos |> Map.keys() |> Enum.join(", ")
-        {:error, "invalid_provider", "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
+
+        {:error, "invalid_provider",
+         "invalid provider '#{provider}'; must be one of: #{valid_providers}"}
 
       provider == "pi" and is_nil(model) ->
         {:error, "invalid_model",
@@ -117,7 +119,16 @@ defmodule EyeInTheSky.Agents.SpawnValidator do
   end
 
   defp invalid_model_message("pi", model),
-    do: "invalid pi model '#{model}'; expected format '<pi-provider>/<model-id>' (e.g. google/gemini-2.5-pro)"
+    do:
+      "invalid pi model '#{model}'; expected format '<pi-provider>/<model-id>' (e.g. google/gemini-2.5-pro)"
+
+  defp invalid_model_message("claude", model),
+    do:
+      "invalid model '#{model}' for provider 'claude'; use a known alias (opus, sonnet, haiku), default, or a Claude slug beginning with 'claude-'"
+
+  defp invalid_model_message("codex", model),
+    do:
+      "invalid model '#{model}' for provider 'codex'; use a Codex/OpenAI slug beginning with 'gpt-'"
 
   defp invalid_model_message(provider, model) do
     valid = ModelConfig.valid_model_slugs(provider) |> Enum.join(", ")

@@ -27,7 +27,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.DefinitionFileActionsTest do
     end
 
     test "returns an error tuple when the source file doesn't exist", %{tmp_dir: tmp_dir} do
-      assert {:error, :enoent} = DefinitionFileActions.duplicate_file(Path.join(tmp_dir, "missing.md"))
+      assert {:error, :enoent} =
+               DefinitionFileActions.duplicate_file(Path.join(tmp_dir, "missing.md"))
     end
   end
 
@@ -41,7 +42,8 @@ defmodule EyeInTheSkyWeb.Live.Shared.DefinitionFileActionsTest do
     end
 
     test "returns an error tuple for a missing file", %{tmp_dir: tmp_dir} do
-      assert {:error, :enoent} = DefinitionFileActions.delete_file(Path.join(tmp_dir, "missing.md"))
+      assert {:error, :enoent} =
+               DefinitionFileActions.delete_file(Path.join(tmp_dir, "missing.md"))
     end
   end
 end

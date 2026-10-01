@@ -179,7 +179,9 @@ defmodule EyeInTheSky.Agents.AgentManager.SessionBridge do
   defp start_child(session, provider, opts, evicted?) do
     case DynamicSupervisor.start_child(@supervisor, {AgentWorker, opts}) do
       {:ok, pid} ->
-        Logger.warning("✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}")
+        Logger.warning(
+          "✅ spawn_worker: started for session.id=#{session.id}, pid=#{inspect(pid)}"
+        )
 
         {:ok, pid, provider}
 

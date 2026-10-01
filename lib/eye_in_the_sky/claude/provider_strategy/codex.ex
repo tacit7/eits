@@ -61,7 +61,8 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     Codex.SDK.cancel(ref)
   end
 
-  defp build_opts(state, context) do
+  @doc false
+  def build_opts(state, context) do
     base = [
       to: self(),
       model: context[:model],
@@ -69,6 +70,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       project_path: state.project_path,
       full_auto: true,
       bypass_sandbox: context[:bypass_sandbox] != false,
+      entrypoint: "sdk-cli",
       eits_session_uuid: state.eits_session_uuid,
       eits_session_id: state.session_id,
       eits_agent_uuid: state.agent_id,
@@ -79,10 +81,10 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
       eits_url: System.get_env("EITS_URL", "http://localhost:5001/api/v1")
     ]
 
-    # Forward extra_cli_opts — Codex.CLI.build_args ignores unknown keys,
-    # so Claude-only flags (--chrome, --sandbox, etc.) are harmlessly dropped.
+    # Forward extra_cli_opts. Settings override strategy defaults; CLI args
+    # unknown to Codex.CLI.build_args are harmlessly ignored.
     extra = context[:extra_cli_opts] || []
-    base ++ extra
+    Keyword.merge(base, extra)
   end
 
   defp maybe_add_content_blocks(opts, []), do: opts

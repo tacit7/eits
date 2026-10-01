@@ -116,7 +116,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
-        <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
+        <.link navigate={~p"/iam/policies"} class="eits-action eits-action--ghost eits-action--icon">
           <.icon name="hero-arrow-left" class="size-4" />
         </.link>
         <.icon name="hero-shield-plus" class="size-6 text-primary" />
@@ -132,8 +132,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyNew do
       >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
-        <section class="card bg-base-200">
-          <div class="card-body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <.input
               field={@form[:name]}
               type="text"

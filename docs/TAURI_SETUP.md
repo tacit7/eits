@@ -15,7 +15,7 @@ Everything in [docs/SETUP.md](SETUP.md) under "System Dependencies" applies here
 | Elixir 1.15+ / OTP 26+ | `brew install elixir` |
 | Node.js 22 LTS | Vite/Tailwind asset pipeline |
 | PostgreSQL 17 | `brew install postgresql@17 && brew services start postgresql@17` |
-| Mix deps | **`mix deps.get` must run before any `cargo build`** — `Cargo.toml` has a path dependency on `../deps/elixirkit/elixirkit_rs`, so the Hex package must be present on disk first |
+| Mix deps | **`mix deps.get` must run before any `cargo build`** — `Cargo.toml` has a path dependency on `../deps/elixirkit/elixirkit_rs`, so the Git dependency declared in `mix.exs` must be present on disk first |
 
 ### Rust / Tauri toolchain
 
@@ -52,20 +52,15 @@ cd assets && npm install && cd ..
 This step is mandatory before any Cargo build. `elixirkit_rs` lives at
 `deps/elixirkit/elixirkit_rs` and Cargo resolves it as a path dependency.
 
-### 2. Source environment variables
+### 2. Build environment
 
-The `beforeBuildCommand` in `tauri.conf.json` runs `mix release` inside a
-`MIX_ENV=prod` context. Phoenix production releases require several env vars
-at build time (`SECRET_KEY_BASE`, `VAPID_PRIVATE_KEY`, etc.). Source the
-project's `.env` and `.env.local` before invoking Cargo:
+The `beforeBuildCommand` in `src-tauri/tauri.conf.json` supplies the build-time
+Phoenix environment inline, including `PHX_INSECURE_COOKIES=1`,
+`DISABLE_AUTH=1`, database settings and a build-time secret. These inline values
+override shell values for that command. Runtime credentials are provisioned
+separately by `setup.command` (see below).
 
-```bash
-cd src-tauri    # or project root — wherever you run cargo tauri build from
-set -a
-. /path/to/eits/web/.env
-. /path/to/eits/web/.env.local
-set +a
-```
+Run the following command from the project root.
 
 ### 3. Run the build
 
@@ -76,8 +71,9 @@ cargo tauri build
 What happens under the hood (from `tauri.conf.json` `beforeBuildCommand`):
 
 1. Fixes permissions on stale `target/release` artifacts (`chmod u+w`).
-2. Touches `endpoint.ex` to force a recompile with `PHX_INSECURE_COOKIES=1`
-   baked in (required so WebKit accepts the cookie over `http://`).
+2. Runs `MIX_ENV=prod mix clean` to force a recompile with
+   `PHX_INSECURE_COOKIES=1` baked in (required so WebKit accepts the cookie
+   over `http://`).
 3. Runs `MIX_ENV=prod mix do compile + assets.deploy + release --overwrite
    --path src-tauri/target/rel` to build the Elixir release.
 4. Cargo links the Rust layer against ElixirKit and bundles everything.
@@ -85,16 +81,18 @@ What happens under the hood (from `tauri.conf.json` `beforeBuildCommand`):
 Build time: **~10–15 min cold** (full LLVM optimisation + Elixir release);
 **~2 min warm** (incremental Rust + cached BEAM).
 
-Output:
+Output (Cargo uses the repository workspace `target/`; version comes from
+`src-tauri/tauri.conf.json`):
 
 ```
-src-tauri/target/release/bundle/macos/Eye in the Sky.app
-src-tauri/target/release/bundle/dmg/Eye in the Sky_0.3.15_aarch64.dmg
+target/release/bundle/macos/Eye in the Sky.app
+target/release/bundle/dmg/Eye in the Sky_<version>_aarch64.dmg
 ```
 
 ### macOS code-signing / entitlements
 
-The release step calls `ElixirKit.Release.codesign/1` (wired in `mix.exs`).
+The release step calls `ElixirKit.Release.codesign/1` only when
+`APPLE_SIGNING_IDENTITY` is set (via `maybe_codesign/1` in `mix.exs`).
 Codesigning is required because BEAM uses JIT compilation — without the
 entitlements in `src-tauri/Entitlements.plist`, macOS will kill the process
 at startup:
@@ -112,7 +110,7 @@ once.
 
 ### Known build gotcha: EACCES on stale `target/release/rel/`
 
-If a prior build completed successfully, `src-tauri/target/release/rel/`
+If a prior build completed successfully, `target/release/rel/`
 contains mode-555 ERTS binaries. On the next build, `tauri-build` tries to
 overwrite them with `O_TRUNC` and gets permission denied:
 
@@ -125,13 +123,13 @@ Fix — move the stale directory out of the way (`rm` is aliased to `rm-trash`
 on this system; use `mv`):
 
 ```bash
-mv src-tauri/target/release/rel /tmp/tauri-rel-stale-$(date +%s)
+mv target/release/rel /tmp/tauri-rel-stale-$(date +%s)
 cargo tauri build
 ```
 
 The two `rel` directories are distinct:
 - `src-tauri/target/rel/` — produced by `mix release`, re-generated every build. Leave it alone.
-- `src-tauri/target/release/rel/` — Cargo's copy inside the `.app`. This one goes stale.
+- `target/release/rel/` — Cargo's staging copy for the bundle. This one goes stale.
 
 ---
 
@@ -140,9 +138,10 @@ The two `rel` directories are distinct:
 The bundled `.app` does not read shell environment variables when launched via
 Finder or the Dock. The Rust layer in `src-tauri/src/lib.rs` (`elixir_command`)
 injects a fixed set of env vars before spawning the Elixir release. In addition,
-`config/runtime.exs` reads `.env` and `.env.local` from the release working
-directory via Dotenvy — if those files exist they override the values injected
-by Rust.
+`config/runtime.exs` reads `~/.config/eits/.env`, then `.env` and `.env.local`
+from the working directory via Dotenvy. Later sources take precedence; the
+process environment is loaded last and overrides file values, including for
+variables injected by Rust.
 
 ### How env provisioning works
 
@@ -158,17 +157,14 @@ by Rust.
 | `DATABASE_SSL_VERIFY` | `false` | Bundled ERTS has no OpenSSL; local Postgres has no SSL |
 | `PHX_DISABLE_FORCE_SSL` | `1` | Disables HSTS + HTTPS redirect so WKWebView doesn't loop on `http://` |
 
-`lib.rs` also provides **hardcoded fallbacks** for two vars when they are not
-already present in the environment:
+`lib.rs` also sets `RELEASE_DISTRIBUTION=none` to avoid Erlang node-name
+collisions and defaults `EITS_BIND` to `loopback` when absent from the parent
+environment.
 
-| Variable | Fallback value | Note |
-|----------|---------------|------|
-| `DATABASE_URL` | `postgres://postgres:postgres@localhost/eits_dev?sslmode=disable` | Works with a standard PostgreSQL install; **fails on Homebrew Postgres** where the superuser is your OS login name, not `postgres` |
-| `SECRET_KEY_BASE` | Hardcoded hex string in source | Acceptable for a single-machine desktop app not exposed to the network; all users share the same key unless overridden |
-
-To override either fallback, set the variable in your shell before launching
-the binary directly, or place it in `.env`/`.env.local` inside the release
-directory (`Eye in the Sky.app/Contents/Resources/rel/`).
+`DATABASE_URL` and `SECRET_KEY_BASE` are **not injected by Rust** and have no
+Rust fallbacks. Run `setup.command` to provision them in `~/.config/eits/.env`,
+or supply them manually through that file or the process environment before
+launching the binary directly.
 
 ### Port resolution
 
@@ -184,7 +180,8 @@ order:
    ephemeral range.
 
 For cases 2–3, if the port is busy at launch the next 9 ports are scanned
-and the first free one is used — a collision never prevents startup. The
+and the first free one is used. If all ten are busy, it uses the original
+port anyway and startup can fail. An explicit `PORT` bypasses the scan. The
 IAM hook entries in `~/.claude/settings.json` are automatically rewritten
 with the actual port on every launch, so hooks keep working after a port
 change or fallback. If you use `tailscale serve`, re-point it after
@@ -216,8 +213,8 @@ This script:
    `~/.local/bin/eits`
 
 > **Note:** Setup is optional — you can still do these steps manually if needed.
-> If you run the app without setup, it will use hardcoded fallback values for
-> `DATABASE_URL` and `SECRET_KEY_BASE` (see "Runtime environment" below).
+> Without setup, you must provision `DATABASE_URL` and `SECRET_KEY_BASE`
+> manually; Rust does not supply fallback credentials.
 
 ### `WEBAUTHN_EXTRA_ORIGINS`
 
@@ -231,7 +228,7 @@ WEBAUTHN_EXTRA_ORIGINS=https://<machine>.<tailnet>.ts.net
 
 ### Why `PHX_INSECURE_COOKIES=1` is baked at compile time
 
-WebKit drops cookies with `Secure` flag over `http://`. Without `PHX_INSECURE_COOKIES=1`, every LiveView mount gets a fresh empty session, causing ~30 reconnects per second. The `beforeBuildCommand` touches `endpoint.ex` before compiling so this flag is baked into the compiled release — not set at runtime.
+WebKit drops cookies with `Secure` flag over `http://`. Without `PHX_INSECURE_COOKIES=1`, every LiveView mount gets a fresh empty session, causing ~30 reconnects per second. The `beforeBuildCommand` runs `MIX_ENV=prod mix clean` before compiling so this flag is baked into the compiled release — not set at runtime.
 
 ---
 
@@ -239,7 +236,8 @@ WebKit drops cookies with `Secure` flag over `http://`. Without `PHX_INSECURE_CO
 
 Click the app icon to launch normally. The Rust layer starts the Elixir
 release, waits for Phoenix to broadcast `"ready"` over ElixirKit PubSub, then
-creates the WKWebView window pointing at `http://127.0.0.1:34877`.
+creates the WKWebView window pointing at `http://127.0.0.1:<resolved port>`
+(default `34877`).
 
 **Do not use `open -n "Eye in the Sky.app"`** to launch programmatically.
 Launch Services does not pass shell env vars. Always invoke the Tauri binary
@@ -254,19 +252,9 @@ DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" \
   "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
 ```
 
-If you need to run the bundled app **alongside** the dev server (port 5001),
-the Elixir release will attempt to use the same Erlang node name. The Rust
-layer does not set `RELEASE_DISTRIBUTION`, so you need to set it manually
-before launching the binary to prevent EPMD collisions:
-
-```bash
-RELEASE_DISTRIBUTION=none \
-  "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"
-```
-
-This avoids the `name eye_in_the_sky seems to be in use by another Erlang node`
-error. The port is already set by `lib.rs` (see "Port resolution"), so no
-port conflict occurs.
+The Rust layer sets `RELEASE_DISTRIBUTION=none` automatically, so the bundled
+release can run alongside a dev server without an Erlang node-name collision.
+Use distinct HTTP ports for the two servers (see "Port resolution").
 
 ---
 
@@ -286,15 +274,15 @@ proxy (Tailscale, below), which connects to `localhost` from the same machine.
 
 **Opt-out:** To deliberately expose the server on the LAN, launch the app with
 `EITS_BIND=all` in its environment (e.g. from a terminal:
-`EITS_BIND=all open -a "Eye in the Sky"`, or via `launchctl setenv EITS_BIND all`).
+`EITS_BIND=all "/Applications/Eye in the Sky.app/Contents/MacOS/eye-in-the-sky"`).
 `lib.rs` only sets the default when the variable is absent. **Never do this on
 an untrusted network, and never expose the app's port to the public internet.**
 
 ### Tailscale recipe
 
-Tailscale tunnels only to machines in your tailnet, so it's safe to expose
-the app on your local network for accessing it from another one of your
-devices (e.g., iPhone, iPad, secondary Mac).
+Keep `EITS_BIND=loopback` when using the local Tailscale reverse proxy.
+The proxy connects to the loopback listener; LAN binding is unnecessary.
+With desktop authentication disabled, restrict tailnet access to trusted devices.
 
 **1. Install Tailscale:**
 
@@ -429,6 +417,6 @@ above is the complete list.
 | App launches but clicks do nothing | WebSocket origin rejected | `WEBAUTHN_EXTRA_ORIGINS` missing or `check_origin` blocking the socket. Check `/tmp/tauri-*.log` for `Could not check origin`. |
 | `VAPID_PRIVATE_KEY is required in production` crash | `DISABLE_AUTH` not set | Launch with `DISABLE_AUTH=1` or add it to `rel/.env` in the app bundle |
 | `role "postgres" does not exist` | `DATABASE_URL` uses wrong user | Override: `DATABASE_URL="ecto://$(whoami)@localhost/eits_dev" <binary>` |
-| Port already in use | Stale process on the configured port | Nothing to do — the app scans the next 9 ports automatically. To reclaim the original: `lsof -i :34877`; kill the conflicting process |
-| `EACCES` during build | Stale `target/release/rel/` | `mv src-tauri/target/release/rel /tmp/rel-stale && cargo tauri build` |
-| `name eye_in_the_sky seems to be in use` | EPMD node collision with running dev server | `RELEASE_DISTRIBUTION=none <binary>` (must be set before launch; lib.rs does not set it automatically) |
+| Port already in use | Stale process on the configured port | Without an explicit `PORT`, the app tries the next 9 ports. If all are busy, choose a free port in Settings → Desktop or via `PORT` |
+| `EACCES` during build | Stale `target/release/rel/` | `mv target/release/rel /tmp/rel-stale && cargo tauri build` |
+| `name eye_in_the_sky seems to be in use` | Release launched outside the desktop wrapper | The desktop wrapper sets `RELEASE_DISTRIBUTION=none` automatically; set it manually when invoking the release directly |

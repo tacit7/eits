@@ -100,6 +100,35 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
            "dm_page must default codex_raw_lines before forwarding it to MessagesTab"
   end
 
+  test "dm_page root sets theme-aware text color" do
+    source =
+      File.read!(
+        Path.join(
+          Path.expand("../../..", __DIR__),
+          "lib/eye_in_the_sky_web/components/dm_page.ex"
+        )
+      )
+
+    assert source =~ ~s("flex flex-col h-full relative overflow-hidden text-base-content"),
+           "dm_page root must set a theme-aware foreground so dark theme text is readable"
+  end
+
+  test "dm_page passes session_state to messages tab content" do
+    source =
+      File.read!(
+        Path.join(
+          Path.expand("../../..", __DIR__),
+          "lib/eye_in_the_sky_web/components/dm_page.ex"
+        )
+      )
+
+    assert source =~ "attr :session_state, :map, default: %{}",
+           "messages_tab_content must default session_state for non-DM render paths"
+
+    assert source =~ "session_state={@session_state}",
+           "dm_page must pass session_state before messages_tab_content reads it"
+  end
+
   # ===== Mobile keyboard-aware composer layout tests =====
   #
   # These tests verify the structural requirements for the mobile keyboard

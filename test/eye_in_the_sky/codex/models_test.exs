@@ -8,8 +8,8 @@ defmodule EyeInTheSky.Codex.ModelsTest do
       assert Models.context_window("gpt-5.6-sol") == 1_050_000
     end
 
-    test "returns 1_050_000 for gpt-5.6-terra" do
-      assert Models.context_window("gpt-5.6-terra") == 1_050_000
+    test "returns 1_050_000 for gpt-5.6-tenna" do
+      assert Models.context_window("gpt-5.6-tenna") == 1_050_000
     end
 
     test "returns 1_050_000 for gpt-5.6-luna" do
@@ -76,8 +76,8 @@ defmodule EyeInTheSky.Codex.ModelsTest do
       assert Models.max_output_tokens("gpt-5.6-sol") == 128_000
     end
 
-    test "returns 128_000 for gpt-5.6-terra" do
-      assert Models.max_output_tokens("gpt-5.6-terra") == 128_000
+    test "returns 128_000 for gpt-5.6-tenna" do
+      assert Models.max_output_tokens("gpt-5.6-tenna") == 128_000
     end
 
     test "returns 128_000 for gpt-5.6-luna" do

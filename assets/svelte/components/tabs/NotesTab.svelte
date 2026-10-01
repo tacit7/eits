@@ -72,8 +72,8 @@
 {#if notes && notes.length > 0}
   <div class="space-y-4">
     {#each notes as note (note.id)}
-      <div class="card bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
-        <div class="card-body p-4">
+      <div class="eits-panel rounded-box bg-base-100 border border-base-300 shadow-sm hover:shadow-md transition-shadow">
+        <div class="eits-panel__body p-4">
           <!-- Markdown content; re-renders when renderReady flips true -->
           <div class="prose prose-sm max-w-none dark:prose-invert
                       prose-headings:font-semibold
@@ -83,17 +83,17 @@
                       prose-p:mb-2
                       prose-ul:mb-2 prose-ol:mb-2
                       prose-li:mb-1
-                      prose-code:bg-base-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
-                      prose-pre:bg-base-300 prose-pre:p-3 prose-pre:rounded-lg
-                      prose-blockquote:border-l-4 prose-blockquote:border-primary prose-blockquote:pl-4">
+                      prose-code:bg-base-200 prose-code:px-1 prose-code:py-0.5 prose-code:rounded-box
+                      prose-pre:bg-base-300 prose-pre:p-3 prose-pre:rounded-box
+                      prose-blockquote:border-l prose-blockquote:border-base-content/20 prose-blockquote:pl-4">
             {@html renderMarkdown(note.body, renderReady)}
           </div>
 
           <!-- Footer with ID and Timestamp -->
-          <div class="card-actions justify-between mt-3 pt-3 border-t border-base-300">
+          <div class="eits-panel__actions justify-between mt-3 pt-3 border-t border-base-300">
             <!-- Note ID Badge -->
             <button
-              class="badge badge-ghost badge-sm hover:badge-primary cursor-pointer font-mono transition-colors"
+              class="eits-chip eits-chip--muted eits-chip--mono cursor-pointer transition-colors hover:text-primary"
               on:click={(e) => handleCopyId(note.id, e)}
               title="Copy ID: {note.id}"
             >
@@ -102,7 +102,7 @@
 
             <!-- Timestamp -->
             {#if note.created_at}
-              <div class="badge badge-ghost badge-sm">
+              <div class="eits-chip eits-chip--muted">
                 <span class="h-3 w-3 mr-1">{@html ClockSvg}</span>
                 {formatDateTime(note.created_at)}
               </div>
@@ -114,15 +114,15 @@
   </div>
 {:else}
   <!-- Empty state -->
-  <div class="hero min-h-[400px] bg-base-200 rounded-lg">
+  <div class="hero min-h-[400px] bg-base-200 rounded-box">
     <div class="hero-content text-center">
       <div class="max-w-md">
         <span class="h-16 w-16 mx-auto mb-4 text-base-content/30 block">{@html DocumentTextSvg}</span>
         <h2 class="text-2xl font-bold text-base-content">No notes yet</h2>
-        <p class="py-3 text-base-content/70">
+        <p class="py-3 text-message text-base-content/70">
           Add a note to capture decisions, blockers, or next steps for this session.
         </p>
-        <button class="btn btn-primary btn-sm">
+        <button class="eits-action eits-action--primary gap-1.5">
           <span class="h-4 w-4">{@html PlusSvg}</span>
           Add Your First Note
         </button>

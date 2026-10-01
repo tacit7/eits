@@ -1,11 +1,22 @@
 <div
   id="app-shell"
+  phx-hook="GlobalKeydown"
   class="flex flex-col h-[var(--app-viewport-height)] bg-base-100"
   data-palette-shortcut={@palette_shortcut}
   data-allow-split={if assigns[:allow_split], do: "true", else: "false"}
 >
-  <div id="aria-live-polite" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-  <div id="aria-live-assertive" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+  <% hide_app_rail = assigns[:hide_app_rail] || false %>
+
+  <div id="aria-live-polite" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+  </div>
+  <div
+    id="aria-live-assertive"
+    class="sr-only"
+    role="alert"
+    aria-live="assertive"
+    aria-atomic="true"
+  >
+  </div>
   <div
     id="vim-nav-root"
     data-vim-nav-enabled={EyeInTheSky.Settings.get("vim_nav_enabled")}
@@ -14,12 +25,12 @@
   </div>
   <a
     href="#main-content"
-    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-md bg-base-100 px-3 py-2 text-xs font-medium shadow"
+    class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] rounded-box bg-base-100 px-3 py-2 text-mini font-medium shadow"
   >
     Skip to main content
   </a>
 
-  <%!-- VS Code-style title bar — full-width, above rail + topbar. Desktop only.
+  <%!-- VS Code-style title bar - full-width, above rail + topbar. Desktop only.
        Drag region for the Tauri window (handler in app.js excludes interactive
        children). Traffic-light clearance via CSS gated on data-env="tauri". --%>
   <div
@@ -29,12 +40,12 @@
   >
     <%!-- Center group: history arrows + command center, absolute-centered so
          left/right content never shifts it (VS Code layout). Arrows drive
-         browser history — LiveView live navs pushState, so back/forward work
+         browser history - LiveView live navs pushState, so back/forward work
          across them; no-ops harmlessly at history ends. --%>
     <span class="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
       <button
         onclick="history.back()"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Go back"
         aria-label="Go back"
       >
@@ -42,7 +53,7 @@
       </button>
       <button
         onclick="history.forward()"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Go forward"
         aria-label="Go forward"
       >
@@ -51,7 +62,7 @@
       <button
         id="vsbar-cmdcenter"
         phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-        class="flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-md border border-base-content/10 bg-base-100 text-xs text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
+        class="flex items-center justify-center gap-2 w-[380px] max-w-[40vw] h-[26px] rounded-box border border-base-content/10 bg-base-100 text-mini text-base-content/50 hover:border-primary/60 hover:text-base-content/80 focus-ring"
         title="Open command palette"
         aria-label="Open command palette"
       >
@@ -65,7 +76,7 @@
     <span class="ml-auto flex items-center gap-1">
       <span
         id="vsbar-status"
-        class="hidden lg:flex items-center gap-1.5 px-2 text-[11px] text-base-content/50 select-none"
+        class="hidden lg:flex items-center gap-1.5 px-2 text-mini text-base-content/50 select-none"
         title="Server connection"
       >
         <span id="vsbar-status-dot" class="size-[7px] rounded-full bg-success"></span>
@@ -75,7 +86,7 @@
         id="push-setup-btn-vsbar"
         phx-hook="PushSetup"
         phx-update="ignore"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         data-push-state="disabled"
         title="Enable push notifications"
         aria-label="Enable push notifications"
@@ -83,9 +94,10 @@
         <.icon name="hero-bell" class="size-4" />
       </button>
       <button
+        :if={!hide_app_rail}
         phx-click="toggle_collapsed"
         phx-target="#app-rail"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
         title="Toggle sidebar"
         aria-label="Toggle sidebar"
       >
@@ -94,7 +106,7 @@
       <button
         id="vsbar-pin"
         phx-update="ignore"
-        class="btn btn-ghost btn-xs btn-square text-base-content/50 focus-ring hidden"
+        class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7 hidden"
         aria-pressed="false"
         title="Always on top"
         aria-label="Toggle always on top"
@@ -105,311 +117,343 @@
   </div>
 
   <div id="app-body" class="flex flex-1 min-h-0">
-  <%= live_render(@socket, EyeInTheSkyWeb.Components.Rail, id: "app-rail", sticky: true) %>
-  <%!-- Grab handle for swipe-to-open sidebar on mobile.
+    <%= unless hide_app_rail do %>
+      {live_render(@socket, EyeInTheSkyWeb.Components.Rail,
+        id: "app-rail",
+        sticky: true,
+        session: %{
+          "rail_context_topic" => assigns[:rail_context_topic],
+          "sidebar_tab" => assigns[:sidebar_tab] && Atom.to_string(assigns[:sidebar_tab]),
+          "sidebar_project_id" => assigns[:sidebar_project] && assigns[:sidebar_project].id,
+          "workspace_id" => assigns[:workspace_id]
+        }
+      )}
+    <% end %>
+    <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
-  <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.
+    <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.
        z-[45] sits below the sidebar (z-50) but above main content. --%>
-  <div
-    id="rail-grab-handle"
-    class="md:hidden fixed left-[52px] bottom-0 w-10 z-[45]"
-    style="touch-action: none; top: calc(3rem + env(safe-area-inset-top));"
-    aria-hidden="true"
-  />
+    <div
+      :if={!hide_app_rail}
+      id="rail-grab-handle"
+      class="md:hidden fixed left-[52px] bottom-0 w-10 z-[45]"
+      style="touch-action: none; top: calc(3rem + env(safe-area-inset-top));"
+      aria-hidden="true"
+    />
 
-  <div id="main-content-wrapper" class="flex-1 flex flex-col min-w-0 overflow-hidden">
-    <%!-- Mobile top bar — hidden on md+ since sidebar is always visible --%>
-    <header class={[
-      "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100",
-      assigns[:hide_mobile_header] && "hidden"
-    ]}>
-      <button
-        phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
-        title="Open menu"
-        aria-label="Open sidebar menu"
-      >
-        <.icon name="hero-bars-3" class="size-5" />
-      </button>
-      <span class="flex-1 text-sm font-semibold text-base-content/80">Eye in the Sky</span>
-      <button
-        phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
-        title="Open command palette"
-        aria-label="Open command palette"
-      >
-        <.icon name="hero-magnifying-glass" class="size-5" />
-      </button>
-      <button
-        id="push-setup-btn"
-        phx-hook="PushSetup"
-        phx-update="ignore"
-        class="btn btn-ghost btn-square w-11 h-11 text-base-content/60 focus-ring"
-        data-push-state="disabled"
-        title="Enable push notifications"
-        aria-label="Enable push notifications"
-      >
-        <.icon name="hero-bell" class="size-5" />
-      </button>
-    </header>
-
-    <%!-- Desktop top bar — hidden on mobile. Window drag + traffic-light
-         clearance moved up to #app-vsbar. --%>
-    <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
-    <div id="app-topbar" class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 pr-3 pl-3">
-      <.top_bar_breadcrumb
-        sidebar_tab={sidebar_tab}
-        dm_session_name={assigns[:page_title]}
-        dm_session_status={assigns[:session_status]}
-      />
-      <%= case sidebar_tab do %>
-        <% :sessions -> %>
-          <EyeInTheSkyWeb.TopBar.Sessions.toolbar
-            search_query={assigns[:search_query]}
-            session_filter={assigns[:session_filter]}
-            sort_by={assigns[:sort_by]}
-          />
-        <% :tasks -> %>
-          <EyeInTheSkyWeb.TopBar.Tasks.toolbar
-            search_query={assigns[:search_query]}
-            filter_state_id={assigns[:filter_state_id]}
-            workflow_states={assigns[:workflow_states] || []}
-            state_counts={assigns[:state_counts] || %{}}
-            sort_by={assigns[:sort_by]}
-            sidebar_project={assigns[:sidebar_project]}
-          />
-        <% :kanban -> %>
-          <EyeInTheSkyWeb.TopBar.Kanban.toolbar
-            search_query={assigns[:search_query]}
-            show_completed={assigns[:show_completed] || false}
-            bulk_mode={assigns[:bulk_mode] || false}
-            active_filter_count={assigns[:active_filter_count] || 0}
-            sidebar_project={assigns[:sidebar_project]}
-            selected_tasks={assigns[:selected_tasks]}
-          />
-        <% :dm -> %>
-          <EyeInTheSkyWeb.TopBar.DM.toolbar
-            active_tab={assigns[:active_tab]}
-            search_query={assigns[:message_search_query]}
-            active_timer={assigns[:active_timer]}
-            session_uuid={assigns[:session_uuid]}
-            show_iterm={true}
-            notify_on_stop={assigns[:notify_on_stop] || false}
-            session_active={
-              (assigns[:agent] || %{})
-              |> Map.get(:status)
-              |> then(&(&1 in ~w(working compacting)))
-            }
-          />
-        <% :notes -> %>
-          <EyeInTheSkyWeb.TopBar.Notes.toolbar
-            search_query={assigns[:search_query]}
-            sort_by={assigns[:sort_by] || "newest"}
-            starred_filter={assigns[:starred_filter] || false}
-            type_filter={assigns[:type_filter] || "all"}
-            new_href={assigns[:new_href]}
-          />
-        <% :skills -> %>
-          <EyeInTheSkyWeb.TopBar.Skills.toolbar
-            search_query={assigns[:search_query] || ""}
-            sort_by={assigns[:sort_by] || "name_asc"}
-            type_filter={assigns[:type_filter] || "all"}
-            scope_filter={assigns[:scope_filter] || "all"}
-          />
-        <% :agents -> %>
-          <EyeInTheSkyWeb.TopBar.Agents.toolbar
-            search_query={assigns[:search_query] || ""}
-            sort_by={assigns[:sort_by] || "name_asc"}
-            scope_filter={assigns[:scope_filter] || "all"}
-          />
-        <% :prompts -> %>
-          <EyeInTheSkyWeb.TopBar.Prompts.toolbar
-            search_query={assigns[:search_query] || ""}
-          />
-        <% :jobs -> %>
-          <EyeInTheSkyWeb.TopBar.Jobs.toolbar
-            active_tab={assigns[:active_tab] || :all_jobs}
-            search_query={assigns[:search_query] || ""}
-            project_id={assigns[:project_id]}
-          />
-        <% :teams -> %>
-          <EyeInTheSkyWeb.TopBar.Teams.toolbar
-            search_query={assigns[:search_query] || ""}
-            show_archived={assigns[:show_archived] || false}
-          />
-        <% :chat -> %>
-          <EyeInTheSkyWeb.TopBar.Chat.toolbar
-            active_channel={assigns[:active_channel]}
-            sender_filter={assigns[:sender_filter]}
-            channel_members={assigns[:channel_members] || []}
-            sessions_by_project={assigns[:sessions_by_project] || []}
-            session_search={assigns[:session_search] || ""}
-          />
-        <% _ -> %>
-          <%= if not is_nil(assigns[:search_query]) do %>
-            <EyeInTheSkyWeb.TopBar.Generic.toolbar search_query={assigns[:search_query]} />
-          <% else %>
-            <EyeInTheSkyWeb.TopBar.Generic.default_toolbar />
-          <% end %>
-      <% end %>
-      <.top_bar_cta
-        label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
-        href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
-        event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
-      />
-    </div>
-
-    <main
-      id="main-content"
-      class="flex-1 overflow-auto flex flex-col min-w-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"
-    >
-      <.flash_group flash={@flash} />
-      {@inner_content}
-    </main>
-
-    <% sidebar_project = assigns[:sidebar_project] %>
-    <% mobile_nav_tab = assigns[:mobile_nav_tab] || :sessions %>
-    <% notes_href =
-      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/" %>
-    <% project_href =
-      if sidebar_project, do: ~p"/projects/#{sidebar_project.id}", else: ~p"/" %>
-    <nav
-      class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
-      aria-label="Main navigation"
-    >
-      <div class={["grid gap-1", if(sidebar_project, do: "grid-cols-4", else: "grid-cols-2")]}>
-        <.link
-          navigate={~p"/"}
-          aria-label="Sessions"
-          aria-current={if mobile_nav_tab == :sessions, do: "page"}
-          class={[
-            "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
-            if(mobile_nav_tab == :sessions,
-              do: "text-primary bg-primary/10",
-              else: "text-base-content/60"
-            )
-          ]}
+    <div id="main-content-wrapper" class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <%!-- Mobile top bar - hidden on md+ since sidebar is always visible --%>
+      <header class={[
+        "md:hidden flex-shrink-0 flex items-center gap-3 px-4 pt-[env(safe-area-inset-top)] h-[calc(3rem+env(safe-area-inset-top))] border-b border-base-content/8 bg-base-100",
+        assigns[:hide_mobile_header] && "hidden"
+      ]}>
+        <button
+          :if={!hide_app_rail}
+          phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
+          title="Open menu"
+          aria-label="Open sidebar menu"
         >
-          <.icon name="hero-cpu-chip" class="size-5 mb-0.5" /> Sessions
-        </.link>
-        <%= if sidebar_project do %>
-          <.link
-            navigate={~p"/projects/#{sidebar_project.id}/tasks"}
-            aria-label="Tasks"
-            aria-current={if mobile_nav_tab == :tasks, do: "page"}
-            class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
-              if(mobile_nav_tab == :tasks,
-                do: "text-primary bg-primary/10",
-                else: "text-base-content/60"
-              )
-            ]}
-          >
-            <.icon name="hero-clipboard-document-list" class="size-5 mb-0.5" /> Tasks
-          </.link>
-          <.link
-            navigate={notes_href}
-            aria-label="Notes"
-            aria-current={if mobile_nav_tab == :notes, do: "page"}
-            class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
-              if(mobile_nav_tab == :notes,
-                do: "text-primary bg-primary/10",
-                else: "text-base-content/60"
-              )
-            ]}
-          >
-            <.icon name="hero-document-text" class="size-5 mb-0.5" /> Notes
-          </.link>
-          <.link
-            navigate={project_href}
-            aria-label="Project"
-            aria-current={if mobile_nav_tab == :project, do: "page"}
-            class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
-              if(mobile_nav_tab == :project,
-                do: "text-primary bg-primary/10",
-                else: "text-base-content/60"
-              )
-            ]}
-          >
-            <.icon name="hero-folder" class="size-5 mb-0.5" /> Project
-          </.link>
-        <% else %>
-          <.link
-            navigate={~p"/notifications"}
-            aria-label="Notifications"
-            aria-current={if mobile_nav_tab == :notifications, do: "page"}
-            class={[
-              "flex flex-col items-center justify-center rounded-lg py-2 min-h-[44px] text-xs font-medium transition-colors focus-ring focus-visible:ring-inset",
-              if(mobile_nav_tab == :notifications,
-                do: "text-primary bg-primary/10",
-                else: "text-base-content/60"
-              )
-            ]}
-          >
-            <.icon name="hero-bell" class="size-5 mb-0.5" /> Notifications
-          </.link>
+          <.icon name="hero-bars-3" class="size-5" />
+        </button>
+        <span class="flex-1 text-message font-semibold text-base-content/80">Eye in the Sky</span>
+        <button
+          phx-click={Phoenix.LiveView.JS.dispatch("palette:open", to: "#command-palette")}
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
+          title="Open command palette"
+          aria-label="Open command palette"
+        >
+          <.icon name="hero-magnifying-glass" class="size-5" />
+        </button>
+        <button
+          id="push-setup-btn"
+          phx-hook="PushSetup"
+          phx-update="ignore"
+          class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
+          data-push-state="disabled"
+          title="Enable push notifications"
+          aria-label="Enable push notifications"
+        >
+          <.icon name="hero-bell" class="size-5" />
+        </button>
+      </header>
+
+      <%!-- Desktop top bar - hidden on mobile. Window drag + traffic-light
+         clearance moved up to #app-vsbar. --%>
+      <% sidebar_tab = assigns[:sidebar_tab] || :sessions %>
+      <div
+        id="app-topbar"
+        class="hidden md:flex h-10 flex-shrink-0 items-center gap-2 border-b border-base-content/8 bg-base-100 pr-3 pl-3"
+      >
+        <.top_bar_breadcrumb
+          sidebar_tab={sidebar_tab}
+          dm_session_name={assigns[:page_title]}
+          dm_session_status={assigns[:session_status]}
+        />
+        <%= case sidebar_tab do %>
+          <% :sessions -> %>
+            <EyeInTheSkyWeb.TopBar.Sessions.toolbar
+              search_query={assigns[:search_query]}
+              session_filter={assigns[:session_filter]}
+              sort_by={assigns[:sort_by]}
+            />
+          <% :tasks -> %>
+            <EyeInTheSkyWeb.TopBar.Tasks.toolbar
+              search_query={assigns[:search_query]}
+              filter_state_id={assigns[:filter_state_id]}
+              workflow_states={assigns[:workflow_states] || []}
+              state_counts={assigns[:state_counts] || %{}}
+              sort_by={assigns[:sort_by]}
+              sidebar_project={assigns[:sidebar_project]}
+            />
+          <% :kanban -> %>
+            <EyeInTheSkyWeb.TopBar.Kanban.toolbar
+              search_query={assigns[:search_query]}
+              show_completed={assigns[:show_completed] || false}
+              bulk_mode={assigns[:bulk_mode] || false}
+              active_filter_count={assigns[:active_filter_count] || 0}
+              sidebar_project={assigns[:sidebar_project]}
+              selected_tasks={assigns[:selected_tasks]}
+            />
+          <% :dm -> %>
+            <EyeInTheSkyWeb.TopBar.DM.toolbar
+              active_tab={assigns[:active_tab]}
+              search_query={assigns[:message_search_query]}
+              active_timer={assigns[:active_timer]}
+              session_uuid={assigns[:session_uuid]}
+              show_iterm={true}
+              notify_on_stop={assigns[:notify_on_stop] || false}
+              session_active={
+                (assigns[:agent] || %{})
+                |> Map.get(:status)
+                |> then(&(&1 in ~w(working compacting)))
+              }
+            />
+          <% :notes -> %>
+            <EyeInTheSkyWeb.TopBar.Notes.toolbar
+              search_query={assigns[:search_query]}
+              sort_by={assigns[:sort_by] || "newest"}
+              starred_filter={assigns[:starred_filter] || false}
+              type_filter={assigns[:type_filter] || "all"}
+              new_href={assigns[:new_href]}
+            />
+          <% :skills -> %>
+            <EyeInTheSkyWeb.TopBar.Skills.toolbar
+              search_query={assigns[:search_query] || ""}
+              sort_by={assigns[:sort_by] || "name_asc"}
+              type_filter={assigns[:type_filter] || "all"}
+              scope_filter={assigns[:scope_filter] || "all"}
+            />
+          <% :agents -> %>
+            <EyeInTheSkyWeb.TopBar.Agents.toolbar
+              search_query={assigns[:search_query] || ""}
+              sort_by={assigns[:sort_by] || "name_asc"}
+              scope_filter={assigns[:scope_filter] || "all"}
+            />
+          <% :prompts -> %>
+            <EyeInTheSkyWeb.TopBar.Prompts.toolbar search_query={assigns[:search_query] || ""} />
+          <% :jobs -> %>
+            <EyeInTheSkyWeb.TopBar.Jobs.toolbar
+              active_tab={assigns[:active_tab] || :all_jobs}
+              search_query={assigns[:search_query] || ""}
+              project_id={assigns[:project_id]}
+            />
+          <% :teams -> %>
+            <EyeInTheSkyWeb.TopBar.Teams.toolbar
+              search_query={assigns[:search_query] || ""}
+              show_archived={assigns[:show_archived] || false}
+            />
+          <% :chat -> %>
+            <EyeInTheSkyWeb.TopBar.Chat.toolbar
+              active_channel={assigns[:active_channel]}
+              sender_filter={assigns[:sender_filter]}
+              channel_members={assigns[:channel_members] || []}
+              sessions_by_project={assigns[:sessions_by_project] || []}
+              session_search={assigns[:session_search] || ""}
+            />
+          <% _ -> %>
+            <%= if not is_nil(assigns[:search_query]) do %>
+              <EyeInTheSkyWeb.TopBar.Generic.toolbar search_query={assigns[:search_query]} />
+            <% else %>
+              <EyeInTheSkyWeb.TopBar.Generic.default_toolbar />
+            <% end %>
         <% end %>
+        <.top_bar_cta
+          label={assigns[:top_bar_cta] && assigns[:top_bar_cta].label}
+          href={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :href)}
+          event={assigns[:top_bar_cta] && Map.get(assigns[:top_bar_cta], :event)}
+        />
       </div>
-    </nav>
 
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_note project_id={
-      assigns[:sidebar_project] && assigns[:sidebar_project].id
-    } />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_agent project_id={
-      assigns[:sidebar_project] && assigns[:sidebar_project].id
-    } />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_update_agent />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_get_agent />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_delete_agent />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_resume_agent />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_chat project_id={
-      assigns[:sidebar_project] && assigns[:sidebar_project].id
-    } />
-    <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_task project_id={
-      assigns[:sidebar_project] && assigns[:sidebar_project].id
-    } />
+      <main
+        id="main-content"
+        class={[
+          "flex-1 overflow-auto flex flex-col min-w-0 md:pb-0",
+          if(hide_app_rail, do: "pb-0", else: "pb-[calc(4.25rem+env(safe-area-inset-bottom))]")
+        ]}
+      >
+        <.flash_group flash={@flash} />
+        {@inner_content}
+      </main>
 
-    <dialog
-      id="command-palette"
-      phx-hook="CommandPalette"
-      phx-update="ignore"
-      data-projects={Jason.encode!(@palette_projects)}
-      class="modal modal-bottom sm:modal-middle p-0 bg-transparent"
-    >
-      <div class="modal-box max-w-2xl p-0 overflow-hidden bg-base-200 pb-[env(safe-area-inset-bottom)]">
-        <div class="border-b border-base-content/10 p-3">
+      <% sidebar_project = assigns[:sidebar_project] %>
+      <% mobile_nav_tab = assigns[:mobile_nav_tab] || :sessions %>
+      <% notes_href =
+        if sidebar_project, do: ~p"/projects/#{sidebar_project.id}/notes", else: ~p"/" %>
+      <% project_href =
+        if sidebar_project, do: ~p"/projects/#{sidebar_project.id}", else: ~p"/" %>
+      <nav
+        :if={!hide_app_rail}
+        class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
+        aria-label="Main navigation"
+      >
+        <div class={["grid gap-1", if(sidebar_project, do: "grid-cols-4", else: "grid-cols-3")]}>
+          <.link
+            navigate={~p"/"}
+            aria-label="Sessions"
+            aria-current={if mobile_nav_tab == :sessions, do: "page"}
+            class={[
+              "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+              if(mobile_nav_tab == :sessions,
+                do: "text-primary bg-primary/10",
+                else: "text-base-content/60"
+              )
+            ]}
+          >
+            <.icon name="hero-cpu-chip" class="size-5 mb-0.5" /> Sessions
+          </.link>
+          <%= if sidebar_project do %>
+            <.link
+              navigate={~p"/projects/#{sidebar_project.id}/tasks"}
+              aria-label="Tasks"
+              aria-current={if mobile_nav_tab == :tasks, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :tasks,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-clipboard-document-list" class="size-5 mb-0.5" /> Tasks
+            </.link>
+            <.link
+              navigate={notes_href}
+              aria-label="Notes"
+              aria-current={if mobile_nav_tab == :notes, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :notes,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-document-text" class="size-5 mb-0.5" /> Notes
+            </.link>
+            <.link
+              navigate={project_href}
+              aria-label="Project"
+              aria-current={if mobile_nav_tab == :project, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :project,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-folder" class="size-5 mb-0.5" /> Project
+            </.link>
+          <% else %>
+            <.link
+              navigate={~p"/tasks"}
+              aria-label="Tasks"
+              aria-current={if mobile_nav_tab == :tasks, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :tasks,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-clipboard-document-list" class="size-5 mb-0.5" /> Tasks
+            </.link>
+            <.link
+              navigate={~p"/notifications"}
+              aria-label="Notifications"
+              aria-current={if mobile_nav_tab == :notifications, do: "page"}
+              class={[
+                "flex flex-col items-center justify-center rounded-box py-2 min-h-[44px] text-mini font-medium transition-colors focus-ring focus-visible:ring-inset",
+                if(mobile_nav_tab == :notifications,
+                  do: "text-primary bg-primary/10",
+                  else: "text-base-content/60"
+                )
+              ]}
+            >
+              <.icon name="hero-bell" class="size-5 mb-0.5" /> Notifications
+            </.link>
+          <% end %>
+        </div>
+      </nav>
+
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_note project_id={
+        assigns[:sidebar_project] && assigns[:sidebar_project].id
+      } />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_agent project_id={
+        assigns[:sidebar_project] && assigns[:sidebar_project].id
+      } />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_update_agent />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_get_agent />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_delete_agent />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_resume_agent />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_chat project_id={
+        assigns[:sidebar_project] && assigns[:sidebar_project].id
+      } />
+      <EyeInTheSkyWeb.Components.QuickCreateDialogs.quick_create_task project_id={
+        assigns[:sidebar_project] && assigns[:sidebar_project].id
+      } />
+
+      <dialog
+        id="command-palette"
+        phx-hook="CommandPalette"
+        phx-update="ignore"
+        data-projects={Jason.encode!(@palette_projects)}
+        class="eits-modal   p-0 bg-transparent"
+      >
+        <div class="eits-dialog max-w-2xl p-0 overflow-hidden bg-base-200 pb-[env(safe-area-inset-bottom)]">
+          <div class="border-b border-base-content/10 p-3">
+            <div
+              data-palette-breadcrumb
+              class="hidden text-mini text-base-content/50 mb-2 select-none"
+            >
+            </div>
+            <label for="command-palette-input" class="sr-only">Search commands</label>
+            <input
+              id="command-palette-input"
+              type="text"
+              data-palette-input
+              placeholder="Search pages, projects, and commands..."
+              class="w-full h-10 rounded-box border border-base-content/10 bg-base-100 px-3 text-message focus:outline-none focus:border-primary/40"
+            />
+          </div>
           <div
-            data-palette-breadcrumb
-            class="hidden text-mini text-base-content/50 mb-2 select-none"
+            data-palette-results
+            role="listbox"
+            aria-label="Command palette results"
+            class="max-h-[55dvh] overflow-y-auto p-2"
           >
           </div>
-          <label for="command-palette-input" class="sr-only">Search commands</label>
-          <input
-            id="command-palette-input"
-            type="text"
-            data-palette-input
-            placeholder="Search pages, projects, and commands..."
-            class="w-full h-10 rounded-lg border border-base-content/10 bg-base-100 px-3 text-base focus:outline-none focus:border-primary/40"
-          />
+          <div class="px-3 py-2 text-mini text-base-content/55 border-t border-base-content/10 hidden sm:block">
+            ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
+          </div>
         </div>
-        <div
-          data-palette-results
-          role="listbox"
-          aria-label="Command palette results"
-          class="max-h-[55dvh] overflow-y-auto p-2"
-        >
-        </div>
-        <div class="px-3 py-2 text-mini text-base-content/55 border-t border-base-content/10 hidden sm:block">
-          ↑↓ to move · Enter to select · Esc to close/back · Backspace to go back
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop">
-        <button>close</button>
-      </form>
-    </dialog>
-  </div>
+        <form method="dialog" class="eits-modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
+    </div>
   </div>
   <%!-- /#app-body --%>
 
@@ -427,12 +471,12 @@
        phx-hooks are silently ignored); the hook itself renders into body. --%>
   <div id="ctx-menu-root" phx-hook="CtxMenu" phx-update="ignore" style="display:none"></div>
 
-  <%!-- Rename dialog driven by the CtxMenu hook's ctx.prompt(). DaisyUI modal,
+  <%!-- Rename dialog driven by the CtxMenu hook's ctx.prompt(). Local modal,
        same pattern as #command-palette. Native <dialog> so Esc/backdrop close
        for free; the hook fills title/value and resolves on the `close` event. --%>
-  <dialog id="ctx-rename-dialog" phx-update="ignore" class="modal modal-bottom sm:modal-middle">
-    <div class="modal-box max-w-sm">
-      <h3 class="text-base font-semibold mb-3" data-rename-title>Rename</h3>
+  <dialog id="ctx-rename-dialog" phx-update="ignore" class="eits-modal  ">
+    <div class="eits-dialog max-w-sm">
+      <h3 class="text-message font-semibold mb-3" data-rename-title>Rename</h3>
       <form method="dialog" data-rename-form>
         <label for="ctx-rename-input" class="sr-only">New name</label>
         <input
@@ -442,17 +486,27 @@
           autocomplete="off"
           class="input input-bordered w-full focus:border-primary/40"
         />
-        <div class="modal-action mt-4">
-          <button type="button" value="cancel" data-rename-cancel class="btn btn-ghost btn-sm">
+        <div class="eits-panel__actions mt-4">
+          <button
+            type="button"
+            value="cancel"
+            data-rename-cancel
+            class="eits-action eits-action--ghost"
+          >
             Cancel
           </button>
-          <button type="submit" value="save" data-rename-save class="btn btn-primary btn-sm">
+          <button
+            type="submit"
+            value="save"
+            data-rename-save
+            class="eits-action eits-action--primary"
+          >
             Save
           </button>
         </div>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="eits-modal-backdrop">
       <button>close</button>
     </form>
   </dialog>

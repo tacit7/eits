@@ -90,17 +90,17 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
     ~H"""
     <div class="px-4 sm:px-6 lg:px-8 py-6">
       <div class="max-w-7xl mx-auto">
-        <!-- Header -->
+        <%!-- Header --%>
         <div class="flex items-center justify-between mb-6">
           <div>
             <h1 class="text-3xl font-bold text-base-content">Bookmarks</h1>
-            <p class="text-sm text-base-content/60 mt-1">
+            <p class="text-message text-base-content/60 mt-1">
               Your saved files, notes, agents, and more
             </p>
           </div>
 
           <div class="flex items-center gap-2">
-            <!-- Type Filter -->
+            <%!-- Type Filter --%>
             <select
               class="select select-bordered select-sm"
               phx-change="filter_type"
@@ -114,8 +114,8 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
               <option value="task">Tasks</option>
               <option value="url">URLs</option>
             </select>
-            
-    <!-- Category Filter -->
+
+            <%!-- Category Filter --%>
             <select
               class="select select-bordered select-sm"
               phx-change="filter_category"
@@ -130,17 +130,17 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
             </select>
           </div>
         </div>
-        
-    <!-- Bookmarks List -->
+
+        <%!-- Bookmarks List --%>
         <%= if @bookmarks == [] do %>
-          <div class="card bg-base-100 shadow-sm">
+          <div class="eits-panel bg-base-100 shadow-sm">
             <.empty_state
               icon="hero-bookmark"
               icon_class="mx-auto w-16 h-16 text-base-content/20 mb-4"
               title="No bookmarks yet"
               title_class="text-lg font-semibold text-base-content/60 mt-0"
               subtitle="Start bookmarking files, notes, and other items to find them quickly later"
-              class="card-body text-center py-12"
+              class="eits-panel__body text-center py-12"
             />
           </div>
         <% else %>
@@ -148,59 +148,66 @@ defmodule EyeInTheSkyWeb.BookmarkLive.Index do
             <%= for bookmark <- @bookmarks do %>
               <div
                 id={"bookmark-#{bookmark.id}"}
-                class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"
+                class="eits-panel bg-base-100 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div class="card-body p-4">
+                <div class="eits-panel__body p-4">
                   <div class="flex items-start justify-between gap-4">
-                    <!-- Bookmark Icon -->
+                    <%!-- Bookmark Icon --%>
                     <div class="flex-shrink-0">
                       <.bookmark_type_icon type={bookmark.bookmark_type} />
                     </div>
-                    
-    <!-- Content -->
+
+                    <%!-- Content --%>
                     <div class="flex-1 min-w-0">
-                      <!-- Badges -->
+                      <%!-- Badges --%>
                       <div class="flex items-center gap-2 mb-2">
-                        <span class="badge badge-sm">{bookmark.bookmark_type}</span>
+                        <span class="eits-chip eits-chip--neutral">
+                          {bookmark.bookmark_type}
+                        </span>
                         <%= if bookmark.category do %>
-                          <span class="badge badge-sm badge-outline">{bookmark.category}</span>
+                          <span class="eits-chip eits-chip--muted">
+                            {bookmark.category}
+                          </span>
                         <% end %>
                         <%= if not is_nil(bookmark.priority) && bookmark.priority > 0 do %>
-                          <span class="badge badge-sm badge-warning">P{bookmark.priority}</span>
+                          <span class="eits-chip eits-chip--warning">
+                            P{bookmark.priority}
+                          </span>
                         <% end %>
                       </div>
-                      
-    <!-- Title -->
+
+                      <%!-- Title --%>
                       <h3 class="font-semibold text-base-content">
                         {bookmark.title || bookmark_display_text(bookmark)}
                       </h3>
-                      
-    <!-- Description -->
+
+                      <%!-- Description --%>
                       <%= if bookmark.description do %>
-                        <p class="text-sm text-base-content/60 mt-1">{bookmark.description}</p>
+                        <p class="text-message text-base-content/60 mt-1">{bookmark.description}</p>
                       <% end %>
-                      
-    <!-- Details -->
-                      <div class="text-xs text-base-content/40 mt-2 font-mono">
+
+                      <%!-- Details --%>
+                      <div class="text-mini text-base-content/40 mt-2 font-mono">
                         {bookmark_details(bookmark)}
                       </div>
-                      
-    <!-- Timestamp -->
-                      <div class="text-xs text-base-content/30 mt-2">
+
+                      <%!-- Timestamp --%>
+                      <div class="text-mini text-base-content/30 mt-2">
                         Created {format_timestamp(bookmark.inserted_at)}
                         <%= if bookmark.accessed_at do %>
-                          • Last accessed {format_timestamp(bookmark.accessed_at)}
+                          | Last accessed {format_timestamp(bookmark.accessed_at)}
                         <% end %>
                       </div>
                     </div>
-                    
-    <!-- Actions -->
+
+                    <%!-- Actions --%>
                     <div class="flex-shrink-0">
                       <button
                         phx-click="delete"
                         phx-value-id={bookmark.id}
-                        class="btn btn-ghost btn-sm btn-square"
+                        class="eits-action eits-action--danger eits-action--icon"
                         title="Remove bookmark"
+                        aria-label="Remove bookmark"
                       >
                         <.icon name="hero-trash" class="size-4" />
                       </button>

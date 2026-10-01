@@ -23,6 +23,7 @@ defmodule EyeInTheSky.SDK.MessageHandlerExtensionTest do
     def handle_result(_data, _state), do: :ok
 
     def handle_protocol_event(%{"raw" => "boom"}, _state), do: {:halt, :preamble_failed}
+
     def handle_protocol_event(data, state) do
       send(state.caller_pid, {:protocol_seen, data})
       {:continue, state}

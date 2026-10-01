@@ -8,9 +8,8 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
 
   # Canonical page per rail section. Click on a section icon NAVIGATES here
   # (desktop); the flyout panel opens via drag-right / chevron / vsbar toggle
-  # instead. Sections with no page (:files; :tasks/:notes without a selected
-  # project — their pages are project-scoped) keep the open-flyout behavior.
-  # NOT /workspace/tasks|notes: those require workspace scope and 302 to /.
+  # instead. Sections with no page (:files; :notes without a selected project)
+  # keep the open-flyout behavior.
   #
   # When a project is selected, project-scoped sections route to /projects/:id/*
   # and fall back to the global route when no project is selected.
@@ -26,6 +25,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
   defp section_route(:teams, %{id: id}), do: "/projects/#{id}/teams"
   defp section_route(:teams, _project), do: "/teams"
   defp section_route(:tasks, %{id: id}), do: "/projects/#{id}/tasks"
+  defp section_route(:tasks, _project), do: "/tasks"
   defp section_route(:notes, %{id: id}), do: "/projects/#{id}/notes"
   defp section_route(:jobs, %{id: id}), do: "/projects/#{id}/jobs"
   defp section_route(:jobs, _project), do: "/jobs"
@@ -108,7 +108,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
      |> assign(:active_section, section)
      |> assign(:flyout_open, true)
      |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(section)})
-     |> assign(:proj_picker_open, false)
      |> assign(:session_scope, :current)
      |> assign(:session_project_visible, %{})
      |> assign(:session_project_collapsed, MapSet.new())
@@ -141,7 +140,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(
            flyout_open: false,
            mobile_open: false,
-           proj_picker_open: false,
            show_new_session_form: false
          )
          |> push_event("save_rail_state", %{flyout_open: false})}
@@ -152,7 +150,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.SectionActions do
          |> assign(:active_section, sticky)
          |> assign(:flyout_open, true)
          |> assign(:mobile_open, false)
-         |> assign(:proj_picker_open, false)
          |> assign(:show_new_session_form, false)
          |> push_event("save_rail_state", %{flyout_open: true, section: Atom.to_string(sticky)})}
     end

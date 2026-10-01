@@ -61,7 +61,14 @@ defmodule EyeInTheSky.Pi.Control do
     with {:ok, port, ref} <- cli.spawn_harness(caller: self(), project_path: File.cwd!()) do
       try do
         with {:ok, _} <-
-               request(cli, port, ref, %{id: "ctl-1", type: "initialize", protocolVersion: 1}, responder, timeout),
+               request(
+                 cli,
+                 port,
+                 ref,
+                 %{id: "ctl-1", type: "initialize", protocolVersion: 1},
+                 responder,
+                 timeout
+               ),
              req <- Map.merge(%{id: "ctl-2", type: command}, payload),
              {:ok, data} <- request(cli, port, ref, req, responder, timeout) do
           {:ok, extract.(data)}

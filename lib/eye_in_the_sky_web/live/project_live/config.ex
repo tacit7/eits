@@ -6,15 +6,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   import EyeInTheSkyWeb.Helpers.ProjectFileBrowserHelpers
   import EyeInTheSkyWeb.Components.ConfigBrowser
   import EyeInTheSkyWeb.Live.FileBrowserHelpers, only: [read_file_for_display: 4]
+  import EyeInTheSkyWeb.Helpers.ProjectLiveHelpers, only: [load_project_for_socket: 3]
 
   alias EyeInTheSky.Events
-  alias EyeInTheSky.Projects
   alias EyeInTheSkyWeb.Helpers.ViewHelpers
   alias EyeInTheSkyWeb.Live.Shared.NotificationHelpers
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     project_id = parse_int(id)
+    project = load_project_for_socket(socket, project_id, [])
 
     socket =
       socket
@@ -29,8 +30,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
       {:ok, redirect(socket, to: "/projects")}
     else
       socket =
-        if connected?(socket) do
-          project = Projects.get_project!(project_id)
+        if project do
           claude_dir = if project.path, do: Path.join(project.path, ".claude"), else: nil
 
           socket
@@ -40,6 +40,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
           |> assign(:claude_dir, claude_dir)
         else
           socket
+          |> put_flash(:error, "Project not found")
         end
 
       if connected?(socket), do: Events.broadcast_rail_context(socket)
@@ -201,19 +202,25 @@ defmodule EyeInTheSkyWeb.ProjectLive.Config do
   def render(assigns) do
     ~H"""
     <%= if @claude_dir && File.dir?(@claude_dir) do %>
-      <!-- View Mode Toggle -->
+      <%!-- View Mode Toggle --%>
       <div class="bg-base-100 border-b border-base-300">
         <div class="px-4 sm:px-6 lg:px-8 py-2">
-          <div class="join">
+          <div class="flex items-center gap-1 rounded-box bg-base-200/45 p-0.5">
             <button
-              class={"btn btn-sm join-item" <> if @view_mode == :tree, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :tree, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="tree"
             >
               <.icon name="hero-folder" class="size-4" /> Explore
             </button>
             <button
-              class={"btn btn-sm join-item" <> if @view_mode == :list, do: " btn-active", else: ""}
+              class={[
+                "eits-action gap-1.5",
+                if(@view_mode == :list, do: "eits-action--primary", else: "eits-action--ghost")
+              ]}
               phx-click="toggle_view_mode"
               phx-value-mode="list"
             >

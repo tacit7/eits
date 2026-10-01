@@ -3,16 +3,17 @@
 ## Tasks
 
 ```bash
-eits tasks begin --title "..." [--description "..."] [-p <project_id>] [--tag <id|name>] [--priority <p>]
-eits tasks claim <id>          # canonical: transfer ownership to current session, set In Progress
-eits tasks begin --id <id>     # compatibility alias for claim; --title/--description silently ignored; --tag still applies
+eits tasks begin --title "..." [--description "..."] [-p <project_id>] [--team <team_id>] [--tag <id|name>] [--priority <p>]
+eits tasks claim <id> [--team <team_id>]  # canonical: transfer ownership to current session, set In Progress; --team is accepted but does not mutate the existing task
+eits tasks begin --id <id> [--team <team_id>]  # compatibility alias for claim; exactly one of --id/--title is required
 eits tasks start <id>          # DEPRECATED — prints a warning; use claim instead
 eits tasks complete <id> --message "Summary" [--commit <sha>] [--commit <sha2> ...]
 eits tasks annotate <id> --body "..."
 eits tasks update <id> [--state <alias|id>] [--title "..."] [--description "..."] [--priority <p>] [--due-at <iso8601>]
-eits tasks list [--all] [-p <project>] [-s <session>] [-l <limit>] [--tag <id|name>] [-q <query>] [--mine]
+eits tasks list [--all] [-p <project>] [-s <session>] [-l <limit>] [--tag <id|name>] [--team <team_id>] [-q <query>] [--mine]
+eits tasks status --team <team_id> [-l <limit>] [--json]  # task-centric team view with linked session_ids
 eits tasks get <id>
-eits tasks create --title "..." [--description "..."] [-p <project_id>]
+eits tasks create --title "..." [--description "..."] [-p <project_id>] [--team <team_id>] [--assign-to <session_uuid_or_id>]
 eits tasks active [--json]     # requires session context; visibility helper: In Progress + In Review tasks for current session
 # Use --json when you need task IDs for follow-up. Note: In Review does not satisfy the write hook.
 eits tasks bulk-update --ids <id,...> [--state <alias|id>] [--priority <p>] [--title "..."]
@@ -21,7 +22,7 @@ eits tasks search <query> [-p <project>] [-l <limit>] [--state <id>]
 eits tasks states              # list all state IDs and accepted aliases
 ```
 
-Use `tasks begin` when starting new work immediately — it creates, links, and starts in one shot. Use `tasks create` when creating a task without starting it (write hook still blocks until you `claim` or `begin --id` the task).
+Use `tasks begin --title` when starting self-owned work immediately, and `tasks begin --id` (or canonical `tasks claim`) for an existing task. Exactly one intent flag is required. Use `tasks create` for a To Do task; it is unassigned unless `--assign-to` is explicit, while creator attribution still comes from the current session.
 
 Use `tasks claim <id>` for pre-existing or orchestrator-assigned tasks. It transfers ownership to the current session and sets state to In Progress. `tasks update <id> --state start` changes state only — it does not transfer session ownership.
 
@@ -83,12 +84,34 @@ eits dm --to <session_uuid_or_integer_id> --message "text"
 # Inbox — auto-resolves from $EITS_SESSION_UUID; omit --session
 eits dm inbox [--limit <n>] [--from <id>] [--since <iso8601>] [--since-session] [--team-only] [--json]
 # --session <uuid|id> is an override only — don't pass it when reading your own inbox
+# Poll at workflow checkpoints: before claiming work, after major state transitions,
+# before closing a task, and after completion DMs.
 # alias: eits dm list
+
+# Long-poll for a new DM. With --team-only, non-team messages are skipped
+# until a shared-team DM arrives or the timeout expires.
+eits dm wait [--session <uuid|id>] [--since <iso8601>] [--team-only] [--timeout <seconds>]
 ```
 
 `--to` / `--from` accept UUID or integer session ID.
 `--since-session` suppresses stale DMs from before session start — use this on resume.
 `--unread` does **not** exist (no is_read field in the backend).
+
+---
+
+## Work
+
+```bash
+eits work status
+eits work checkpoint   # alias for status
+```
+
+Reports the current checkpoint for the active session. JSON output includes current session identity, project, active and claimed tasks, team memberships, inbound DM summary, git/worktree health, and commit-tracking status where feasible.
+
+**Best uses:**
+- Resume and handoff check: verify the current session is linked to the right project and task set
+- Team context: inspect memberships before sending DMs or spawning follow-up work
+- Git hygiene: confirm whether HEAD is already logged to EITS commits
 
 ---
 

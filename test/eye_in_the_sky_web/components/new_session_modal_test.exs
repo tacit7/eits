@@ -1,7 +1,8 @@
 defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
-  use EyeInTheSkyWeb.ConnCase, async: true
+  use EyeInTheSkyWeb.ConnCase, async: false
   import Phoenix.LiveViewTest
 
+  alias EyeInTheSkyWeb.Helpers.AgentCreationHelpers
   alias EyeInTheSkyWeb.Components.NewSessionModal
 
   @agents [
@@ -33,10 +34,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
   defmodule HostLive do
     use Phoenix.LiveView
 
-    def mount(_params, _session, socket) do
+    def mount(_params, session, socket) do
       {:ok,
        assign(socket,
-         show: true,
+         show: Map.get(session, "show", true),
          toggle_event: "toggle_new_session",
          submit_event: "create_session",
          prompts: [],
@@ -64,6 +65,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       """
     end
 
+    def handle_event("toggle_new_session", _, socket) do
+      {:noreply, assign(socket, show: not socket.assigns.show)}
+    end
+
     def handle_event(_, _, socket), do: {:noreply, socket}
   end
 
@@ -73,6 +78,21 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
 
   defp render_new_session_modal(overrides) do
     render_component(NewSessionModal, base_assigns(overrides))
+  end
+
+  test "fixes static root rendering when the modal is closed and toggled", %{conn: conn} do
+    {:ok, view, _html} = live_isolated(conn, HostLive, session: %{"show" => false})
+
+    refute has_element?(view, "#new-session-drawer")
+
+    render_click(view, "toggle_new_session")
+    assert has_element?(view, "#new-session-drawer #new-session-form")
+
+    render_click(view, "toggle_new_session")
+    refute has_element?(view, "#new-session-drawer")
+
+    render_click(view, "toggle_new_session")
+    assert has_element?(view, "#new-session-drawer #new-session-form")
   end
 
   # -------------------------------------------------------------------------
@@ -154,6 +174,23 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
   end
 
   describe "shared model selector" do
+    test "configured OpenAI default keeps its Codex provider in the launch form", %{conn: conn} do
+      previous = EyeInTheSky.Settings.get("default_model")
+
+      try do
+        for model <- ["gpt-5.6-sol", "gpt-6-astra"] do
+          EyeInTheSky.Settings.put("default_model", model)
+          {:ok, view, _html} = mount_new_session_modal(conn)
+
+          assert has_element?(view, "#new-session-model-selector[data-selected-provider=codex]")
+          assert has_element?(view, ~s(input[name="agent_type"][value="codex"]))
+          assert has_element?(view, ~s(input[name="model"][value="#{model}"]))
+        end
+      after
+        EyeInTheSky.Settings.put("default_model", previous)
+      end
+    end
+
     test "renders with allow_provider_switch? true and the full cross-provider list" do
       html = render_new_session_modal(%{})
       assert html =~ ~s(data-allow-provider-switch="true")
@@ -165,9 +202,15 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
 
       view
       |> element("#new-session-model-selector")
-      |> render_hook("model_and_provider_selected", %{"provider" => "codex", "model" => "gpt-5.5"})
+      |> render_hook("model_and_provider_selected", %{
+        "provider" => "codex",
+        "model" => "gpt-6-astra"
+      })
 
-      assert render(view) =~ "GPT-5.5"
+      html = render(view)
+      assert html =~ "GPT-6-Astra"
+      assert html =~ ~s(name="agent_type" value="codex")
+      assert html =~ ~s(name="model" value="gpt-6-astra")
     end
 
     test "an invalid payload is rejected, previous selection is kept", %{conn: conn} do
@@ -181,6 +224,120 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       })
 
       refute render(view) =~ "not-a-real-model"
+    end
+  end
+
+  describe "provider-specific advanced options" do
+    test "renders Claude CLI fields by default" do
+      html = render_new_session_modal(%{})
+
+      assert html =~ "Permission Mode"
+      assert html =~ ~s(name="permission_mode")
+      assert html =~ ~s(name="max_turns")
+      assert html =~ "--mcp-config"
+      refute html =~ ~s(name="bypass_sandbox")
+    end
+
+    test "renders Codex CLI fields without Claude-only options", %{conn: conn} do
+      {:ok, view, _html} = mount_new_session_modal(conn)
+
+      view
+      |> element("#new-session-model-selector")
+      |> render_hook("model_and_provider_selected", %{
+        "provider" => "codex",
+        "model" => "gpt-6-astra"
+      })
+
+      html = render(view)
+
+      assert html =~ "Bypass approvals and sandbox"
+      assert html =~ ~s(name="bypass_sandbox")
+      assert html =~ ~s(name="sandbox")
+      assert html =~ ~s(value="workspace-write")
+      assert html =~ ~s(name="ask_for_approval")
+
+      refute html =~ "Permission Mode"
+      refute html =~ ~s(name="permission_mode")
+      refute html =~ ~s(name="max_turns")
+      refute html =~ "--mcp-config"
+      refute html =~ "--dangerously-skip-permissions"
+      refute html =~ "Chrome integration"
+    end
+
+    test "build_opts ignores Claude-only advanced params for Codex" do
+      opts =
+        AgentCreationHelpers.build_opts(
+          %{
+            "agent_type" => "codex",
+            "model" => "gpt-6-astra",
+            "permission_mode" => "bypassPermissions",
+            "max_turns" => "10",
+            "skip_permissions" => "true",
+            "chrome" => "true",
+            "mcp_config" => "./mcp.json",
+            "plugin_dir" => "./plugins",
+            "settings_file" => "./settings.json",
+            "sandbox" => "workspace-write",
+            "ask_for_approval" => "on-request",
+            "bypass_sandbox" => "false"
+          },
+          project_path: "/tmp/project",
+          description: "name",
+          instructions: "prompt"
+        )
+
+      assert opts[:agent_type] == "codex"
+      assert opts[:sandbox] == "workspace-write"
+      assert opts[:ask_for_approval] == "on-request"
+      assert opts[:bypass_sandbox] == false
+
+      refute Keyword.has_key?(opts, :permission_mode)
+      refute Keyword.has_key?(opts, :max_turns)
+      refute Keyword.has_key?(opts, :skip_permissions)
+      refute Keyword.has_key?(opts, :chrome)
+      refute Keyword.has_key?(opts, :mcp_config)
+      refute Keyword.has_key?(opts, :plugin_dir)
+      refute Keyword.has_key?(opts, :settings_file)
+    end
+  end
+
+  describe "update/2" do
+    test "merges parent updates while preserving open modal state" do
+      socket = %Phoenix.LiveView.Socket{
+        assigns: %{
+          __changed__: %{},
+          show: true,
+          toggle_event: "toggle_new_session",
+          submit_event: "create_session",
+          prompts: [],
+          projects: [%{id: 1, name: "Original Project"}],
+          current_project: nil,
+          available_agents: [{"local-agent", "Local Agent", :global}],
+          selected_model: "claude-sonnet-4-6",
+          selected_provider: "claude",
+          selected_prompt_id: "prompt-1",
+          prefill_text: "Existing prompt text",
+          file_uploads: %{agent_images: %{entries: [], ref: "old-ref"}}
+        }
+      }
+
+      new_uploads = %{agent_images: %{entries: [%{client_name: "shot.png"}], ref: "new-ref"}}
+
+      {:ok, result_socket} =
+        NewSessionModal.update(
+          %{
+            show: true,
+            button_text: "Launch from refresh",
+            current_project: %{id: 2, name: "Updated Project", path: "/tmp/updated"},
+            file_uploads: new_uploads
+          },
+          socket
+        )
+
+      assert result_socket.assigns.button_text == "Launch from refresh"
+      assert result_socket.assigns.current_project.id == 2
+      assert result_socket.assigns.available_agents == [{"local-agent", "Local Agent", :global}]
+      assert result_socket.assigns.file_uploads == new_uploads
     end
   end
 end

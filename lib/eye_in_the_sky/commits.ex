@@ -89,6 +89,24 @@ defmodule EyeInTheSky.Commits do
     |> Repo.insert(on_conflict: :nothing, conflict_target: [:session_id, :commit_hash])
   end
 
+  def get_commit_by_session_and_hash(session_id, commit_hash) do
+    Commit
+    |> where([c], c.session_id == ^session_id and c.commit_hash == ^commit_hash)
+    |> Repo.one()
+  end
+
+  def link_commit_to_task(commit_id, task_id)
+      when is_integer(commit_id) and is_integer(task_id) do
+    Repo.insert_all(
+      "commit_tasks",
+      [%{commit_id: commit_id, task_id: task_id}],
+      on_conflict: :nothing,
+      conflict_target: [:commit_id, :task_id]
+    )
+
+    :ok
+  end
+
   @doc """
   Full-text search across commit messages using ILIKE.
   Joins sessions to return session_uuid and session_name alongside each commit.

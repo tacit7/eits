@@ -119,8 +119,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.ContextTabTest do
           session_context: context
         )
 
-      assert html =~ "collapse"
-      assert html =~ "collapse-arrow"
+      assert html =~ "eits-disclosure"
+      assert html =~ "eits-disclosure__summary"
     end
 
     test "renders section with unique id based on index" do

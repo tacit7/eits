@@ -88,7 +88,7 @@ export const SlashCommandPopup = {
     this.popup.id = 'slash-command-popup'
     this.popup.className = [
       'absolute bottom-full left-0 right-0 mb-2',
-      'rounded-xl border border-base-content/10',
+      'rounded-box border border-base-content/10',
       'bg-base-100 shadow-xl overflow-hidden',
       'z-50 hidden'
     ].join(' ')
@@ -207,7 +207,7 @@ export const SlashCommandPopup = {
 
     if (entries.length === 0) {
       const empty = document.createElement('div')
-      empty.className = 'px-4 py-3 text-xs text-base-content/40 select-none text-center'
+      empty.className = 'px-4 py-3 text-mini text-base-content/40 select-none text-center'
       empty.textContent = 'No matching files'
       this.popup.appendChild(empty)
       this.slashOrdered = []
@@ -218,7 +218,7 @@ export const SlashCommandPopup = {
     }
 
     const header = document.createElement('div')
-    header.className = 'px-3 py-1 text-xs font-semibold uppercase tracking-wider text-base-content/40 bg-base-content/[0.02] sticky top-0'
+    header.className = 'px-3 py-1 text-mini font-semibold uppercase tracking-normal text-base-content/40 bg-base-content/[0.02] sticky top-0'
     header.textContent = 'Files'
     this.popup.appendChild(header)
 
@@ -231,7 +231,7 @@ export const SlashCommandPopup = {
       const row = document.createElement('button')
       row.type = 'button'
       row.dataset.slashIdx = idx
-      row.className = 'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors text-sm'
+      row.className = 'w-full flex items-center gap-3 px-3 py-2 text-left transition-colors text-message'
 
       const iconHtml = entry.is_dir
         ? '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-4 text-base-content/40 shrink-0"><path d="M2 6a2 2 0 0 1 2-2h5l2 2h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"/></svg>'
@@ -254,13 +254,13 @@ export const SlashCommandPopup = {
 
     if (truncated) {
       const footer = document.createElement('div')
-      footer.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 select-none'
+      footer.className = 'px-3 py-1.5 text-mini text-base-content/30 border-t border-base-content/5 select-none'
       footer.textContent = 'Showing first 50 — keep typing to narrow'
       this.popup.appendChild(footer)
     }
 
     const hint = document.createElement('div')
-    hint.className = 'px-3 py-1.5 text-xs text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
+    hint.className = 'px-3 py-1.5 text-mini text-base-content/30 border-t border-base-content/5 flex items-center gap-3 sticky bottom-0 bg-base-100'
     hint.innerHTML = '<kbd class="font-mono">↑↓</kbd> navigate &nbsp;<kbd class="font-mono">↵</kbd> or <kbd class="font-mono">Tab</kbd> select &nbsp;<kbd class="font-mono">Esc</kbd> dismiss'
     this.popup.appendChild(hint)
 

@@ -135,7 +135,8 @@ defmodule EyeInTheSky.Agents.AgentManager.RecordBuilder do
       git_worktree_path: worktree_path,
       started_at: DateTime.utc_now(),
       parent_agent_id: opts[:parent_agent_id],
-      parent_session_id: opts[:parent_session_id]
+      parent_session_id: opts[:parent_session_id],
+      managed_by_app: true
     }
 
     result =

@@ -30,87 +30,100 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
   def jobs_table(assigns) do
     ~H"""
     <%= if @jobs != [] do %>
-      <div class="mt-2 rounded-xl shadow-sm">
+      <div class="mt-2 rounded-box shadow-sm">
         <div class="divide-y divide-base-content/5">
-        <%= for job <- @jobs do %>
-          <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
-          <% selected? = @expanded_job_id == job.id %>
-          <div
-            id={"job-row-#{job.id}"}
-            class={[
-              "flex items-center gap-3 py-3 px-4 cursor-pointer relative group/row",
-              "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:ring-inset",
-              if(selected?, do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg", else: "bg-base-100 hover:bg-base-200/40")
-            ]}
-            phx-click="expand_job"
-            phx-value-id={job.id}
-            phx-target={@target}
-            role="button"
-            tabindex="0"
-            aria-label={job.name}
-          >
-            <%!-- Status icon: spinner when running, coloured dot otherwise --%>
-            <%= if job_state == :running do %>
-              <span class="loading loading-spinner loading-xs text-primary flex-shrink-0" />
-            <% else %>
-              <span class={[
-                "size-2 rounded-full flex-shrink-0",
-                case job_state do
-                  :healthy -> "bg-success"
-                  :failed -> "bg-error"
-                  _ -> "bg-base-content/20"
-                end
-              ]} />
-            <% end %>
-
-            <%!-- Main content --%>
-            <div class="flex-1 min-w-0">
-              <%!-- Line 1: name + type badge --%>
-              <div class="flex items-center gap-2">
+          <%= for job <- @jobs do %>
+            <% job_state = job_row_state(job, @running_ids, @last_run_map) %>
+            <% selected? = @expanded_job_id == job.id %>
+            <div
+              id={"job-row-#{job.id}"}
+              class={[
+                "flex items-center gap-3 py-3 px-4 cursor-pointer relative group/row",
+                "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:ring-inset",
+                if(selected?,
+                  do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-box",
+                  else: "bg-base-100 hover:bg-base-200/40"
+                )
+              ]}
+              phx-click="expand_job"
+              phx-value-id={job.id}
+              phx-target={@target}
+              role="button"
+              tabindex="0"
+              aria-label={job.name}
+            >
+              <%!-- Status icon: spinner when running, coloured dot otherwise --%>
+              <%= if job_state == :running do %>
+                <span class=" spinner spinner--xs text-primary flex-shrink-0" />
+              <% else %>
                 <span class={[
-                  "text-sm font-semibold truncate",
-                  if(selected?, do: "text-primary", else: "text-base-content/85")
-                ]}>
-                  {job.name}
-                </span>
-                <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">
-                  {type_label(job.job_type)}
-                </span>
-                <%= if is_nil(job.project_id) and @scope == "overview" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">global</span>
-                <% end %>
-                <%= if @show_origin and job.origin == "system" do %>
-                  <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/8 text-base-content/40 flex-shrink-0">system</span>
-                <% end %>
-              </div>
-              <%!-- Line 2: schedule · last run · next run --%>
-              <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/40 font-mono">
-                <span>{format_schedule(job)}</span>
-                <span class="text-base-content/20">·</span>
-                <%= if job.last_run_at do %>
-                  <span class={if job_state == :failed, do: "text-error/60"}>
-                    Last run {format_relative_time(job.last_run_at)}
-                  </span>
-                <% else %>
-                  <span class="text-base-content/25">Never run</span>
-                <% end %>
-                <%= if not is_nil(job.next_run_at) and job_state != :disabled do %>
-                  <span class="text-base-content/20">·</span>
-                  <span>Next {format_relative_time(job.next_run_at)}</span>
-                <% end %>
-              </div>
-            </div>
+                  "size-2 rounded-full flex-shrink-0",
+                  case job_state do
+                    :healthy -> "bg-success"
+                    :failed -> "bg-error"
+                    _ -> "bg-base-content/20"
+                  end
+                ]} />
+              <% end %>
 
-            <%!-- Status badge --%>
-            <%= if job_state == :running do %>
-              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-primary/15 text-primary flex-shrink-0">running</span>
-            <% end %>
-            <%= if job_state == :disabled do %>
-              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-base-content/10 text-base-content/50 flex-shrink-0">disabled</span>
-            <% end %>
-            <%= if job_state == :failed do %>
-              <span class="text-mini font-medium px-1.5 py-0.5 rounded bg-error/15 text-error flex-shrink-0">failed</span>
-            <% end %>
+              <%!-- Main content --%>
+              <div class="flex-1 min-w-0">
+                <%!-- Line 1: name + type badge --%>
+                <div class="flex items-center gap-2">
+                  <span class={[
+                    "text-message font-semibold truncate",
+                    if(selected?, do: "text-primary", else: "text-base-content/85")
+                  ]}>
+                    {job.name}
+                  </span>
+                  <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-base-content/8 text-base-content/40 flex-shrink-0">
+                    {type_label(job.job_type)}
+                  </span>
+                  <%= if is_nil(job.project_id) and @scope == "overview" do %>
+                    <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-base-content/8 text-base-content/40 flex-shrink-0">
+                      global
+                    </span>
+                  <% end %>
+                  <%= if @show_origin and job.origin == "system" do %>
+                    <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-base-content/8 text-base-content/40 flex-shrink-0">
+                      system
+                    </span>
+                  <% end %>
+                </div>
+                <%!-- Line 2: schedule · last run · next run --%>
+                <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/40 font-mono">
+                  <span>{format_schedule(job)}</span>
+                  <span class="text-base-content/20">·</span>
+                  <%= if job.last_run_at do %>
+                    <span class={if job_state == :failed, do: "text-error/60"}>
+                      Last run {format_relative_time(job.last_run_at)}
+                    </span>
+                  <% else %>
+                    <span class="text-base-content/25">Never run</span>
+                  <% end %>
+                  <%= if not is_nil(job.next_run_at) and job_state != :disabled do %>
+                    <span class="text-base-content/20">·</span>
+                    <span>Next {format_relative_time(job.next_run_at)}</span>
+                  <% end %>
+                </div>
+              </div>
+
+              <%!-- Status badge --%>
+              <%= if job_state == :running do %>
+                <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-primary/15 text-primary flex-shrink-0">
+                  running
+                </span>
+              <% end %>
+              <%= if job_state == :disabled do %>
+                <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-base-content/10 text-base-content/50 flex-shrink-0">
+                  disabled
+                </span>
+              <% end %>
+              <%= if job_state == :failed do %>
+                <span class="text-mini font-medium px-1.5 py-0.5 rounded-box bg-error/15 text-error flex-shrink-0">
+                  failed
+                </span>
+              <% end %>
 
               <%!-- Hover-reveal actions.
                    phx-click="noop" on wrapper intercepts click so the row's
@@ -121,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 phx-target={@target}
               >
                 <button
-                  class="flex items-center justify-center size-8 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
+                  class="flex items-center justify-center size-8 rounded-box text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
                   phx-click="run_now"
                   phx-value-id={job.id}
                   phx-target={@target}
@@ -132,7 +145,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                 </button>
                 <%= if job.origin != "system" do %>
                   <button
-                    class="flex items-center justify-center size-8 rounded text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
+                    class="flex items-center justify-center size-8 rounded-box text-base-content/40 hover:text-base-content/80 hover:bg-base-200/70 transition-colors"
                     phx-click="edit_job"
                     phx-value-id={job.id}
                     phx-target={@target}
@@ -142,7 +155,7 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     <.icon name="hero-pencil-square" class="size-3.5" />
                   </button>
                   <button
-                    class="flex items-center justify-center size-8 rounded text-error/40 hover:text-error hover:bg-error/10 transition-colors"
+                    class="flex items-center justify-center size-8 rounded-box text-error/40 hover:text-error hover:bg-error/10 transition-colors"
                     phx-click="delete_job"
                     phx-value-id={job.id}
                     phx-target={@target}
@@ -153,9 +166,9 @@ defmodule EyeInTheSkyWeb.Components.JobsTable do
                     <.icon name="hero-trash" class="size-3.5" />
                   </button>
                 <% end %>
+              </div>
             </div>
-          </div>
-        <% end %>
+          <% end %>
         </div>
       </div>
     <% else %>

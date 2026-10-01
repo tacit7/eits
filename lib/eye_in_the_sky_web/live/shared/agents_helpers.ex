@@ -230,9 +230,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.AgentsHelpers do
     end
   end
 
-  def source_badge_class(:agents), do: "bg-primary/10 text-primary/70"
-  def source_badge_class(:project_agents), do: "bg-secondary/10 text-secondary/70"
-  def source_badge_class(_), do: "bg-base-content/5 text-base-content/50"
+  def source_badge_class(:agents), do: "eits-chip--primary"
+  def source_badge_class(:project_agents), do: "eits-chip--secondary"
+  def source_badge_class(_), do: "eits-chip--muted"
 
   def source_label(:agents), do: "global"
   def source_label(:project_agents), do: "project"

@@ -76,12 +76,14 @@ defmodule EyeInTheSky.Claude.ChannelProtocol do
           sender_role: String.t(),
           body: String.t()
         }) :: String.t()
-  def build_prompt(%{
-        mode: mode,
-        channel: %{id: channel_id, name: channel_name},
-        sender: sender,
-        body: body
-      } = params) do
+  def build_prompt(
+        %{
+          mode: mode,
+          channel: %{id: channel_id, name: channel_name},
+          sender: sender,
+          body: body
+        } = params
+      ) do
     sender_role = Map.get(params, :sender_role, "agent")
     mode_str = Atom.to_string(mode)
 

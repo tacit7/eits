@@ -35,18 +35,18 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
   # Badge and display helpers
   # ---------------------------------------------------------------------------
 
-  def type_badge_class("spawn_agent"), do: "badge-primary"
-  def type_badge_class("mix_task"), do: "badge-accent"
-  def type_badge_class(_), do: "badge-ghost"
+  def type_badge_class("spawn_agent"), do: "eits-chip--primary"
+  def type_badge_class("mix_task"), do: "eits-chip--secondary"
+  def type_badge_class(_), do: "eits-chip--muted"
 
   def type_label("spawn_agent"), do: "Agent"
   def type_label("mix_task"), do: "Mix"
   def type_label(t), do: t
 
-  def status_badge_class("running"), do: "badge-info"
-  def status_badge_class("completed"), do: "badge-success"
-  def status_badge_class("failed"), do: "badge-error"
-  def status_badge_class(_), do: "badge-ghost"
+  def status_badge_class("running"), do: "eits-chip--info"
+  def status_badge_class("completed"), do: "eits-chip--success"
+  def status_badge_class("failed"), do: "eits-chip--error"
+  def status_badge_class(_), do: "eits-chip--muted"
 
   # Returns :disabled | :running | :failed | :healthy for a job row.
   def job_row_state(job, running_ids, last_run_map) do
@@ -57,11 +57,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.JobsFormatters do
       true -> :healthy
     end
   end
-
-  def row_border_class(:disabled), do: "border-l-4 border-base-content/20"
-  def row_border_class(:running), do: "border-l-4 border-warning"
-  def row_border_class(:failed), do: "border-l-4 border-error"
-  def row_border_class(:healthy), do: "border-l-4 border-success"
 
   def cfg(config, key) do
     case config do

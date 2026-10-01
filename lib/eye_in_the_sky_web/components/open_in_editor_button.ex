@@ -66,9 +66,9 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
 
     ~H"""
     <%= if @preferred && @active do %>
-      <div class="join">
+      <div class="flex items-center overflow-hidden rounded-box border border-base-content/10">
         <button
-          class="btn btn-ghost btn-xs join-item gap-1.5 min-h-[30px] h-[30px]"
+          class="eits-action eits-action--ghost h-[30px] min-h-0 gap-1.5 px-2"
           phx-click="open_in_editor"
           phx-value-editor={@preferred.id}
           phx-value-path={@path}
@@ -76,25 +76,25 @@ defmodule EyeInTheSkyWeb.Components.OpenInEditorButton do
           title={"Open in #{@preferred.label}"}
         >
           <.icon name="hero-arrow-top-right-on-square" class="size-3.5" />
-          <span class="text-xs font-normal">{@preferred.label}</span>
+          <span class="text-mini font-normal">{@preferred.label}</span>
         </button>
         <%= if @others != [] do %>
-          <div class="dropdown dropdown-end join-item">
+          <div class="relative  join-item">
             <button
               tabindex="0"
-              class="btn btn-ghost btn-xs join-item px-1 min-h-[30px] h-[30px] border-l border-base-content/10"
-              title="Open in…"
+              class="eits-action eits-action--ghost h-[30px] min-h-0 border-l border-base-content/10 px-1"
+              title="Open in..."
             >
               <.icon name="hero-chevron-down" class="size-3" />
             </button>
             <ul
               tabindex="0"
-              class="dropdown-content menu bg-base-200 border border-base-content/10 rounded-box z-50 w-40 shadow-lg p-1 mt-1"
+              class="eits-menu absolute eits-menu-list bg-base-200 border border-base-content/10 rounded-box z-50 w-40 shadow-lg p-1 mt-1"
             >
               <%= for ed <- @others do %>
                 <li>
                   <button
-                    class="text-xs"
+                    class="text-mini"
                     phx-click="open_in_editor"
                     phx-value-editor={ed.id}
                     phx-value-path={@path}

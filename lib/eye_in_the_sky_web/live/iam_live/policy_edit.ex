@@ -212,24 +212,24 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
     <div class="p-6 max-w-4xl mx-auto space-y-6">
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
       <div class="flex items-center gap-3">
-        <.link navigate={~p"/iam/policies"} class="btn btn-ghost btn-sm">
+        <.link navigate={~p"/iam/policies"} class="eits-action eits-action--ghost eits-action--icon">
           <.icon name="hero-arrow-left" class="size-4" />
         </.link>
         <.icon name="hero-pencil-square" class="size-6 text-primary" />
         <h1 class="text-2xl font-bold">Edit policy</h1>
         <%= if @system? do %>
-          <span class="badge badge-info gap-1">
+          <span class="eits-chip eits-chip--info gap-1">
             <.icon name="hero-lock-closed" class="size-3" /> system
           </span>
         <% end %>
       </div>
 
       <%= if @system? do %>
-        <div class="alert alert-warning">
+        <div class="eits-alert eits-alert--warning">
           <.icon name="hero-exclamation-triangle" class="size-5" />
           <div>
             <div class="font-semibold">This is a built-in system policy.</div>
-            <div class="text-sm">
+            <div class="text-message">
               Matcher fields are locked — you can only edit:
               <code class="font-mono">
                 {Enum.join(@policy.editable_fields || [], ", ")}
@@ -248,8 +248,8 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
       >
         <input type="hidden" name="condition_text" value={@condition_text} />
 
-        <section class="card bg-base-200">
-          <div class="card-body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
             <.input
               field={@form[:name]}
               type="text"
@@ -335,7 +335,7 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
           <%= if @system? do %>
             <button
               type="button"
-              class="btn btn-ghost btn-sm text-warning"
+              class="eits-action eits-action--warning gap-1.5"
               phx-click="reseed"
               data-confirm="Reset this policy to its seed defaults? All customizations (enabled, priority, condition, message) will be overwritten."
             >
@@ -349,16 +349,15 @@ defmodule EyeInTheSkyWeb.IAMLive.PolicyEdit do
       </.form>
 
       <%= if @matcher_source do %>
-        <details class="collapse collapse-arrow bg-base-200">
-          <summary class="collapse-title font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
-            <.icon name="hero-code-bracket" class="size-4 text-primary" />
-            Matcher source
-            <code class="font-mono text-xs text-base-content/60 ml-1">
+        <details class="eits-disclosure  bg-base-200">
+          <summary class="eits-disclosure__summary font-semibold flex items-center gap-2 min-h-0 py-3 px-4">
+            <.icon name="hero-code-bracket" class="size-4 text-primary" /> Matcher source
+            <code class="font-mono text-mini text-base-content/60 ml-1">
               {@policy.builtin_matcher}.ex
             </code>
           </summary>
-          <div class="collapse-content px-0 pb-0">
-            <pre class="overflow-x-auto text-xs font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
+          <div class="eits-disclosure__content px-0 pb-0">
+            <pre class="overflow-x-auto text-mini font-mono leading-relaxed p-4 bg-base-300 rounded-b-box max-h-[32rem] overflow-y-auto"><code>{@matcher_source}</code></pre>
           </div>
         </details>
       <% end %>

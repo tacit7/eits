@@ -51,7 +51,7 @@ defmodule EyeInTheSkyWeb.DmLive.TimerTest do
     |> render_submit()
 
     html = render(view)
-    refute html =~ "modal-open"
+    refute html =~ "eits-modal-open"
     assert html =~ "hero-clock"
   after
     OrchestratorTimers.cancel(session.id)

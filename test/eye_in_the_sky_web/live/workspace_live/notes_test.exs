@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.NotesTest do
     test "renders workspace content", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/workspace/notes")
 
-      assert html =~ "Workspace notes view — coming soon."
+      assert html =~ "Workspace notes view | coming soon."
     end
   end
 end

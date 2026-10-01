@@ -78,7 +78,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
         <%= if @project do %>
-          <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
+          <.link
+            navigate={~p"/projects/#{@project.id}/prompts"}
+            class="eits-action eits-action--ghost gap-2"
+          >
             <.icon name="hero-arrow-left" class="size-4" /> Back to Prompts
           </.link>
         <% end %>
@@ -89,7 +92,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
           <h1 class="text-2xl font-semibold leading-6 text-base-content">
             New Prompt
           </h1>
-          <p class="mt-2 text-sm text-base-content/70">
+          <p class="mt-2 text-message text-base-content/70">
             Create a reusable prompt template for subagents
             <%= if @project do %>
               in <span class="font-medium">{@project.name}</span>
@@ -102,9 +105,9 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
         for={@form}
         phx-change="validate"
         phx-submit="save"
-        class="card bg-base-100 shadow-xl max-w-3xl"
+        class="eits-panel bg-base-100 shadow-xl max-w-3xl"
       >
-        <div class="card-body gap-4">
+        <div class="eits-panel__body gap-4">
           <div class="form-control">
             <label class="label">
               <span class="label-text font-semibold">Name <span class="text-error">*</span></span>
@@ -148,19 +151,22 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptNew do
               field={@form[:prompt_text]}
               type="textarea"
               rows="20"
-              class="font-mono text-sm"
+              class="font-mono text-message"
               placeholder="Write the prompt instructions here..."
               phx-debounce="blur"
             />
           </div>
 
-          <div class="card-actions justify-end mt-2">
+          <div class="eits-panel__actions justify-end mt-2">
             <%= if @project do %>
-              <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost">
+              <.link
+                navigate={~p"/projects/#{@project.id}/prompts"}
+                class="eits-action eits-action--ghost"
+              >
                 Cancel
               </.link>
             <% end %>
-            <button type="submit" class="btn btn-primary">
+            <button type="submit" class="eits-action eits-action--primary gap-1.5">
               <.icon name="hero-check" class="size-4" /> Create Prompt
             </button>
           </div>

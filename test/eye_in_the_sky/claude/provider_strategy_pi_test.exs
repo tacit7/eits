@@ -23,7 +23,9 @@ defmodule EyeInTheSky.Claude.ProviderStrategyPiTest do
     }
 
     opts =
-      EyeInTheSky.Claude.ProviderStrategy.Pi.build_opts(state, %{model: "openrouter/qwen/qwen3-coder"})
+      EyeInTheSky.Claude.ProviderStrategy.Pi.build_opts(state, %{
+        model: "openrouter/qwen/qwen3-coder"
+      })
 
     assert opts[:session_id] == "conv-uuid-1"
     assert opts[:model] == "openrouter/qwen/qwen3-coder"

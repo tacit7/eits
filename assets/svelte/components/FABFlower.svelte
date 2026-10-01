@@ -82,23 +82,23 @@
 
   function getStatusBadgeClass(status) {
     switch(status) {
-      case 'active': return 'badge-success'
-      case 'idle': return 'badge-info'
-      case 'working': return 'badge-warning'
-      default: return 'badge-ghost'
+      case 'active': return 'eits-chip--success'
+      case 'idle': return 'eits-chip--info'
+      case 'working': return 'eits-chip--warning'
+      default: return 'eits-chip--muted'
     }
   }
 </script>
 
-<!-- DaisyUI FAB with Flower Layout -->
+<!-- FAB with flower layout -->
 <div class="fab fab-flower" class:opacity-50={bookmarkedAgents.length === 0}>
   <div
     tabindex="0"
     role="button"
     aria-label="Bookmarked agents"
-    class="btn btn-lg btn-circle"
-    class:btn-primary={bookmarkedAgents.length > 0}
-    class:btn-disabled={bookmarkedAgents.length === 0}
+    class="eits-action eits-action--icon rounded-full"
+    class:eits-action--primary={bookmarkedAgents.length > 0}
+    class:pointer-events-none={bookmarkedAgents.length === 0}
     on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click() } }}
   >
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
@@ -107,50 +107,54 @@
     </svg>
 
     {#if bookmarkedAgents.length > 0}
-      <span class="badge badge-sm badge-error absolute top-0 right-0">{bookmarkedAgents.length}</span>
+      <span class="eits-chip eits-chip--error absolute top-0 right-0">{bookmarkedAgents.length}</span>
     {/if}
   </div>
 
   <!-- Agent Buttons -->
   {#each bookmarkedAgents as agent (agent.session_id)}
     <button
-      class="btn btn-circle btn-sm relative"
+      class="eits-action eits-action--icon relative rounded-full"
       on:click={() => handleAgentClick(agent)}
       title={agent.name || agent.session_id}
     >
-      <span class="font-bold text-xs">{getAgentInitials(agent.name)}</span>
-      <span class="badge {getStatusBadgeClass(agent.status)} badge-xs absolute -bottom-1 -right-1"></span>
+      <span class="font-bold text-nano">{getAgentInitials(agent.name)}</span>
+      <span class="eits-chip {getStatusBadgeClass(agent.status)} absolute -bottom-1 -right-1"></span>
     </button>
   {/each}
 </div>
 
-<!-- DaisyUI Modal for Chat -->
-<dialog bind:this={chatDialog} class="modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
-  <div class="modal-box max-w-lg">
+<!-- Modal for chat -->
+<dialog bind:this={chatDialog} class="eits-modal" aria-labelledby="fab-chat-modal-title" on:close={closeChatModal}>
+  <div class="eits-dialog max-w-lg">
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
         <h3 id="fab-chat-modal-title" class="font-bold text-lg">{selectedAgent?.name || 'Agent'}</h3>
         {#if selectedAgent}
-          <span class="badge badge-sm badge-outline font-mono">{selectedAgent.session_id.substring(0, 8)}</span>
+          <span class="eits-chip eits-chip--neutral eits-chip--mono">{selectedAgent.session_id.substring(0, 8)}</span>
         {/if}
       </div>
-      <button class="btn btn-sm btn-circle btn-ghost" aria-label="Close" on:click={closeChatModal}>✕</button>
+      <button class="eits-action eits-action--ghost eits-action--icon rounded-full" aria-label="Close" on:click={closeChatModal}>
+        <svg xmlns="http://www.w3.org/2000/svg" class="size-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+        </svg>
+      </button>
     </div>
 
       <!-- Messages Area -->
-      <div class="bg-base-200 rounded-lg p-4 h-96 overflow-y-auto mb-4">
+      <div class="bg-base-200 rounded-box p-4 h-96 overflow-y-auto mb-4">
         {#if messages.length === 0}
           <div class="text-center text-base-content/50 py-8">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
             </svg>
-            <p class="text-sm">No messages yet. Start a conversation!</p>
+            <p class="text-message">No messages yet. Start a conversation!</p>
           </div>
         {:else}
           <div class="space-y-0">
             {#each messages as message (message.inserted_at + message.sender_role)}
-              <div class="group py-2 px-1 rounded-lg hover:bg-base-content/[0.02] transition-colors">
+              <div class="group py-2 px-1 rounded-box hover:bg-base-content/[0.02] transition-colors">
                 <div class="flex items-start gap-2">
                   {#if message.sender_role === 'user'}
                     <div class="w-3.5 h-3.5 rounded-full mt-1 flex-shrink-0 bg-success/20 flex items-center justify-center">
@@ -162,10 +166,10 @@
                     </div>
                   {/if}
                   <div class="min-w-0 flex-1">
-                    <span class="text-[11px] font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'} mr-1.5">
+                    <span class="text-mini font-semibold {message.sender_role === 'user' ? 'text-base-content/60' : 'text-primary/70'} mr-1.5">
                       {message.sender_role === 'user' ? 'You' : 'Agent'}
                     </span>
-                    <p class="text-sm leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
+                    <p class="text-message leading-relaxed text-base-content/85 whitespace-pre-wrap break-words mt-0.5">{message.body}</p>
                   </div>
                 </div>
               </div>
@@ -178,19 +182,19 @@
       <form on:submit|preventDefault={handleSubmit} class="flex gap-2">
         <input
           type="text"
-          class="input input-bordered flex-1"
+          class="input input-bordered flex-1 text-message"
           placeholder="Send message to agent..."
           bind:value={inputValue}
           autocomplete="off"
         />
-        <button type="submit" class="btn btn-primary" disabled={!inputValue.trim()} aria-label="Send">
+        <button type="submit" class="eits-action eits-action--primary" disabled={!inputValue.trim()} aria-label="Send">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
             <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
           </svg>
         </button>
       </form>
     </div>
-    <form method="dialog" class="modal-backdrop">
+    <form method="dialog" class="eits-modal-backdrop">
       <button>close</button>
     </form>
 </dialog>

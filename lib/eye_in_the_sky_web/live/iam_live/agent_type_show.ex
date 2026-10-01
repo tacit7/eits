@@ -153,7 +153,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       <.iam_offline_banner hooks_status={@iam_hooks_status} />
 
       <%!-- Breadcrumb --%>
-      <div class="flex items-center gap-2 text-sm text-base-content/60">
+      <div class="flex items-center gap-2 text-message text-base-content/60">
         <.link navigate={~p"/iam/agent-types"} class="hover:text-base-content/85 transition-colors">
           Agent Types
         </.link>
@@ -170,7 +170,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
 
         <.link
           navigate={~p"/iam/simulator?agent_type=#{@agent_type}"}
-          class="btn btn-ghost btn-sm"
+          class="eits-action eits-action--ghost gap-1.5"
         >
           <.icon name="hero-beaker" class="size-4" /> Test in simulator
         </.link>
@@ -190,31 +190,31 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       </div>
 
       <%!-- Attached documents --%>
-      <section class="card bg-base-200">
-        <div class="card-body p-4 space-y-3">
-          <h2 class="card-title text-base">Attached documents</h2>
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-4 space-y-3">
+          <h2 class="eits-panel__title text-message">Attached documents</h2>
 
           <%= if @attached_docs == [] do %>
-            <p class="text-sm text-base-content/50 py-2">No documents attached yet.</p>
+            <p class="text-message text-base-content/50 py-2">No documents attached yet.</p>
           <% end %>
 
           <div class="space-y-2">
             <%= for doc <- @attached_docs do %>
               <div
                 id={"attached-doc-#{doc.id}"}
-                class="flex items-center justify-between gap-3 p-3 bg-base-100 rounded-lg border border-base-content/10"
+                class="flex items-center justify-between gap-3 p-3 bg-base-100 rounded-box border border-base-content/10"
               >
                 <div class="flex-1 min-w-0">
                   <.link navigate={~p"/iam/documents/#{doc.id}"} class="font-medium link link-hover">
                     {doc.name}
                   </.link>
                   <%= if doc.description do %>
-                    <p class="text-xs text-base-content/55 mt-0.5 truncate">{doc.description}</p>
+                    <p class="text-mini text-base-content/55 mt-0.5 truncate">{doc.description}</p>
                   <% end %>
                 </div>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs text-error"
+                  class="eits-action eits-action--danger h-7 min-h-0 gap-1 px-2"
                   phx-click="detach_document"
                   phx-value-doc_id={doc.id}
                   data-confirm={"Remove \"#{doc.name}\" from #{@agent_type}?"}
@@ -228,22 +228,22 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
       </section>
 
       <%!-- Attach document --%>
-      <section class="card bg-base-200">
-        <div class="card-body p-4 space-y-3">
-          <h2 class="card-title text-base">Attach document</h2>
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-4 space-y-3">
+          <h2 class="eits-panel__title text-message">Attach document</h2>
 
           <%= if @available_documents == [] do %>
-            <p class="text-sm text-base-content/50">All documents are already attached.</p>
+            <p class="text-message text-base-content/50">All documents are already attached.</p>
           <% else %>
             <div class="flex items-end gap-2">
               <label class="form-control flex-1">
-                <span class="label-text text-xs">Document</span>
+                <span class="label-text text-mini">Document</span>
                 <select
                   class="select select-bordered select-sm"
                   phx-change="select_attach_doc"
                   name="doc_id"
                 >
-                  <option value="">— select —</option>
+                  <option value="">- select -</option>
                   <%= for doc <- @available_documents do %>
                     <option value={doc.id} selected={@attach_doc_id == doc.id}>
                       {doc.name}
@@ -253,7 +253,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypeShow do
               </label>
               <button
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="eits-action eits-action--primary"
                 phx-click="attach_document"
                 disabled={is_nil(@attach_doc_id)}
               >

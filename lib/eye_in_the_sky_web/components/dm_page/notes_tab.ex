@@ -21,7 +21,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           <button
             type="button"
             phx-click="open_create_note_modal"
-            class="btn btn-primary btn-sm mt-4"
+            class="eits-action eits-action--primary mt-4 gap-1.5"
           >
             <.icon name="hero-plus" class="size-4" /> Create Note
           </button>
@@ -31,22 +31,22 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
           <button
             type="button"
             phx-click="open_create_note_modal"
-            class="btn btn-primary btn-sm self-start"
+            class="eits-action eits-action--primary self-start gap-1.5"
           >
             <.icon name="hero-plus" class="size-4" /> Create Note
           </button>
 
           <div
-            class="space-y-1 bg-base-200 rounded-xl shadow-sm p-4"
+            class="space-y-1 bg-base-200 rounded-box shadow-sm p-4"
             id="dm-note-list"
           >
             <%= for note <- @notes do %>
               <div
-                class="collapse collapse-arrow rounded-lg border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
+                class="eits-disclosure  rounded-box border border-base-content/5 bg-base-200 hover:border-base-content/10 transition-colors"
                 id={"dm-note-#{note.id}"}
               >
                 <input type="checkbox" />
-                <div class="collapse-title py-3 px-4 min-h-0">
+                <div class="eits-disclosure__summary py-3 px-4 min-h-0">
                   <div class="flex items-center gap-3">
                     <%!-- Star button --%>
                     <button
@@ -63,7 +63,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                     </button>
                     <%!-- Title + meta --%>
                     <div class="flex-1 min-w-0">
-                      <h3 class="text-[13px] font-semibold text-base-content/85 truncate">
+                      <h3 class="text-message font-semibold text-base-content/85 truncate">
                         {note.title || extract_title(note.body)}
                       </h3>
                       <div class="flex items-center gap-1.5 mt-0.5 text-mini text-base-content/30">
@@ -96,11 +96,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.NotesTab do
                   </div>
                 </div>
 
-                <div class="collapse-content px-4 pb-4">
+                <div class="eits-disclosure__content px-4 pb-4">
                   <div class="pl-[30px]">
                     <div
                       id={"note-body-#{note.id}"}
-                      class="dm-markdown text-sm text-base-content/70 leading-relaxed"
+                      class="dm-markdown text-message text-base-content/70 leading-relaxed"
                       phx-hook="MarkdownMessage"
                       data-raw-body={note.body}
                     >

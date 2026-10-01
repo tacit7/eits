@@ -12,6 +12,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_refresh_usage(params, socket) do
     _ = params
+
     {:noreply,
      socket
      |> assign(:flyout_usage, nil)
@@ -36,7 +37,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   end
 
   @doc """
-  Toggles the flyout panel (rail collapse). Fired by the vsbar toggle button,
+  Toggles the flyout panel (rail disclosure). Fired by the vsbar toggle button,
   the hover chevron on the rail divider, and double-click on the divider —
   one state, three affordances. Persisted via the RailState hook's
   save_rail_state localStorage patch.
@@ -48,16 +49,6 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
      socket
      |> assign(:flyout_open, open)
      |> Phoenix.LiveView.push_event("save_rail_state", %{flyout_open: open})}
-  end
-
-  def handle_toggle_proj_picker(params, socket) do
-    _ = params
-    {:noreply, assign(socket, :proj_picker_open, !socket.assigns.proj_picker_open)}
-  end
-
-  def handle_close_proj_picker(params, socket) do
-    _ = params
-    {:noreply, assign(socket, :proj_picker_open, false)}
   end
 
   def handle_open_mobile(params, socket) do
@@ -77,7 +68,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_show_more_project_sessions(%{"project_id" => pid_str}, socket) do
     case parse_int(pid_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       pid ->
         current = Map.get(socket.assigns.session_project_visible, pid, 5)
 
@@ -92,7 +85,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_toggle_project_sessions(%{"project_id" => pid_str}, socket) do
     case parse_int(pid_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       pid ->
         collapsed = socket.assigns.session_project_collapsed
 
@@ -118,7 +113,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_open_task_detail(%{"task_id" => task_id_str}, socket) do
     case parse_int(task_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       task_id ->
         tasks = socket.assigns.flyout_tasks
         index = Enum.find_index(tasks, &(&1.id == task_id)) || 0
@@ -135,7 +132,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   def handle_open_note_detail(%{"note_id" => note_id_str}, socket) do
     case parse_int(note_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       note_id ->
         notes = socket.assigns.flyout_notes
         index = Enum.find_index(notes, &(&1.id == note_id)) || 0
@@ -210,17 +209,41 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
   # corrupted localStorage entry never crashes the LiveComponent.
 
   defp maybe_restore_project(socket, %{"project_id" => id}) when not is_nil(id) do
-    # Only restore when the parent LiveView hasn't already set a project.
-    # update/2 runs before the hook fires, so a route-scoped project wins.
-    if is_nil(socket.assigns.sidebar_project) do
-      ProjectActions.handle_restore_project(to_string(id), socket)
-      |> then(fn {:noreply, s} -> s end)
-    else
-      socket
+    current_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    case parse_int(to_string(id)) do
+      nil ->
+        socket
+
+      ^current_id ->
+        socket
+
+      project_id ->
+        ProjectActions.handle_restore_project(to_string(project_id), socket)
+        |> then(fn {:noreply, restored_socket} ->
+          maybe_navigate_to_restored_project(restored_socket, current_id, project_id)
+        end)
     end
   end
 
   defp maybe_restore_project(socket, _), do: socket
+
+  defp maybe_navigate_to_restored_project(socket, nil, _project_id), do: socket
+
+  defp maybe_navigate_to_restored_project(socket, _current_id, project_id) do
+    restored_id = get_in(socket.assigns, [:sidebar_project, Access.key(:id)])
+
+    if restored_id == project_id do
+      sidebar_tab = socket.assigns[:sidebar_tab] || :sessions
+
+      case ProjectActions.project_path(project_id, sidebar_tab) do
+        nil -> socket
+        path -> push_navigate(socket, to: path)
+      end
+    else
+      socket
+    end
+  end
 
   defp maybe_restore_section(socket, %{"section" => section}) when is_binary(section) do
     assign(socket, :active_section, Loader.parse_section(section))
@@ -316,7 +339,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailStateActions do
 
   # Re-fetch flyout content for the restored section so the panel isn't empty
   # after live navigation. Mirrors the loader pipeline in open_section/2 but
-  # without resetting session_scope / proj_picker_open / etc. — we preserve
+  # without resetting session_scope or other restored filters — we preserve
   # whatever state was already restored from localStorage. Skipped entirely
   # when the flyout is collapsed (no visible content to populate).
   defp reload_section_content(socket) do

@@ -16,10 +16,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
         <input
           type="text"
           value={@prompt_search}
-          placeholder="Search prompts…"
+          placeholder="Search prompts..."
           phx-keyup="update_prompt_search"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="w-full pl-6 pr-2 py-1 text-mini bg-base-content/5 border border-base-content/10 rounded-box focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
         />
       </div>
 
@@ -43,7 +43,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
     <.prompt_row :for={p <- @prompts} prompt={p} sidebar_project={@sidebar_project} />
     <%= if @prompts == [] do %>
       <% filtering = @prompt_search != "" or @prompt_scope != "all" %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">
         {if filtering, do: "No matching prompts", else: "No prompts"}
       </div>
     <% end %>
@@ -61,7 +61,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
     <.link
       navigate={@href}
       data-vim-flyout-item
-      class="flex flex-col gap-0.5 px-3 py-2 text-xs text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="flex flex-col gap-0.5 px-3 py-2 text-mini text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded-box"
     >
       <div class="flex items-center gap-1.5 min-w-0">
         <.icon name="hero-document-text" class="size-3 flex-shrink-0 text-base-content/30" />
@@ -102,7 +102,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.PromptsSection do
       phx-click="set_prompt_scope"
       phx-value-scope={@value}
       class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
+        "text-nano px-1.5 py-0.5 rounded-box transition-colors",
         if(active,
           do: "bg-primary/15 text-primary font-medium",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"

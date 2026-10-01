@@ -26,7 +26,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
     ~H"""
     <div>
       <div class="flex items-center gap-2 mb-2">
-        <span class="text-mini font-medium text-base-content/40 uppercase tracking-wider">
+        <span class="text-mini font-medium text-base-content/40 uppercase tracking-normal">
           Checklist
         </span>
         <%= if @total > 0 do %>
@@ -55,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
               phx-target={@myself}
             />
             <span class={[
-              "text-sm flex-1",
+              "text-message flex-1",
               item.completed && "line-through text-base-content/40"
             ]}>
               {item.title}
@@ -78,11 +78,12 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
           type="text"
           name="title"
           placeholder="Add item..."
-          class="input input-xs flex-1 bg-base-200 border-base-300 text-base placeholder:text-base-content/20 focus:border-primary/30"
+          class="input input-xs flex-1 bg-base-200 border-base-300 text-message placeholder:text-base-content/20 focus:border-primary/30"
         />
         <button
           type="submit"
-          class="btn btn-xs btn-ghost text-base-content/30 hover:text-base-content/60"
+          class="eits-action eits-action--ghost eits-action--icon !min-h-8 !min-w-8"
+          aria-label="Add checklist item"
         >
           <.icon name="hero-plus-mini" class="size-3.5" />
         </button>
@@ -101,7 +102,11 @@ defmodule EyeInTheSkyWeb.Components.TaskChecklistComponent do
           items = Tasks.list_checklist_items(task.id)
           next_position = if items == [], do: 0, else: length(items)
 
-          case Tasks.create_checklist_item(%{task_id: task.id, title: title, position: next_position}) do
+          case Tasks.create_checklist_item(%{
+                 task_id: task.id,
+                 title: title,
+                 position: next_position
+               }) do
             {:ok, _} ->
               updated_task = Tasks.get_task!(task.id)
               send(self(), {:checklist_updated, updated_task})

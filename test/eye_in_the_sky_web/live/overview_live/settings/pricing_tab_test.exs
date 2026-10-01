@@ -33,7 +33,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.PricingTabTest do
 
     test "renders within a card element" do
       html = render_tab()
-      assert html =~ "card"
+      assert html =~ "eits-panel"
       assert html =~ "bg-base-100"
     end
   end

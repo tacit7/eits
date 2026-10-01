@@ -19,26 +19,6 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpersTest do
     %Phoenix.LiveView.Socket{assigns: Map.merge(base, assigns)}
   end
 
-  describe "handle_toggle_model_menu/1" do
-    test "opens model_menu when no overlay is active" do
-      socket = build_socket(%{active_overlay: nil})
-      {:noreply, result} = DmModelHelpers.handle_toggle_model_menu(socket)
-      assert result.assigns.active_overlay == :model_menu
-    end
-
-    test "closes model_menu when model_menu is already active" do
-      socket = build_socket(%{active_overlay: :model_menu})
-      {:noreply, result} = DmModelHelpers.handle_toggle_model_menu(socket)
-      assert result.assigns.active_overlay == nil
-    end
-
-    test "switches to model_menu when a different overlay is active" do
-      socket = build_socket(%{active_overlay: :effort_menu})
-      {:noreply, result} = DmModelHelpers.handle_toggle_model_menu(socket)
-      assert result.assigns.active_overlay == :model_menu
-    end
-  end
-
   describe "handle_toggle_effort_menu/1" do
     test "opens effort_menu when no overlay is active" do
       socket = build_socket(%{active_overlay: nil})

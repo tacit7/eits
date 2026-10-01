@@ -57,26 +57,44 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActions do
   def handle_remove_agent(socket, %{"session_id" => session_id_str}) do
     channel_id = socket.assigns.active_channel_id
 
-    with session_id when not is_nil(session_id) <- ControllerHelpers.parse_int(session_id_str),
-         {:ok, session} <- Sessions.get_session(session_id) do
-      Channels.remove_member(channel_id, session_id)
-
-      broadcast_system_event(
-        channel_id,
-        "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
-      )
-
-      Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
-      {:noreply, refresh_members_and_picker(socket)}
-    else
+    case ControllerHelpers.parse_int(session_id_str) do
       nil ->
         {:noreply, put_flash(socket, :error, "Invalid session ID format")}
 
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "Session not found")}
+      session_id ->
+        case Sessions.get_session(session_id) do
+          {:ok, session} ->
+            Channels.remove_member(channel_id, session_id)
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Failed to remove agent from channel")}
+            broadcast_system_event(
+              channel_id,
+              "Agent @#{session_id} (#{session.name || "unnamed"}) left the channel"
+            )
+
+            Logger.info("Removed agent session=#{session_id} from channel=#{channel_id}")
+            {:noreply, refresh_members_and_picker(socket)}
+
+          {:error, :not_found} ->
+            case Channels.remove_member(channel_id, session_id) do
+              {removed_count, _} when removed_count > 0 ->
+                broadcast_system_event(
+                  channel_id,
+                  "Agent @#{session_id} (missing session) left the channel"
+                )
+
+                Logger.info(
+                  "Removed stale agent session=#{session_id} from channel=#{channel_id}"
+                )
+
+                {:noreply, refresh_members_and_picker(socket)}
+
+              _ ->
+                {:noreply, put_flash(socket, :error, "Session not found")}
+            end
+
+          {:error, _} ->
+            {:noreply, put_flash(socket, :error, "Failed to remove agent from channel")}
+        end
     end
   end
 

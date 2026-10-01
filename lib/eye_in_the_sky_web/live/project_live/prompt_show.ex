@@ -120,7 +120,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
     <div class="px-4 sm:px-6 lg:px-8">
       <div class="mb-6">
         <%= if @project do %>
-          <.link navigate={~p"/projects/#{@project.id}/prompts"} class="btn btn-ghost btn-sm gap-2">
+          <.link
+            navigate={~p"/projects/#{@project.id}/prompts"}
+            class="eits-action eits-action--ghost gap-2"
+          >
             <.icon name="hero-arrow-left" class="size-4" /> Back to Prompts
           </.link>
         <% end %>
@@ -134,15 +137,15 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
                 {@prompt.name}
               </h1>
               <%= if is_nil(@prompt.project_id) do %>
-                <span class="badge badge-primary">Global</span>
+                <span class="eits-chip eits-chip--primary">Global</span>
               <% else %>
-                <span class="badge badge-secondary">Project</span>
+                <span class="eits-chip eits-chip--secondary">Project</span>
               <% end %>
-              <span class="badge badge-ghost">v{@prompt.version}</span>
+              <span class="eits-chip eits-chip--muted">v{@prompt.version}</span>
             </div>
 
             <%= if @prompt.description do %>
-              <p class="mt-2 text-sm text-base-content/70">
+              <p class="mt-2 text-message text-base-content/70">
                 {@prompt.description}
               </p>
             <% end %>
@@ -150,16 +153,16 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
 
           <div class="mt-4 sm:mt-0 flex items-center gap-2">
             <%= if @editing do %>
-              <button phx-click="cancel_edit" class="btn btn-ghost btn-sm">
+              <button phx-click="cancel_edit" class="eits-action eits-action--ghost">
                 Cancel
               </button>
             <% else %>
-              <button phx-click="edit" class="btn btn-primary btn-sm">
+              <button phx-click="edit" class="eits-action eits-action--primary gap-1.5">
                 <.icon name="hero-pencil-square" class="size-4" /> Edit
               </button>
               <button
                 phx-click="delete"
-                class="btn btn-error btn-sm"
+                class="eits-action eits-action--destructive gap-1.5"
                 data-confirm="Are you sure you want to deactivate this prompt?"
               >
                 <.icon name="hero-trash" class="size-4" /> Deactivate
@@ -169,33 +172,33 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
-              <div class="text-xs text-base-content/50 uppercase font-semibold">Slug</div>
-              <code class="text-sm font-mono mt-1">{@prompt.slug}</code>
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
+              <div class="text-mini text-base-content/50 uppercase font-semibold">Slug</div>
+              <code class="text-message font-mono mt-1">{@prompt.slug}</code>
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
-              <div class="text-xs text-base-content/50 uppercase font-semibold">Version</div>
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
+              <div class="text-mini text-base-content/50 uppercase font-semibold">Version</div>
               <div class="text-lg font-semibold mt-1">v{@prompt.version}</div>
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
-              <div class="text-xs text-base-content/50 uppercase font-semibold">Created</div>
-              <div class="text-sm mt-1" title={format_datetime_full(@prompt.created_at)}>
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
+              <div class="text-mini text-base-content/50 uppercase font-semibold">Created</div>
+              <div class="text-message mt-1" title={format_datetime_full(@prompt.created_at)}>
                 {relative_time(@prompt.created_at)}
               </div>
             </div>
           </div>
 
-          <div class="card bg-base-200">
-            <div class="card-body p-4">
-              <div class="text-xs text-base-content/50 uppercase font-semibold">Updated</div>
-              <div class="text-sm mt-1" title={format_datetime_full(@prompt.updated_at)}>
+          <div class="eits-panel bg-base-200">
+            <div class="eits-panel__body p-4">
+              <div class="text-mini text-base-content/50 uppercase font-semibold">Updated</div>
+              <div class="text-message mt-1" title={format_datetime_full(@prompt.updated_at)}>
                 {relative_time(@prompt.updated_at)}
               </div>
             </div>
@@ -207,10 +210,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
             for={@form}
             phx-change="validate"
             phx-submit="save"
-            class="card bg-base-100 shadow-xl"
+            class="eits-panel bg-base-100 shadow-xl"
           >
-            <div class="card-body">
-              <h2 class="card-title text-lg">Edit Prompt</h2>
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Edit Prompt</h2>
 
               <div class="form-control mt-4">
                 <label class="label">
@@ -241,20 +244,20 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
                   field={@form[:prompt_text]}
                   type="textarea"
                   rows="20"
-                  class="font-mono text-sm"
+                  class="font-mono text-message"
                   phx-debounce="blur"
                 />
               </div>
 
-              <div class="card-actions justify-end mt-6">
+              <div class="eits-panel__actions justify-end mt-6">
                 <.form_actions submit_text="Save Changes" cancel_event="cancel_edit" />
               </div>
             </div>
           </.form>
         <% else %>
-          <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-              <h2 class="card-title text-lg">Prompt Text</h2>
+          <div class="eits-panel bg-base-100 shadow-xl">
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Prompt Text</h2>
               <div class="mockup-code mt-4">
                 <pre class="px-6 py-4 whitespace-pre-wrap break-words"><code>{@prompt.prompt_text}</code></pre>
               </div>
@@ -263,32 +266,34 @@ defmodule EyeInTheSkyWeb.ProjectLive.PromptShow do
         <% end %>
 
         <%= if @prompt.tags || @prompt.created_by || @prompt.project_id do %>
-          <div class="card bg-base-100 shadow-xl mt-6">
-            <div class="card-body">
-              <h2 class="card-title text-lg">Additional Information</h2>
+          <div class="eits-panel bg-base-100 shadow-xl mt-6">
+            <div class="eits-panel__body">
+              <h2 class="eits-panel__title text-lg">Additional Information</h2>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-4">
                 <%= if @prompt.tags do %>
                   <div>
-                    <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">Tags</div>
-                    <div class="text-sm">{@prompt.tags}</div>
+                    <div class="text-mini text-base-content/50 uppercase font-semibold mb-2">
+                      Tags
+                    </div>
+                    <div class="text-message">{@prompt.tags}</div>
                   </div>
                 <% end %>
 
                 <%= if @prompt.created_by do %>
                   <div>
-                    <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
+                    <div class="text-mini text-base-content/50 uppercase font-semibold mb-2">
                       Created By
                     </div>
-                    <div class="text-sm">{@prompt.created_by}</div>
+                    <div class="text-message">{@prompt.created_by}</div>
                   </div>
                 <% end %>
 
                 <%= if @prompt.project_id do %>
                   <div>
-                    <div class="text-xs text-base-content/50 uppercase font-semibold mb-2">
+                    <div class="text-mini text-base-content/50 uppercase font-semibold mb-2">
                       Project ID
                     </div>
-                    <div class="text-sm font-mono">{@prompt.project_id}</div>
+                    <div class="text-message font-mono">{@prompt.project_id}</div>
                   </div>
                 <% end %>
               </div>

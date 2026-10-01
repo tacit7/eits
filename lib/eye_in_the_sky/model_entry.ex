@@ -8,8 +8,16 @@ defmodule EyeInTheSky.ModelEntry do
   badge — it does not mean "this is the only model that costs money."
   """
 
-  defstruct [:provider, :slug, :label, :group, :sub_provider,
-             premium?: false, legacy?: false, default?: false]
+  defstruct [
+    :provider,
+    :slug,
+    :label,
+    :group,
+    :sub_provider,
+    premium?: false,
+    legacy?: false,
+    default?: false
+  ]
 
   @type t :: %__MODULE__{
           provider: String.t(),

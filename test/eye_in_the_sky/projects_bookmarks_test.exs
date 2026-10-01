@@ -3,13 +3,27 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
 
   alias EyeInTheSky.Projects
   alias EyeInTheSky.Projects.Project
+  alias EyeInTheSky.Workspaces
 
-  defp create_project(name) do
+  defp create_workspace do
+    user = EyeInTheSky.Factory.user_fixture()
+    Workspaces.default_workspace_for_user!(user)
+  end
+
+  defp create_project(name, workspace_id \\ nil) do
+    attrs = %{
+      name: name,
+      path: "/tmp/#{name}-#{System.unique_integer([:positive])}"
+    }
+
+    attrs =
+      case workspace_id do
+        nil -> attrs
+        workspace_id -> Map.put(attrs, :workspace_id, workspace_id)
+      end
+
     {:ok, project} =
-      Projects.create_project(%{
-        name: name,
-        path: "/tmp/#{name}-#{System.unique_integer([:positive])}"
-      })
+      Projects.create_project(attrs)
 
     project
   end
@@ -44,6 +58,45 @@ defmodule EyeInTheSky.ProjectsBookmarksTest do
 
     test "returns error for unknown id" do
       assert {:error, :not_found} = Projects.set_bookmarked(999_999, true)
+    end
+  end
+
+  describe "get_project_for_workspace/2" do
+    test "returns a project in the requested workspace" do
+      workspace = create_workspace()
+      project = create_project("workspace", workspace.id)
+
+      assert {:ok, found} = Projects.get_project_for_workspace(project.id, workspace.id)
+      assert found.id == project.id
+      assert found.workspace_id == workspace.id
+    end
+
+    test "treats foreign workspace projects as not found" do
+      workspace = create_workspace()
+      foreign_workspace = create_workspace()
+      project = create_project("foreign", foreign_workspace.id)
+
+      assert {:error, :not_found} = Projects.get_project_for_workspace(project.id, workspace.id)
+    end
+
+    test "treats missing projects as not found" do
+      workspace = create_workspace()
+
+      assert {:error, :not_found} =
+               Projects.get_project_for_workspace(999_999, workspace.id)
+    end
+
+    test "accepts string ids for project and workspace lookups" do
+      workspace = create_workspace()
+      project = create_project("string-id", workspace.id)
+
+      assert {:ok, found} = Projects.get_project_for_workspace("#{project.id}", workspace.id)
+      assert found.id == project.id
+
+      assert {:ok, found_again} =
+               Projects.get_project_for_workspace(project.id, "#{workspace.id}")
+
+      assert found_again.id == project.id
     end
   end
 

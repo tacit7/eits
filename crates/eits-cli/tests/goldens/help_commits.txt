@@ -1,6 +1,6 @@
 Commit tracking queries and mutations
 
-Usage: eitsr commits [OPTIONS] <COMMAND>
+Usage: eits commits [OPTIONS] <COMMAND>
 
 Commands:
   list    List tracked commits (session-scoped by default)

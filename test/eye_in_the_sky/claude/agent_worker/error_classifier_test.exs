@@ -3,6 +3,27 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
 
   alias EyeInTheSky.Claude.AgentWorker.ErrorClassifier
 
+  describe "provider process exits" do
+    test "unexplained non-zero exits are terminal and have a persistent reason" do
+      for code <- [1, 2, 42, 127, 137, 255] do
+        reason = EyeInTheSky.SDK.MessageHandler.default_exit_reason(code)
+
+        assert reason == {:exit_code, code}
+        assert ErrorClassifier.classify(reason) == :cli_exit_error
+        assert ErrorClassifier.systemic?(reason)
+        assert ErrorClassifier.status_reason(reason) == "cli_exit_error"
+      end
+    end
+
+    test "timeouts and malformed exit tuples retain the fallback policy" do
+      for reason <- [:timeout, {:exit_code, 0}, {:exit_code, "1"}, {:exit_code, nil}] do
+        assert ErrorClassifier.classify(reason) == :transient
+        refute ErrorClassifier.systemic?(reason)
+        assert ErrorClassifier.status_reason(reason) == nil
+      end
+    end
+  end
+
   describe "systemic?/1 — atom-tagged billing/auth errors" do
     test "billing_error tuple is systemic" do
       assert ErrorClassifier.systemic?({:billing_error, "Credit balance is too low"})
@@ -201,7 +222,11 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
     end
 
     test "auth -> :authentication_error" do
-      for msg <- ["HTTP 401 authentication_error", "invalid api key provided", "HTTP 403 forbidden"] do
+      for msg <- [
+            "HTTP 401 authentication_error",
+            "invalid api key provided",
+            "HTTP 403 forbidden"
+          ] do
         assert ErrorClassifier.classify({:pi_turn_error, msg}) == :authentication_error
       end
     end
@@ -222,6 +247,44 @@ defmodule EyeInTheSky.Claude.AgentWorker.ErrorClassifierTest do
 
     test "unrecognized pi error -> :transient" do
       assert ErrorClassifier.classify({:pi_turn_error, "connection reset by peer"}) == :transient
+    end
+  end
+
+  describe "codex error content mapping" do
+    test "structured Codex CLI exits stay terminal" do
+      payload = %{
+        "type" => "cli_exit_error",
+        "status" => 1,
+        "message" => "Codex process exited with status 1. Provider output: connection reset"
+      }
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :cli_exit_error
+      assert ErrorClassifier.systemic?({:codex_error, payload})
+      assert ErrorClassifier.status_reason({:codex_error, payload}) == "cli_exit_error"
+    end
+
+    test "unsupported ChatGPT account model is model_not_found and systemic" do
+      payload =
+        Jason.encode!(%{
+          "type" => "error",
+          "status" => 400,
+          "error" => %{
+            "type" => "invalid_request_error",
+            "message" =>
+              "The 'gpt-5.2' model is not supported when using Codex with a ChatGPT account."
+          }
+        })
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :model_not_found
+      assert ErrorClassifier.systemic?({:codex_error, payload})
+      assert ErrorClassifier.status_reason({:codex_error, payload}) == "model_not_found"
+    end
+
+    test "codex rate limits stay retryable" do
+      payload = %{"type" => "error", "status" => 429, "message" => "rate limit exceeded"}
+
+      assert ErrorClassifier.classify({:codex_error, payload}) == :rate_limit_error
+      refute ErrorClassifier.systemic?({:codex_error, payload})
     end
   end
 

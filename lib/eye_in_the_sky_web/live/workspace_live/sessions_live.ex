@@ -29,7 +29,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
 
     socket =
       socket
-      |> assign(:page_title, "#{workspace.name} — Sessions")
+      |> assign(:page_title, "#{workspace.name} / Sessions")
       |> assign(:projects, projects)
       |> assign(:show_new_session_drawer, false)
       |> assign(:visible_count, @page_size)
@@ -85,7 +85,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         </div>
         <button
           phx-click="toggle_new_session_drawer"
-          class="btn btn-primary btn-sm gap-2"
+          class="focus-ring inline-flex min-h-[44px] items-center justify-center gap-2 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
         >
           <.icon name="hero-plus-mini" class="size-4" /> New Agent
         </button>
@@ -112,7 +112,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         class="py-4 flex justify-center"
       >
         <%= if @has_more do %>
-          <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+          <span class=" spinner spinner--sm text-base-content/30"></span>
         <% end %>
       </div>
 
@@ -122,6 +122,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Sessions do
         show={@show_new_session_drawer}
         projects={@projects}
         current_project={nil}
+        workspace_id={@workspace.id}
         toggle_event="toggle_new_session_drawer"
         submit_event="create_new_session"
         title="New Agent"

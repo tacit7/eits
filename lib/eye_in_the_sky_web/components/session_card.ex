@@ -53,7 +53,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       class={[
         "relative group/row",
         if(@selected,
-          do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-lg",
+          do: "bg-primary/5 ring-1 ring-primary/20 ring-inset rounded-box",
           else: "bg-base-100"
         )
       ]}
@@ -90,7 +90,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       <%!-- Row content --%>
       <div
         class={[
-          "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-lg cursor-pointer relative",
+          "flex items-center gap-4 py-3 pr-2 -mx-2 rounded-box cursor-pointer relative",
           "[&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50",
           if(@select_mode, do: "pl-10 sm:pl-2", else: "pl-2")
         ]}
@@ -133,7 +133,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
                   type="text"
                   name="name"
                   value={@session.name || ""}
-                  class="input input-xs w-full text-[13px] font-medium border-primary/40 focus:border-primary bg-base-100 text-base"
+                  class="input input-xs w-full text-message font-medium border-primary/40 focus:border-primary bg-base-100 text-message"
                   phx-keyup="cancel_rename"
                   phx-key="Escape"
                   phx-blur="cancel_rename"
@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
                 />
               </form>
             <% else %>
-              <span class="text-sm font-semibold text-base-content/85 truncate">
+              <span class="text-message font-semibold text-base-content/85 truncate">
                 {@session.name ||
                   truncate_text(session_agent_description(@session)) ||
                   "Unnamed session"}
@@ -240,6 +240,7 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
       "failed_rate_limit" -> :failed_rate_limit
       "failed_timeout" -> :failed_timeout
       "failed_retry_exhausted" -> :failed_retry_exhausted
+      "failed_model" -> :failed_model
       _ -> :idle
     end
   end
@@ -253,13 +254,31 @@ defmodule EyeInTheSkyWeb.Components.SessionCard do
         %{label: "Waiting", border: "border-warning", class: "text-warning"}
 
       "compacting" ->
-        %{label: "Compacting", border: "border-orange-500", class: "text-orange-500"}
+        %{label: "Compacting", border: "border-warning", class: "text-warning"}
 
       "idle" ->
         %{label: "Idle", border: "border-transparent", class: "text-base-content/50"}
 
       "completed" ->
         %{label: "Done", border: "border-transparent", class: "text-base-content/50"}
+
+      status when status in ["failed", "failed_retry_exhausted"] ->
+        %{label: "Failed", border: "border-error", class: "text-error"}
+
+      "failed_billing" ->
+        %{label: "Billing", border: "border-error", class: "text-error"}
+
+      "failed_auth" ->
+        %{label: "Auth", border: "border-error", class: "text-error"}
+
+      "failed_rate_limit" ->
+        %{label: "Rate limited", border: "border-error", class: "text-error"}
+
+      "failed_timeout" ->
+        %{label: "Timed out", border: "border-error", class: "text-error"}
+
+      "failed_model" ->
+        %{label: "Model not found", border: "border-error", class: "text-error"}
 
       _ ->
         %{label: "Idle", border: "border-transparent", class: "text-base-content/55"}

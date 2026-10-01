@@ -28,6 +28,20 @@ defmodule EyeInTheSky.Codex.CLITest do
       assert "--json" in args
       refute nil in args
     end
+
+    test "injects app-spawned ENTRYPOINT into shell environment policy" do
+      args = CLI.build_args(prompt: "x")
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(shell_environment_policy.set.ENTRYPOINT="cli")]))
+    end
+
+    test "entrypoint opt overrides shell environment policy default" do
+      args = CLI.build_args(prompt: "x", entrypoint: "custom")
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(shell_environment_policy.set.ENTRYPOINT="custom")]))
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -46,6 +60,15 @@ defmodule EyeInTheSky.Codex.CLITest do
       args = CLI.build_args(prompt: "x", model: nil)
       refute "-m" in args
     end
+
+    test "rewrites ChatGPT-account unsupported gpt-5.2 to the Codex model slug" do
+      args = CLI.build_args(prompt: "x", model: "gpt-5.2")
+      idx = Enum.find_index(args, &(&1 == "-m"))
+
+      assert idx != nil
+      assert Enum.at(args, idx + 1) == "gpt-5.2-codex"
+      refute "gpt-5.2" in args
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -59,14 +82,46 @@ defmodule EyeInTheSky.Codex.CLITest do
       refute "--full-auto" in args
     end
 
-    test "full_auto: true with bypass_sandbox: false includes --full-auto" do
+    test "full_auto: true uses current CLI sandbox and approval equivalents" do
       args = CLI.build_args(prompt: "x", full_auto: true, bypass_sandbox: false)
-      assert "--full-auto" in args
+      refute "--full-auto" in args
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "workspace-write"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
+    end
+
+    test "disabling bypass without explicit modes keeps the legacy full-auto default" do
+      args = CLI.build_args(prompt: "x", bypass_sandbox: false)
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "workspace-write"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
     end
 
     test "full_auto: false with bypass_sandbox: false omits --full-auto" do
       args = CLI.build_args(prompt: "x", full_auto: false, bypass_sandbox: false)
       refute "--full-auto" in args
+    end
+
+    test "explicit sandbox and approval settings reach codex exec" do
+      args =
+        CLI.build_args(
+          prompt: "x",
+          bypass_sandbox: false,
+          sandbox: "read-only",
+          ask_for_approval: "on-request"
+        )
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["--sandbox", "read-only"]))
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(approval_policy="on-request")]))
     end
   end
 
@@ -85,6 +140,21 @@ defmodule EyeInTheSky.Codex.CLITest do
     test "no resume omits resume subcommand" do
       args = CLI.build_args(prompt: "x")
       refute "resume" in args
+    end
+
+    test "resume uses config override instead of unsupported --sandbox flag" do
+      args =
+        CLI.build_args(
+          prompt: "continue",
+          resume: "thread-abc-123",
+          bypass_sandbox: false,
+          sandbox: "workspace-write"
+        )
+
+      refute "--sandbox" in args
+
+      assert Enum.chunk_every(args, 2, 1, :discard)
+             |> Enum.any?(&(&1 == ["-c", ~s(sandbox_mode="workspace-write")]))
     end
   end
 

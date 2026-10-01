@@ -34,10 +34,10 @@ export function parseDateLike(v) {
  * @returns {string} - Formatted relative time
  */
 export function relativeFrom(date) {
-  if (!date) return "—"
+  if (!date) return "-"
 
   const parsed = parseDateLike(date)
-  if (!parsed) return "—"
+  if (!parsed) return "-"
 
   const secs = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000))
   const m = Math.floor(secs / 60)
@@ -55,10 +55,10 @@ export function relativeFrom(date) {
  * @returns {string} - Formatted elapsed time
  */
 export function elapsedTime(date) {
-  if (!date) return "—"
+  if (!date) return "-"
 
   const parsed = parseDateLike(date)
-  if (!parsed) return "—"
+  if (!parsed) return "-"
 
   const secs = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000))
   const m = Math.floor(secs / 60)
@@ -76,10 +76,10 @@ export function elapsedTime(date) {
  * @returns {string} - Formatted short date
  */
 export function formatDateShort(date) {
-  if (!date) return "—"
+  if (!date) return "-"
 
   const parsed = parseDateLike(date)
-  if (!parsed) return "—"
+  if (!parsed) return "-"
 
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
   return `${months[parsed.getMonth()]} ${parsed.getDate()}`
@@ -115,10 +115,10 @@ export function shortId(id, length = 8) {
  * @returns {string} - Formatted time (HH:MM)
  */
 export function formatTime(timestamp) {
-  if (!timestamp) return '—'
+  if (!timestamp) return '-'
 
   const parsed = parseDateLike(timestamp)
-  if (!parsed) return '—'
+  if (!parsed) return '-'
 
   return parsed.toLocaleTimeString(undefined, {
     hour: '2-digit',

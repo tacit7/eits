@@ -174,7 +174,7 @@ Install these globally to `~/.claude/skills/` for use across any project:
 | `eits-chat` | *(auto)* | Handles `eits-chat:` messages from the web UI. Parses channel/message, sends response via `i-chat-send`. |
 | `doc-search` | `/doc-search <query>` | Full-text search across emdash-indexed documentation libraries. |
 | `i-compact` | `/i-compact` | Handle context compaction: ends old session, starts fresh one. |
-| `i-end-session` | `/i-end-session` | Gracefully end the current EITS session. |
+| `eits-end-session` | `/eits-end-session` | Gracefully end the current EITS session. |
 | `gitea` | `/gitea` | Gitea PR and repo workflow. |
 
 ### Registering a skill in EITS (DM autocomplete)

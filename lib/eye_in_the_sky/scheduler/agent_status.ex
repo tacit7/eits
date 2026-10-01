@@ -24,6 +24,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
   @one_hour_ago 60 * 60
   @one_day_ago 24 * 60 * 60
   @thirty_minutes 30 * 60
+  @five_days 5 * 24 * 60 * 60
 
   def start_link(_opts) do
     GenServer.start_link(__MODULE__, nil, name: __MODULE__)
@@ -120,10 +121,11 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     DateTime.diff(now, created_at) < @one_hour_ago
   end
 
-  # Archive sessions that are idle, older than 30 min, and have no active tasks.
+  # Archive app-managed sessions that are idle, older than 5 days, and have no active tasks.
+  # Terminal-owned sessions are process-external; an idle terminal turn is not an app worker to reclaim.
   defp archive_dead_idle_sessions do
     now = DateTime.utc_now()
-    cutoff = DateTime.add(now, -@thirty_minutes, :second)
+    cutoff = DateTime.add(now, -@five_days, :second)
 
     # Preload agents in one batch — eliminates one get_agent/1 SELECT per idle session.
     idle_sessions =
@@ -169,7 +171,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
     |> MapSet.new()
   end
 
-  # Sessions stuck in 'working' with no heartbeat for >30 minutes are zombies.
+  # App-managed sessions stuck in 'working' with no heartbeat for >30 minutes are zombies.
   # Their AgentWorker died without firing on_sdk_errored or on_session_failed.
   # Sweep them to 'failed' so the UI reflects reality.
   # Also mark the linked agent as failed to ensure UI status filters are correct.
@@ -183,6 +185,7 @@ defmodule EyeInTheSky.Scheduler.AgentStatus do
         left_join: a in Agent,
         on: a.id == s.agent_id,
         where: s.status == "working",
+        where: s.managed_by_app == true,
         where:
           (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
             (is_nil(s.last_activity_at) and not is_nil(s.started_at) and s.started_at < ^cutoff),

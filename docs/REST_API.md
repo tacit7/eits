@@ -44,6 +44,9 @@ Register a new session. Creates a ChatAgent (chat identity) and Agent (execution
 | `model` | string | no | Model identifier, e.g. `claude-sonnet-4-5-20250929` |
 | `provider` | string | no | AI provider. Defaults to `"claude"` |
 | `worktree_path` | string | no | Git worktree path |
+| `entrypoint` | string | no | Runtime entrypoint marker. `cli` marks the session terminal-owned unless `managed_by_app=true` or `process_owner=app` is also sent |
+| `managed_by_app` | boolean | no | Whether Phoenix may start/resume an app worker for this session. Defaults to `false` for `entrypoint=cli`, otherwise `true` |
+| `process_owner` | string | no | Optional alias for ownership: `"terminal"` sets `managed_by_app=false`, `"app"` sets `managed_by_app=true` |
 
 **Response:** `201 Created`
 
@@ -88,9 +91,16 @@ When transitioning away from `waiting` status (e.g., to `working`, `completed`, 
 |-------|------|----------|-------------|
 | `status` | string | no | One of: `working`, `idle`, `waiting`, `completed`, `failed` |
 | `status_reason` | string | no | One of: `nil`, `"session_ended"`, `"sdk_completed"`, `"zombie_swept"`, `"billing_error"`, `"authentication_error"`, `"rate_limit_error"`, `"watchdog_timeout"`, `"retry_exhausted"`. Auto-cleared when transitioning away from waiting. Error values are normally set by the AgentWorker on systemic failure, not by API clients — they drive the red failure-tier badges in the session UI |
+| `entrypoint` | string | no | Runtime entrypoint marker. `cli` marks the session terminal-owned unless ownership is explicitly overridden |
+| `managed_by_app` | boolean | no | Whether Phoenix may start/resume an app worker for this session |
+| `process_owner` | string | no | Optional alias for ownership: `"terminal"` or `"app"` |
 | `ended_at` | string | no | ISO 8601 timestamp. Auto-set for completed/failed |
 | `read_only` | boolean | no | Session intent: `true` for read-only (review mode), `false` for work mode |
 | `worktree_path` | string | no | Absolute path to the git worktree for this session. Stored as `git_worktree_path` in DB. Set by agents after `git worktree add` |
+| `model` | string | no | Raw model string as reported by the Claude CLI (e.g. `"claude-opus-4-5"`). |
+| `model_name` | string | no | Structured model name — authoritative field for display and filtering (e.g. `"claude-opus-4-5"`). |
+| `model_provider` | string | no | Model provider identifier (e.g. `"anthropic"`, `"openai"`). |
+| `model_version` | string | no | Model version string (e.g. `"20250929"`). |
 
 **Response:** `200 OK`
 
@@ -227,7 +237,7 @@ curl -X POST localhost:5001/api/v1/sessions/abc-123/waiting \
 
 ### POST /api/v1/sessions/:uuid/end
 
-End a session with optional final status. Implements the i-end-session MCP tool.
+End a session with optional final status. Implements the eits-end-session MCP tool.
 
 Accepts integer session ID or UUID string. Sets `status` to the provided `final_status` (default: `"completed"`) and `ended_at=now` if the status is a terminal state.
 
@@ -291,6 +301,7 @@ Fetch session detail with related resources (tasks, notes, commits).
   "name": "fix auth bug",
   "description": "fixing the oauth flow",
   "is_spawned": true,
+  "managed_by_app": true,
   "initialized": true,
   "worktree_path": "/path/to/project/.claude/worktrees/fix-auth-bug",
   "branch_name": "worktree-fix-auth-bug",
@@ -344,7 +355,7 @@ curl localhost:5001/api/v1/sessions/42 \
 
 ### GET /api/v1/sessions/:id/worker
 
-Check AgentWorker liveness for a session. Returns the alive status, last activity timestamp, and whether the worker is hung (stale).
+Check AgentWorker liveness for a session. Returns the worker state, handler/CLI port health, last activity timestamp, and whether the worker is hung (stale).
 
 **URL params:**
 
@@ -357,6 +368,17 @@ Check AgentWorker liveness for a session. Returns the alive status, last activit
 ```json
 {
   "alive": true,
+  "provider": "claude",
+  "status": "running",
+  "processing": true,
+  "handler_alive": true,
+  "sdk_active": true,
+  "port_alive": true,
+  "port_type": "port",
+  "os_pid": 12345,
+  "current_job_active": true,
+  "current_job_id": 987654321,
+  "queue_depth": 0,
   "last_activity_at": "2026-05-06T19:30:45Z",
   "hung": false
 }
@@ -364,6 +386,17 @@ Check AgentWorker liveness for a session. Returns the alive status, last activit
 
 **Fields:**
 - `alive` — Boolean indicating whether the AgentWorker process is registered and running
+- `provider` — Provider for the worker (`claude`, `codex`, or `pi`); `null` when no worker is registered
+- `status` — AgentWorker internal status (`idle`, `running`, `retry_wait`, or `failed`); `null` when no worker is registered
+- `processing` — Boolean indicating whether the AgentWorker currently believes an SDK run is active
+- `handler_alive` — Boolean indicating whether the SDK output handler process is alive
+- `sdk_active` — Boolean indicating whether the AgentWorker has an active SDK reference
+- `port_alive` — Boolean indicating whether the active SDK Port, or test PID, is still alive
+- `port_type` — `"port"` for real CLI subprocess ports, `"pid"` for test doubles, or `null`
+- `os_pid` — Operating-system process ID for the CLI Port when available; `null` when absent or when the backing object is not a Port
+- `current_job_active` — Boolean indicating whether the worker has an in-flight job
+- `current_job_id` — Current in-flight AgentWorker job ID when assigned; may be `null` for immediate jobs, idle workers, or missing workers
+- `queue_depth` — Count of queued prompts waiting behind the current job
 - `last_activity_at` — ISO 8601 timestamp of the last recorded session activity; `null` if no activity recorded
 - `hung` — Boolean indicating whether the worker is stale (alive but with no activity in the last 10 minutes)
 
@@ -709,7 +742,7 @@ List commits for a session or agent with optional filtering.
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `session_id` | string | no | Session UUID to list commits for |
-| `agent_id` | string | no | Agent UUID to list commits for |
+| `agent_id` | string | no | Agent integer ID or UUID to list commits for |
 | `limit` | integer | no | Max results (default 20, max 100) |
 | `since_hash` | string | no | Return only commits newer than this hash; includes `since_hash_found` in response |
 
@@ -746,17 +779,24 @@ curl localhost:5001/api/v1/commits?session_id=abc-123&since_hash=a1b2c3
 
 ### POST /commits
 
-Track one or more git commits. Looks up the Agent by UUID to get the integer `session_id` FK.
+Track one or more git commits. When `session_id` is present it is used as the authoritative commit target; otherwise the latest session for `agent_id` is used (backwards-compatible fallback).
 
 **Request body:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `agent_id` | string | yes | Agent UUID |
+| `session_id` | string \| integer | no | Session UUID or integer ID — authoritative target when present |
+| `agent_id` | string \| integer | no* | Agent integer ID or UUID — required when `session_id` is absent |
 | `commit_hashes` | string[] | yes | List of commit hashes |
 | `commit_messages` | string[] | no | Parallel list of commit messages |
+| `task_ids` | (string\|integer)[] | no | Task integer IDs or UUIDs to link each commit to via the `commit_tasks` join table. Must be a list if provided. |
 
-**Response:** `201 Created` (or `207 Multi-Status` if some duplicates)
+\* At least one of `session_id` or `agent_id` must be provided. If both are omitted the request fails with `400 "session_id or agent_id is required"`.
+
+**Response:** `201 Created` or `207 Multi-Status`
+
+- `201 Created` — all commits were inserted successfully **and** `link_errors` is empty.
+- `207 Multi-Status` — at least one commit hash was a duplicate/error **or** at least one task-link failed.
 
 Distinguishes created commits from duplicates. Duplicate hashes (detected via `on_conflict: :nothing`) are returned separately with `status: "duplicate"`.
 
@@ -769,9 +809,14 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
     {"commit_hash": "existing123", "status": "duplicate"}
   ],
   "errors": [],
+  "link_errors": [],
   "already_tracked": false
 }
 ```
+
+`link_errors` contains one entry per failed task link. Each entry is either:
+- `{"commit_hash": "<hash>", "error": "commit not found for task linkage"}` — the commit hash could not be found after insertion
+- `{"task_id": "<id>", "error": "task not found"}` — the provided task ID did not resolve to a known task
 
 `already_tracked` is `true` when all submitted hashes were duplicates (i.e. `duplicates` is non-empty and both `commits` and `errors` are empty). Lets callers detect the already-tracked case without inspecting array lengths.
 
@@ -780,16 +825,42 @@ Distinguishes created commits from duplicates. Duplicate hashes (detected via `o
   "commits": [],
   "duplicates": [{"commit_hash": "abc123", "status": "duplicate"}],
   "errors": [],
+  "link_errors": [],
   "already_tracked": true
 }
 ```
 
-**Example:**
+**Error responses:**
+
+| Status | Condition |
+|--------|-----------|
+| `400` | Neither `session_id` nor `agent_id` provided |
+| `400` | `task_ids` is not a list |
+| `404` | `session_id` provided but resolves to no session |
+| `404` | `agent_id` provided but agent not found or has no session |
+
+**Example — via agent_id (legacy):**
 
 ```bash
 curl -X POST localhost:5001/api/v1/commits \
   -H 'Content-Type: application/json' \
   -d '{"agent_id":"abc-123","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
+```
+
+**Example — via session_id (preferred):**
+
+```bash
+curl -X POST localhost:5001/api/v1/commits \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"d475b275-d827-40de-9748-5f2335c38be2","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"]}'
+```
+
+**Example — with task linkage:**
+
+```bash
+curl -X POST localhost:5001/api/v1/commits \
+  -H 'Content-Type: application/json' \
+  -d '{"session_id":"d475b275-d827-40de-9748-5f2335c38be2","commit_hashes":["a1b2c3"],"commit_messages":["fix auth bug"],"task_ids":[42,99]}'
 ```
 
 ---
@@ -1017,6 +1088,11 @@ All errors return JSON with an `error` field and optional `details`:
 {"error": "session_id is required"}
 ```
 
+**403 Forbidden** - Workspace scope violation (see below):
+```json
+{"error": "Access denied"}
+```
+
 **404 Not Found** - Entity lookup failed:
 ```json
 {"error": "Agent not found"}
@@ -1035,6 +1111,55 @@ Controllers can return errors in these formats, which FallbackController handles
 - `{:error, status, reason}` — Custom HTTP status with reason (e.g. `{:error, :unauthorized, "Invalid token"}`)
 - `{:error, status}` — Custom HTTP status with status atom as error message (e.g. `{:error, :forbidden}` → `{"error": "forbidden"}`)
 - `{:error, changeset}` — 422 Unprocessable Entity with changeset errors
+
+---
+
+## Workspace Scope Enforcement
+
+Project-scoped API routes enforce **workspace isolation** via `EyeInTheSkyWeb.Api.V1.ProjectScope`. When a `project_id` parameter is supplied to an affected endpoint, the server validates that the requested project belongs to the same workspace as the calling session before proceeding.
+
+**How scope is resolved (in priority order):**
+
+1. `session_id` query/body param → resolved to a session record
+2. `agent_id` query/body param → resolved to that agent's most-recent session
+3. `x-eits-session` request header → resolved to a session record
+4. No session context → **bearer-only** mode; workspace check is skipped
+
+**Validation rules:**
+
+- `project_id` absent or `nil` → no workspace check; request proceeds normally
+- Bearer-only (no session context) → no workspace check; request proceeds
+- Calling session has no project → `403 Forbidden` (session must be scoped to a project to access project-specific data cross-workspace)
+- Both projects share the same `workspace_id` → `200/201` as normal
+- Projects belong to different workspaces → `403 Forbidden`
+- `project_id` not found → `404 Not Found`
+
+**Affected endpoints** (those that accept `project_id`):
+
+| Endpoint | Effect |
+|----------|--------|
+| `GET /api/v1/agents` | Filters agent list to workspace-matching project |
+| `GET /api/v1/channels` | Lists channels for workspace-matching project only |
+| `POST /api/v1/channels` | Validates project before channel creation |
+| `GET /api/v1/jobs` | Filters jobs to workspace-matching project |
+| `POST /api/v1/jobs` | Validates project before job creation |
+| `GET /api/v1/notes` | Filters notes to workspace-matching project |
+| `GET /api/v1/prompts` | Filters prompts to workspace-matching project |
+| `POST /api/v1/prompts` | Validates project before prompt creation |
+| `GET /api/v1/tasks` | Filters tasks to workspace-matching project |
+| `POST /api/v1/tasks` | Validates project before task creation |
+
+**Error responses:**
+
+```json
+{ "error": "Access denied" }
+```
+`403 Forbidden` — `project_id` was provided, but it belongs to a different workspace than the calling session's project. No data is returned.
+
+```json
+{ "error": "not_found" }
+```
+`404 Not Found` — the `project_id` does not exist.
 
 ## PubSub Topics
 
@@ -1282,6 +1407,23 @@ broadcast lands or the timeout elapses; no DB polling loop.
 | `session` or `session_id` | string or integer | yes | Recipient session ID (UUID or integer) |
 | `since` | string | no | ISO 8601 datetime; only a DM with `inserted_at` after this counts as new. Omit to also match any DM already sitting unread in the inbox. |
 | `timeout` | integer | no | Seconds to block for (default 25, capped at 55 — keep comfortably under typical HTTP client/proxy read timeouts) |
+| `watch` | string | no | Set to `"true"` to opt into ordered, reconnecting watch mode (see below). Requires `since` and honors `after_id`. |
+| `after_id` | string or integer | no | Only used when `watch=true`. Message ID cursor — returns the next message where `inserted_at > since`, or `inserted_at == since and id > after_id`. Defaults to `"0"`. |
+
+**Watch mode (`watch=true`):** an opt-in cursor-based variant of the same
+endpoint for callers that need to reconnect after a drop without losing or
+duplicating messages — e.g. a CLI `dm watch` loop. Instead of matching on
+`inserted_at` alone, it matches on the compound cursor
+`(since, after_id)`, breaking ties on `id` when two messages share the same
+timestamp. A broadcast wakeup always re-queries committed rows via the
+cursor rather than trusting the broadcast payload directly, so out-of-order
+or stale PubSub delivery can't skip backlog or bypass the cursor. Every
+response in watch mode carries the extra field `"watch_cursor": true`, and
+`inserted_at` is normalized to microsecond precision so cursors compare
+safely as plain strings — advance the cursor by re-issuing the same request
+with `since` and `after_id` set from the last item received. Legacy
+(non-watch) requests are unaffected — `watch` is opt-in only and the
+existing timestamp-only contract is unchanged for every other caller.
 
 **Response:** `200 OK` in both cases — the caller distinguishes "arrived" from
 "nothing yet" by `count`, not by status code.
@@ -1319,6 +1461,7 @@ On timeout with no matching DM:
 | Status | When |
 |--------|------|
 | `400 Bad Request` | `session` is missing, or `since` is not a valid ISO 8601 timestamp |
+| `400 Bad Request` | `watch=true` without a valid `since`, or `after_id` is negative/non-numeric |
 | `404 Not Found` | no session with that ID/UUID |
 
 **Fan-out:** this is a broadcast subscription, not a queue — if multiple
@@ -1330,6 +1473,7 @@ of the same DM. It's not a competing-consumers pattern.
 ```bash
 curl "localhost:5001/api/v1/dm/wait?session=42&timeout=30"
 curl "localhost:5001/api/v1/dm/wait?session=42&since=2026-03-17T10:00:00Z&timeout=10"
+curl "localhost:5001/api/v1/dm/wait?session=42&watch=true&since=2026-03-17T10:00:00.000000Z&after_id=0&timeout=30"
 eitsr dm wait --session 42 --timeout 30   # eitsr only; bash `eits dm` has no `wait`
 ```
 
@@ -1339,7 +1483,7 @@ eitsr dm wait --session 42 --timeout 30   # eitsr only; bash `eits dm` has no `w
 
 Send a message to an agent session. Rate-limited to protect against message injection flooding.
 
-Messages can only be delivered to sessions with `status` in `["working", "idle"]`. Attempts to DM sessions with other statuses (e.g., `waiting`, `completed`, `failed`) return `422 Unprocessable Entity`.
+DMs can be sent to any session regardless of status. If the recipient session is active (`working`, `idle`, or `waiting`), the message is delivered live. If the session is terminated (`completed` or `failed`), the message is persisted to the database and will be available on resume — no `422` is returned.
 
 **Request body (current format):**
 
@@ -1374,7 +1518,7 @@ Messages can only be delivered to sessions with `status` in `["working", "idle"]
 }
 ```
 
-`reachable: true` indicates the target session is in a receivable status (`working` or `idle`). Future implementations may support queuing to `waiting` sessions.
+`reachable: true` indicates the target session is in an active status (`working` or `idle`). When `reachable: false`, the message was persisted but not live-delivered (e.g. the session is `waiting`, `completed`, or `failed`).
 
 **Message body format sent to agent:**
 
@@ -1673,7 +1817,7 @@ Send a message to a channel.
 | `sender_role` | string | no | Default: `"agent"` |
 | `recipient_role` | string | no | Default: `"user"` |
 | `provider` | string | no | Default: `"claude"` |
-| `broadcast_to_team_id` | integer | no | When present, fans out DMs to all team members with active sessions (excluding sender) after message is persisted |
+| `broadcast_to_team_id` | integer | no | When present, fans out DMs to all team members with sessions (excluding sender) after message is persisted; terminated sessions receive a persisted message via deliver_or_persist |
 
 **Response:** `201 Created`
 
@@ -1727,6 +1871,7 @@ List sessions with optional filtering. Supports full-text search, name filters, 
       "description": "fixing the oauth flow",
       "status": "working",
       "status_reason": null,
+      "managed_by_app": true,
       "tasks": [
         {
           "id": 1,
@@ -1885,6 +2030,7 @@ List teams with optional filtering by status and result limit.
 |-------|------|----------|-------------|
 | `status` | string | no | Filter by status: `"active"` (default, excludes archived), `"all"` (includes archived teams). Returns 400 on invalid input |
 | `limit` | integer | no | Max results per page. Must be positive; returns 400 on negative or zero values |
+| `member_agent_uuid` | string | no | Filter to teams that have a member matching this agent identity. Accepts either an agent UUID or a numeric agent ID (as a string). An identity that resolves to no agent returns an empty list rather than an error |
 
 **Response:** `200 OK`
 
@@ -1907,6 +2053,7 @@ List teams with optional filtering by status and result limit.
 ```bash
 curl 'localhost:5001/api/v1/teams?status=active&limit=20'
 curl 'localhost:5001/api/v1/teams?status=all'
+curl 'localhost:5001/api/v1/teams?member_agent_uuid=42'
 eits teams list
 eits teams list --limit 50
 ```
@@ -1984,6 +2131,7 @@ List tasks with optional filtering by project, session, agent, tag, search query
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
 | `project_id` | integer | no | Filter to tasks in a specific project |
+| `team_id` | integer | no | Filter to tasks belonging to a specific team |
 | `session_id` | string or integer | no | Filter to tasks for a specific session (UUID or integer ID) |
 | `created_by_session_id` | string or integer | no | Filter to tasks created by a specific session |
 | `agent_id` | string or integer | no | Filter to tasks assigned to an agent |
@@ -2166,6 +2314,108 @@ Get all sessions linked to a task.
 
 ```bash
 eits tasks sessions 1
+```
+
+---
+
+### POST /api/v1/tasks/:id/release
+
+Owner-only: atomically releases an active task back to To Do and clears
+ownership. Runs inside a `FOR UPDATE` transaction with `claim_task`/`handoff`
+so concurrent ownership changes serialize cleanly. A retry with an identical
+prior release (matched via an ownership receipt note) is a no-op that
+returns the current task unchanged rather than erroring.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string or integer | yes | Caller's session ID (UUID or integer); must be the current sole owner |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "task": {
+    "id": 1,
+    "title": "Fix auth bug",
+    "state": "To Do",
+    "state_id": 1,
+    "session_id": null,
+    "session_ids": [],
+    "updated_at": "2026-09-25T16:00:00Z"
+  }
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `session_id` missing or invalid |
+| `404 Not Found` | task not found |
+| `403 Forbidden` | caller is not the current owner |
+| `409 Conflict` | task is archived, Done, or otherwise not active |
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/tasks/1/release \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": 42}'
+eits tasks release 1
+```
+
+---
+
+### POST /api/v1/tasks/:id/handoff
+
+Owner-only: atomically transfers an active task to another session without
+changing its workflow state (In Progress stays In Progress). Same ownership
+transaction and no-op-retry semantics as `release`. Handing off to yourself
+is a no-op.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `session_id` | string or integer | yes | Caller's session ID (UUID or integer); must be the current sole owner |
+| `to` | string or integer | yes | Target session ID (UUID or integer) to receive ownership |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "task": {
+    "id": 1,
+    "title": "Fix auth bug",
+    "state": "In Progress",
+    "state_id": 2,
+    "session_id": 99,
+    "session_ids": [99],
+    "updated_at": "2026-09-25T16:05:00Z"
+  }
+}
+```
+
+**Errors:**
+
+| Status | When |
+|--------|------|
+| `400 Bad Request` | `session_id` or `to` missing or invalid |
+| `404 Not Found` | task not found |
+| `403 Forbidden` | caller is not the current owner |
+| `409 Conflict` | task is archived, Done, or otherwise not active |
+
+**Example:**
+
+```bash
+curl -X POST localhost:5001/api/v1/tasks/1/handoff \
+  -H "Content-Type: application/json" \
+  -d '{"session_id": 42, "to": 99}'
+eits tasks handoff 1 --to 99
 ```
 
 ---

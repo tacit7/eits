@@ -162,6 +162,7 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
           channels when is_list(channels) -> channels
           _ -> []
         end
+
       unread_counts = ChannelHelpers.calculate_unread_counts(channels, get_session_id(socket))
 
       Logger.info("📬 Pushed delta for message id=#{message.id}")
@@ -170,7 +171,10 @@ defmodule EyeInTheSkyWeb.ChatLive.PubSubHandlers do
 
       {:noreply,
        socket
-       |> assign(:received_message_ids, MapSet.put(socket.assigns.received_message_ids, message.id))
+       |> assign(
+         :received_message_ids,
+         MapSet.put(socket.assigns.received_message_ids, message.id)
+       )
        |> assign(:unread_counts, unread_counts)
        |> Phoenix.LiveView.push_event("chat:message_appended", %{message: serialized})}
     end

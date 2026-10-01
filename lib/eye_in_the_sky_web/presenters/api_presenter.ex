@@ -13,12 +13,16 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       title: task.title,
       description: task.description,
       priority: task.priority,
+      project_id: task.project_id,
+      team_id: task.team_id,
       state: loaded_field(task.state, :name),
       state_id: task.state_id,
-      session_id: case task.sessions do
-        sessions when is_list(sessions) -> sessions |> List.first() |> then(&(&1 && &1.id))
-        _ -> nil
-      end,
+      session_id:
+        case task.sessions do
+          sessions when is_list(sessions) -> sessions |> List.first() |> then(&(&1 && &1.id))
+          _ -> nil
+        end,
+      session_ids: task.session_ids,
       due_at: task.due_at,
       created_at: format_dt(task.created_at),
       updated_at: format_dt(task.updated_at)
@@ -145,6 +149,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       intent: session.intent,
       intent_set_at: session.intent_set_at,
       turn_start_at: session.turn_start_at,
+      managed_by_app: managed_by_app(session),
       read_only: session.read_only || false
     }
   end
@@ -164,6 +169,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       id: session.id,
       uuid: session.uuid,
       session_id: session.uuid,
+      started_at: session.started_at,
       agent_id: Keyword.get(opts, :agent_uuid),
       agent_int_id: session.agent_id,
       project_id: session.project_id,
@@ -175,6 +181,7 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       name: session.name,
       description: session.description,
       is_spawned: Keyword.get(opts, :is_spawned, false),
+      managed_by_app: managed_by_app(session),
       read_only: session.read_only || false,
       initialized: true,
       worktree_path: Keyword.get(opts, :worktree_path),
@@ -212,6 +219,8 @@ defmodule EyeInTheSkyWeb.Presenters.ApiPresenter do
       inserted_at: to_string(commit.created_at)
     }
   end
+
+  defp managed_by_app(session), do: Map.get(session, :managed_by_app, true)
 
   @doc """
   Resolves a human-readable sender name from a session struct.

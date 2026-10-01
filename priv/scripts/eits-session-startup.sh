@@ -118,6 +118,39 @@ else
   _log "WARN: CLAUDE_ENV_FILE not set, skipping env writes"
 fi
 
+# Codex has no CLAUDE_ENV_FILE equivalent. Persist non-secret EITS identity in
+# a session-specific env file so later `eits` CLI calls can source or auto-load
+# it without relying on a last-writer-wins global fallback.
+_write_codex_env_file() {
+  local env_dir="${HOME}/.eits/codex"
+  local sessions_dir="$env_dir/sessions"
+  local safe_session_id
+  safe_session_id=$(printf '%s' "$SESSION_ID" | tr -c 'A-Za-z0-9_.-' '_')
+
+  mkdir -p "$sessions_dir" 2>/dev/null || return 0
+  chmod 700 "$env_dir" "$sessions_dir" 2>/dev/null || true
+
+  local tmp_file
+  tmp_file=$(mktemp "$env_dir/session.env.XXXXXX") || return 0
+  chmod 600 "$tmp_file" 2>/dev/null || true
+
+  {
+    printf 'export EITS_URL=%q\n' "${EITS_URL:-http://localhost:5001/api/v1}"
+    printf 'export EITS_SESSION_UUID=%q\n' "$SESSION_ID"
+    [ -n "$SESSION_INT_ID" ] && printf 'export EITS_SESSION_ID=%q\n' "$SESSION_INT_ID"
+    [ -n "$EXISTING_AGENT_UUID" ] && printf 'export EITS_AGENT_UUID=%q\n' "$EXISTING_AGENT_UUID"
+    [ -n "$EXISTING_AGENT_INT_ID" ] && printf 'export EITS_AGENT_ID=%q\n' "$EXISTING_AGENT_INT_ID"
+    [ -n "$PROJECT_ID" ] && printf 'export EITS_PROJECT_ID=%q\n' "$PROJECT_ID"
+  } > "$tmp_file"
+
+  cp "$tmp_file" "$sessions_dir/$safe_session_id.env" 2>/dev/null || true
+  chmod 600 "$sessions_dir/$safe_session_id.env" 2>/dev/null || true
+  rm -f "$tmp_file"
+  _log "wrote codex env file: $sessions_dir/$safe_session_id.env"
+}
+
+_write_codex_env_file
+
 # Write session/agent UUIDs to .git/ for post-commit hook
 GIT_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)
 if [ -n "$GIT_DIR" ]; then
@@ -225,6 +258,9 @@ $INIT_NOTE
 
 # Create + start in one shot
 eits tasks begin --title \"Task name\"
+
+# Inbox checkpoints
+eits dm inbox --since-session --team-only --json   # before claiming work, after major state transitions, before done, after completion DMs
 
 # Finish (atomic: annotate + mark done in one round-trip)
 eits tasks complete <task_id> --message \"What happened\"

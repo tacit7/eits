@@ -11,7 +11,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.Helpers do
     ~H"""
     <.link
       navigate={@route}
-      class="flex-1 min-w-0 flex items-center gap-1.5 rounded hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
+      class="focus-ring flex-1 min-w-0 flex items-center gap-1.5 rounded-box hover:bg-base-content/5 -mx-1 px-1 py-0.5 transition-colors group"
     >
       <span class="flex-shrink-0 flex items-center justify-center text-base-content/35 group-hover:text-base-content/60 transition-colors">
         <%= if @custom do %>
@@ -20,7 +20,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.Helpers do
           <.icon name={@icon} class="size-3.5" />
         <% end %>
       </span>
-      <span class="text-micro font-semibold uppercase tracking-widest text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
+      <span class="text-micro font-semibold uppercase tracking-normal text-base-content/40 group-hover:text-base-content/60 truncate transition-colors">
         {@label}
       </span>
     </.link>
@@ -35,7 +35,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.Helpers do
     ~H"""
     <.link
       navigate={@href}
-      class="flex items-center gap-2.5 px-3 py-2 text-sm text-base-content/60 hover:text-base-content/85 hover:bg-base-content/5 transition-colors"
+      class="focus-ring flex h-8 items-center gap-2 rounded-box px-3 text-mini text-base-content/60 transition-colors hover:bg-base-content/5 hover:text-base-content/85"
     >
       <.icon name={@icon} class="size-3.5 flex-shrink-0" />
       <span class="truncate">{@label}</span>

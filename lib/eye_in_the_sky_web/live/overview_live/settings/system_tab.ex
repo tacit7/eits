@@ -6,16 +6,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
   def render(assigns) do
     ~H"""
     <section>
-      <h2 class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-4">
+      <h2 class="text-message font-semibold text-base-content/60 uppercase tracking-normal mb-4">
         System
       </h2>
-      <div class="card bg-base-100 border border-base-300 shadow-sm">
-        <div class="card-body p-0 divide-y divide-base-300">
+      <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+        <div class="eits-panel__body p-0 divide-y divide-base-300">
           <%!-- Debug Logging --%>
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Log Raw Claude Output</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Log Raw Claude Output</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Log raw JSONL output from Claude CLI to console
               </p>
             </div>
@@ -30,8 +30,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Log Raw Codex Output</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Log Raw Codex Output</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Log raw output from Codex CLI to console
               </p>
             </div>
@@ -46,8 +46,24 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <div class="flex items-center justify-between px-5 py-4">
             <div>
-              <p class="text-sm font-medium text-base-content">Per-session Rate-Limit Bucket</p>
-              <p class="text-xs text-base-content/50 mt-0.5">
+              <p class="text-message font-medium text-base-content">Codex App Server Bridge</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
+                Use the feature-flagged Codex JSON-RPC app-server backend for Codex turns
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              class="toggle toggle-sm toggle-primary"
+              checked={@settings["codex_app_server_enabled"] == "true"}
+              phx-click="toggle_setting"
+              phx-value-key="codex_app_server_enabled"
+            />
+          </div>
+
+          <div class="flex items-center justify-between px-5 py-4">
+            <div>
+              <p class="text-message font-medium text-base-content">Per-session Rate-Limit Bucket</p>
+              <p class="text-mini text-base-content/50 mt-0.5">
                 Per-session rate-limit bucket (Phase 2). Requires eits CLI with x-eits-session header support. Leaving off keeps the current IP-keyed bucket.
               </p>
             </div>
@@ -62,8 +78,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
 
           <%!-- Database Info --%>
           <div class="px-5 py-4">
-            <p class="text-sm font-medium text-base-content mb-3">Database</p>
-            <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+            <p class="text-message font-medium text-base-content mb-3">Database</p>
+            <div class="grid grid-cols-2 gap-x-8 gap-y-2 text-mini">
               <div class="text-base-content/50">Path</div>
               <div class="font-mono text-base-content truncate" title={@db_info.path}>
                 {@db_info.path}
@@ -72,11 +88,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings.SystemTab do
               <div class="text-base-content">{format_db_size(@db_info.size)}</div>
             </div>
             <div class="mt-3">
-              <p class="text-xs text-base-content/50 mb-2">Table Counts</p>
+              <p class="text-mini text-base-content/50 mb-2">Table Counts</p>
               <div class="flex flex-wrap gap-2">
                 <span
                   :for={{table, count} <- @db_info.table_counts}
-                  class="badge badge-ghost badge-sm gap-1"
+                  class="eits-chip eits-chip--muted gap-1"
                 >
                   {table}
                   <span class="font-semibold">{count}</span>

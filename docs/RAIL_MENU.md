@@ -1,11 +1,11 @@
 # Rail Menu
 
-The rail is a persistent LiveComponent (`EyeInTheSkyWeb.Components.Rail`) mounted in `app.html.heex`. It is shared across all pages in the `:app` live session and provides navigation, flyout panels, and project context.
+The rail is a persistent LiveView (`EyeInTheSkyWeb.Components.Rail`) mounted via `live_render` in `app.html.heex` with `sticky: true`. It is shared across all pages in the `:app` live session and provides navigation, flyout panels, and project context.
 
 ## Files
 
 ```
-lib/eye_in_the_sky_web/components/rail.ex                     # Main LiveComponent — state machine, event handlers, lazy loaders
+lib/eye_in_the_sky_web/components/rail.ex                     # Main LiveView — state machine, event handlers, lazy loaders
 lib/eye_in_the_sky_web/components/rail/flyout.ex              # Flyout panel rendering (all sections)
 lib/eye_in_the_sky_web/components/rail/project_switcher.ex    # Project picker overlay
 lib/eye_in_the_sky_web/components/rail/project_actions.ex     # Project CRUD + select event handlers
@@ -372,17 +372,17 @@ Helper functions:
 
 Project-scoped pages (`/projects/:id/*`) set `sidebar_project` to the project struct in `mount/3`. Global pages (`/usage`, `/jobs`, `/tasks`, `/canvases`, etc.) set it to `nil`.
 
-The layout passes it directly to the rail:
+The layout embeds the rail as a sticky child LiveView:
 
 ```heex
-<.live_component
-  module={EyeInTheSkyWeb.Components.Rail}
-  id="app-rail"
-  sidebar_tab={assigns[:sidebar_tab] || :sessions}
-  sidebar_project={assigns[:sidebar_project]}
-  ...
-/>
+{live_render(@socket, EyeInTheSkyWeb.Components.Rail,
+  id: "app-rail",
+  sticky: true,
+  session: %{"rail_context_topic" => assigns[:rail_context_topic]}
+)}
 ```
+
+Context is communicated from the page LiveView to the rail via PubSub (`Events.broadcast_rail_context/1`) rather than props, because they are separate processes.
 
 ### The Nil-Guard
 
@@ -417,6 +417,72 @@ sidebar_project =
 **Guard**: restore only runs when `sidebar_project` is nil. Project-scoped pages set a non-nil project first (via `update/2`), so the restore is a no-op on those pages — route-derived project is never overridden.
 
 Result: Project selection now persists across all page navigations.
+
+### Browser-Session-Scoped `rail:context` PubSub Topic (Cross-Window Isolation)
+
+**Problem**: The rail is a standalone `LiveView` process, so page LiveViews communicate project selection to it via a PubSub broadcast (`Events.broadcast_rail_context/1`). With a single global `"rail:context"` topic, opening the app in two browser windows let one window's project selection overwrite the other window's rail — both rails were subscribed to the same topic.
+
+**Fix** (`32a3bee6`): The topic is now scoped per browser session using the CSRF token as a stable, per-tab identifier.
+
+**`Events.rail_context_topic/1`** derives the topic from the session map:
+
+```elixir
+def rail_context_topic(%{"_csrf_token" => token}) when is_binary(token) and token != "" do
+  digest =
+    :crypto.hash(:sha256, token)
+    |> Base.url_encode64(padding: false)
+
+  "rail:context:#{digest}"
+end
+
+def rail_context_topic(_session), do: "rail:context"   # fallback
+```
+
+**Flow**:
+
+1. **`NavHook.on_mount/4`** computes the topic at mount time:
+   ```elixir
+   |> assign(:rail_context_topic, Events.rail_context_topic(session))
+   ```
+2. **`app.html.heex`** passes it as a `live_render` session key into the Rail LiveView:
+   ```heex
+   session: %{"rail_context_topic" => assigns[:rail_context_topic]}
+   ```
+3. **`Rail.mount/3`** reads it from the session and stores it as an assign:
+   ```elixir
+   rail_context_topic = session["rail_context_topic"] || "rail:context"
+   assign(socket, rail_context_topic: rail_context_topic, ...)
+   ```
+4. **`Rail.mount/3`** subscribes to the scoped topic:
+   ```elixir
+   Events.subscribe_rail_context(rail_context_topic)
+   ```
+5. **`Events.broadcast_rail_context/1`** reads `socket.assigns[:rail_context_topic]` and broadcasts on the same scoped topic, so only the rail in the same browser window receives it.
+
+Result: Each browser tab/window has its own isolated `rail:context:<digest>` topic. Project selection in one window never bleeds into another.
+
+### Workspace-Scoped Project List
+
+The rail's project list (used by the project switcher and command palette) is scoped to the current workspace rather than showing every project globally.
+
+**`rail.ex`** tracks `workspace_id`/`workspace` assigns alongside `sidebar_project`:
+
+- `initial_workspace_id/2` resolves workspace from the `session["workspace_id"]` passed via `live_render`, falling back to `sidebar_project.workspace_id` when present.
+- `workspace_projects/1` calls `Projects.list_projects_for_workspace/1` when a workspace is known, otherwise returns `[]` (previously defaulted to `Projects.list_projects_for_sidebar/0`, i.e. all projects).
+- The `{:rail_context, payload}` handler now also carries `workspace_id`; `maybe_reload_projects/3` reloads `:projects` only when the workspace actually changed, avoiding redundant queries on unrelated context updates.
+- `:rail_refresh_projects` and the disconnected-render fallback both re-derive the list via `workspace_projects(socket.assigns[:workspace_id])`.
+
+See [WORKSPACE_SCOPE.md](WORKSPACE_SCOPE.md) for the underlying `Projects.list_projects_for_workspace/1` contract.
+
+### Restored-Project Navigation Fix
+
+**Previously**: `maybe_restore_project/2` only restored a project from localStorage when `sidebar_project` was nil, but never navigated the route to match — so restoring project A while sitting on project B's URL left the rail and the address bar out of sync.
+
+**Now**: `maybe_restore_project/2` compares the restored `project_id` against the current `sidebar_project.id`; if they differ, it calls `ProjectActions.handle_restore_project/2` and then `maybe_navigate_to_restored_project/3`, which `push_navigate`s to the project-scoped path for the current `sidebar_tab` (via the now-public `ProjectActions.project_path/2`). No-op when the restored ID matches what's already selected, or when there was no prior project to navigate from.
+
+### Palette Project Selection Persistence
+
+Selecting a project from the command palette ("Switch Project" / "Go to Project" results) now writes the selected `project_id` into the `rail_state` localStorage entry (via `saveRailProjectSelection` in `assets/js/command_palette.js`) before navigating. This keeps the rail's restored-project state in sync with palette-driven navigation instead of only updating on rail-driven selection. See [COMMAND_PALETTE.md](COMMAND_PALETTE.md) for the palette-side details.
 
 ---
 

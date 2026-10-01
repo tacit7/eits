@@ -1,0 +1,15 @@
+Claim an existing task with --id or create + claim self-owned work with --title
+
+Usage: eits tasks begin [OPTIONS] <--id <ID>|--title <TITLE>>
+
+Options:
+      --id <ID>                    Claim an existing task for the current session
+      --pretty                     Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -q, --quiet                      Print only the created/affected ID on success (mutations)
+  -t, --title <TITLE>              Create new work owned by the current session
+  -d, --description <DESCRIPTION>
+  -p, --project <PROJECT>
+      --team <TEAM>                Team id to attach when creating a new task
+      --priority <PRIORITY>
+      --tag <TAGS>
+  -h, --help                       Print help

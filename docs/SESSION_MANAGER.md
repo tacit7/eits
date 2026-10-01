@@ -312,7 +312,7 @@ Session status is set by lifecycle hooks and reflects the CLI process state:
 | `working` | UserPromptSubmit hook | Claude Code is processing a message |
 | `idle` | Stop hook, SessionEnd hook (cli), or SessionEnd hook (sdk-cli) | Session stopped gracefully; sdk-cli can be resumed |
 | `waiting` | Explicit POST /sessions/:id/waiting | Session waiting for action/resume; blocked or temporarily paused |
-| `completed` | Explicit POST /sessions/:id/complete or i-end-session skill | Session finished (manually set) |
+| `completed` | Explicit POST /sessions/:id/complete or eits-end-session skill | Session finished (manually set) |
 | `failed` | AgentWorker abnormal exit or zombie sweep | Billing/auth/watchdog error, agent crash, or zombie cleanup; session persisted to DB, Teams cleanup fired |
 
 ### Status Reason Field
@@ -434,7 +434,7 @@ This prevents `ArgumentError` crashes when UI renders sessions with newly-added 
 
 **Auto-completion behavior:**
 - Status is **not** auto-set on CLI exit (Stop hook sets `idle`, not `completed`)
-- Completed status must be set **explicitly** via i-end-session skill or `POST /sessions/:id/complete`
+- Completed status must be set **explicitly** via eits-end-session skill or `POST /sessions/:id/complete`
 - This prevents incorrect status when sessions are retried or resumed
 
 ---
@@ -514,7 +514,7 @@ def register_from_hook(params, project_id)
 **Purpose:** Register a new session from a SessionStart hook payload (e.g., `eits-session-startup.sh`).
 
 **Input Parameters:**
-- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `read_only`
+- `params` (map) — raw hook payload with keys: `session_id`, `agent_id`, `agent_description`, `description`, `project_name`, `worktree_path`, `model`, `name`, `provider`, `entrypoint`, `managed_by_app`, `process_owner`, `read_only`
 - `project_id` (integer | nil) — pre-resolved project ID (may be nil if project wasn't found during startup)
 
 **Workflow:**
@@ -522,7 +522,8 @@ def register_from_hook(params, project_id)
 2. **Parse model info** — Extracts model provider and name via `ModelInfo.parse_model_string/1`
 3. **Create session** — Calls either `Sessions.create_session_with_model/1` or `Sessions.create_session/1` depending on whether model_name was parsed
 4. **Fire event** — On success, fires `Events.session_started/1` for downstream listeners
-5. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
+5. **Trigger auto-naming** — If `params["description"]` is present, spawns a `Task.start` to call `Sessions.Naming.try_auto_name/3` asynchronously (commit a15ffb70)
+6. **Return result** — Returns `{:ok, %{session: session, agent: agent}}` on success, or `{:error, :agent | :session, changeset}` on failure
 
 **Error handling:**
 - Returns `{:error, :agent, changeset}` if agent creation fails
@@ -530,6 +531,41 @@ def register_from_hook(params, project_id)
 - Either error short-circuits the workflow — both agent and session must succeed
 
 **Usage:** Called by the startup hook when initializing a new Claude Code session.
+
+**Provider inference (commit 7edaa2e3):** When the hook payload omits `provider`
+(Codex hooks don't always send it), `HookRegistrar` infers the runtime provider
+from the parsed `model_provider` instead of defaulting to `"claude"`:
+
+```elixir
+defp runtime_provider_for_model_provider("openai"), do: "codex"
+defp runtime_provider_for_model_provider("anthropic"), do: "claude"
+defp runtime_provider_for_model_provider("claude"), do: "claude"
+defp runtime_provider_for_model_provider("gemini"), do: "gemini"
+defp runtime_provider_for_model_provider("pi"), do: "pi"
+defp runtime_provider_for_model_provider(_), do: "claude"
+```
+
+This relies on `ModelInfo.parse_model_string/1` recognizing a `"gpt-*"` model
+string as `model_provider: "openai"` (added alongside this fix, previously only
+`"claude-*"` was pattern-matched to `"anthropic"`). Net effect: a Codex hook
+payload with `model: "gpt-5"` and no explicit `provider` now correctly registers
+`session.provider == "codex"` instead of falling back to `"claude"`.
+
+**Process ownership:** `sessions.managed_by_app` controls whether the Phoenix app
+may start an `AgentWorker` for a session. Hook payloads with `entrypoint=cli`
+default to `managed_by_app=false`, making terminal sessions inbox-only from the
+app's perspective. EITS Codex startup defaults to `entrypoint=sdk-cli`, and
+app-created sessions set `managed_by_app=true`.
+
+Ownership applies to both message delivery and lifecycle automation:
+- `managed_by_app=true` means Phoenix owns the worker lifecycle and may start or
+  resume an `AgentWorker` when a message arrives.
+- `managed_by_app=false` means the process is owned by an external terminal.
+  Phoenix may persist messages and status updates, but it must not start a
+  replacement process for that session.
+- `entrypoint=cli` is the explicit terminal-owned marker for Codex startup hooks.
+  Use `managed_by_app=true` or `process_owner=app` only for sessions intentionally
+  spawned and controlled by the app.
 
 ---
 
@@ -624,7 +660,9 @@ PATCH /api/v1/sessions/8803d56d-dbbd-4916-9ff0-155378a64a47       # UUID
 
 **Endpoints using `resolve_session/1`:**
 - `PATCH /api/v1/sessions/:uuid` — Update session status, read_only intent, and other fields (lifecycle hooks)
-  - Parameters: `status`, `status_reason`, `intent`, `read_only`, `entrypoint`, `name`, `description`
+  - Parameters: `status`, `status_reason`, `intent`, `read_only`, `entrypoint`, `name`, `description`, `model`, `model_name`, `model_provider`, `model_version`
+  - Model fields: `model` (raw model string, e.g. `"claude-opus-4-5"`), `model_name` (authoritative structured name), `model_provider` (e.g. `"anthropic"`, `"openai"`), `model_version` (version string)
+  - CLI (eitsr): `eitsr sessions update <uuid> --model <str> --model-name <str> --model-provider <str> --model-version <str>`
 - `POST /api/v1/sessions/:uuid/tool_event` — Record tool event
 - `POST /api/v1/sessions/:uuid/end` — End session with final status
 - `POST /api/v1/sessions/:uuid/complete` — Mark session completed and sync team member (NEW)
@@ -1205,7 +1243,7 @@ A GenServer-backed ETS table that buffers the initial message body and send opti
 
 ### Sessions.Naming — Haiku Auto-Naming (`lib/eye_in_the_sky/sessions/naming.ex`)
 
-After a `/dm/new` session is created and the first message is sent, the system asynchronously calls `Sessions.Naming.try_auto_name/3` to generate a short descriptive name via `claude-haiku-4-5-20251001`.
+After a session is created and a first body (instructions or description) is available, the system asynchronously calls `Sessions.Naming.try_auto_name/3` to generate a short descriptive name via `claude-haiku-4-5-20251001`.
 
 **Configuration:**
 - Model: `claude-haiku-4-5-20251001` (fast, cheap — appropriate for a background naming call)
@@ -1226,9 +1264,77 @@ Sessions.Naming.generate_name(body)
 
 **Race guard:** `try_auto_name/3` uses an atomic `update_all` with a `WHERE name = ^fallback_name` condition. If the user manually renames the session between creation and the Haiku call completing, the DB write is a no-op — no clobber.
 
+**`indeterminate_datatype` fix (commit 879b2359):** The previous implementation used a single Ecto query with a combined SQL predicate (`(is_nil(^fallback_name) and is_nil(s.name)) or (not is_nil(^fallback_name) and s.name == ^fallback_name)`). PostgreSQL could not infer the type for the `^fallback_name` binding and raised `indeterminate_datatype`. The fix branches in Elixir before building the query:
+
+```elixir
+name_query =
+  if is_nil(fallback_name) do
+    from(s in Session, where: s.id == ^session_id and is_nil(s.name), select: s)
+  else
+    from(s in Session, where: s.id == ^session_id and s.name == ^fallback_name, select: s)
+  end
+
+{1, [updated_session]} <- Repo.update_all(name_query, set: [name: generated_name])
+```
+
+Each branch produces a query whose types are unambiguous to PostgreSQL.
+
+**Call sites (centralized as of commit a15ffb70, extended in bd118c38):** Auto-naming is triggered from `AgentManager`, `HookRegistrar`, and new-agent form action modules. Five paths exist:
+- `AgentManager.create_pty_session/1` — PTY sessions
+- `AgentManager.create_agent_without_start/1` — pre-flight `/dm/new` sessions
+- `AgentManager.create_agent/1` — SDK agent sessions
+- `HookRegistrar.register_from_hook/2` — startup-hook–registered sessions (uses `params["description"]`)
+- `ProjectLive.Sessions.Actions` / `WorkspaceLive.Sessions.Actions` — sessions launched from the new agent form; fires `try_auto_name` asynchronously when the form description is non-empty (commit bd118c38)
+
+All four call a private `maybe_auto_name/2` helper (or equivalent `Task.start` in HookRegistrar) and only fire when the body/description is a non-empty binary.
+
 **Failure modes:** All errors (no API key, HTTP error, empty response) are silently swallowed — the session just keeps its fallback name. Auto-naming is best-effort.
 
 **PubSub:** On a successful name write, `Events.broadcast_rail_session_updated/1` fires so the rail sidebar updates immediately without a page refresh.
+
+### Rail Flyout Refresh on Session/Task Mutations
+
+`Events.broadcast_rail_session_updated/1` only patches a single row in the rail's flyout session list — it can't signal removals or filtered-list changes. `Sessions.StatusTransitions` fires a dedicated `Events.broadcast_rail_sessions_refresh/0` after any mutation that can change *which* sessions belong in the flyout, not just one row's fields:
+
+```elixir
+def delete_session(%Session{} = session) do
+  case Repo.delete(session) do
+    {:ok, deleted} ->
+      Events.broadcast_rail_sessions_refresh()
+      {:ok, deleted}
+
+    error ->
+      error
+  end
+end
+```
+
+**Fires from:** `delete_session/1`, `batch_delete_sessions/1`, `batch_archive_sessions_for_project/2` — all StatusTransitions operations that remove or archive sessions out from under the flyout's filtered list.
+
+**Rail LiveView handling** (`lib/eye_in_the_sky_web/components/rail.ex`):
+- `{:rail_session_updated, _session}` and `:rail_sessions_refresh` both call `reload_flyout_sessions/1`, which re-runs `Loader.load_flyout_sessions/4` with the current sort/filter/limit assigns and reassigns `:flyout_sessions`. A full reload (not a row patch) is required because the mutation may have removed the row's eligibility for the current filter entirely.
+- The Rail LiveView also subscribes to `Events.subscribe_tasks()` on mount and handles `:tasks_changed` / `{:tasks_changed, _entity}` the same way, via `reload_flyout_tasks/1` — so task state changes and deletions refresh the flyout's task list, not just the row that changed.
+- Both flyout row templates (`sessions_section.ex`, `tasks_section.ex`) render a stable `id={"rail-session-#{@session.id}"}` / `id={"rail-task-#{@task.id}"}` on the row so tests (and any future targeted DOM updates) can assert on a specific row's presence/absence.
+
+**Why a full reload instead of a targeted `stream_insert`/`stream_delete`:** the flyout list isn't a LiveView stream — it's a plain assign rebuilt from `Loader.load_flyout_sessions/4` / `load_flyout_tasks/3`, so there's no dom_id-keyed structure to surgically patch. A full reload keeps the visible list consistent with the active sort/filter after any mutation that can change membership (delete, archive, task state change moving a row outside the current state filter).
+
+---
+
+## NewSessionModal — Workspace-Scoped Project Dropdown
+
+`NewSessionModal` (`lib/eye_in_the_sky_web/components/new_session_modal.ex`) loads the project dropdown fresh from the DB on mount (not from the host's stale assigns). When a `workspace_id` attr is provided, it scopes the query to that workspace; when nil, it falls back to the full sidebar list:
+
+```elixir
+projects =
+  case assigns[:workspace_id] do
+    nil          -> Projects.list_projects_for_sidebar()
+    workspace_id -> Projects.list_projects_for_workspace(workspace_id)
+  end
+```
+
+`WorkspaceLive.Sessions` passes `workspace_id={@workspace.id}` to the modal so the project dropdown only shows projects belonging to the current workspace. Without this scoping, the dropdown would expose projects from other workspaces to the user.
+
+**Why fresh DB load:** Host LiveViews load projects once at mount. A project created after that mount (e.g., via the rail's folder picker) would never appear in the dropdown until the page reloads. The modal bypasses the host's stale assigns with a direct query on every open.
 
 ---
 
@@ -1669,6 +1775,7 @@ end
 def list_idle_sessions_older_than(cutoff) do
   from(s in Session,
     where: s.status in ["idle", "waiting"],
+    where: s.managed_by_app == true,
     where: is_nil(s.archived_at),
     where: not is_nil(s.started_at),
     where:
@@ -1687,6 +1794,33 @@ Two separate OR branches allow PostgreSQL to use:
 A single `coalesce(last_activity_at, started_at)` expression would prevent index use and force a full table scan.
 
 The partial indexes filter on `status IN ["idle", "waiting"]` and `archived_at IS NULL` to avoid scanning completed or archived sessions.
+
+**Terminal-owned sessions:** A terminal-owned Codex session can be marked
+`idle` by `codex-session-stop.sh` between turns while still being resumable from
+the user's terminal. `AgentStatus` cleanup distinguishes that from a dead
+app-owned worker by filtering dead-idle archive and zombie sweep candidates to
+`managed_by_app=true`. In practice, `managed_by_app=false` sessions are not
+app-spawned and are not hidden by app-worker reclamation. If a session is later
+marked `working` while `archived_at` remains non-null, the session was resumed
+without being unarchived; use `eits sessions unarchive <uuid>` or clear
+`archived_at` as part of the resume/update path.
+
+### Idle Ticket Nudges
+
+`EyeInTheSky.Scheduler.IdleTicketNudger` checks idle sessions that still have
+open tasks linked through `task_sessions`. It sends a DM reminding the session
+to review the open ticket(s) and update status or notes if applicable. The
+worker does not directly mutate tasks.
+
+Candidate sessions must be `status="idle"`, unarchived, older than the worker's
+idle cutoff, and linked to at least one task that is neither Done nor archived.
+This is intentionally separate from dead-idle archival: sessions with open tasks
+are preserved and nudged instead of being reclaimed by the app-worker cleanup
+path.
+
+Terminal-owned sessions are allowed in the candidate set. Delivery goes through
+`DMDelivery.deliver_or_persist/4`, so terminal-owned sessions get a durable
+inbox record and no app worker is started.
 
 ---
 

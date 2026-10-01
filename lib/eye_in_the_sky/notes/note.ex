@@ -17,7 +17,16 @@ defmodule EyeInTheSky.Notes.Note do
   @doc false
   def changeset(note, attrs) do
     note
-    |> cast(attrs, [:uuid, :parent_type, :parent_id, :title, :body, :starred, :source_session_uuid, :created_at])
+    |> cast(attrs, [
+      :uuid,
+      :parent_type,
+      :parent_id,
+      :title,
+      :body,
+      :starred,
+      :source_session_uuid,
+      :created_at
+    ])
     |> maybe_generate_uuid()
     |> maybe_set_created_at()
     |> validate_required([:parent_type, :parent_id, :body])

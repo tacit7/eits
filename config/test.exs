@@ -83,3 +83,5 @@ config :eye_in_the_sky, :rate_limit_enabled, false
 # Without this, tests asserting empty state fail on dev machines that have
 # actual agent/skill files installed globally.
 config :eye_in_the_sky, :claude_home_dir, "/tmp/eits_test_claude_home_nonexistent"
+
+config :eye_in_the_sky, :pi_control_module, EyeInTheSky.PiModelDiscoveryStub

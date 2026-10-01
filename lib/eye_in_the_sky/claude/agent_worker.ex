@@ -23,6 +23,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   }
 
   alias EyeInTheSky.Claude.{Job, Message, StreamAssembler, StreamAssemblerDispatcher}
+  alias EyeInTheSky.Claude.SDK.Registry, as: SDKRegistry
   alias EyeInTheSky.Codex.StreamAssembler, as: CodexStreamAssembler
   alias EyeInTheSky.Messages
 
@@ -134,6 +135,30 @@ defmodule EyeInTheSky.Claude.AgentWorker do
     )
   end
 
+  @doc """
+  Returns a health snapshot for the AgentWorker and its active SDK subprocess.
+
+  `alive` reports the registered AgentWorker GenServer. `processing` reports the
+  worker's internal running state. `handler_alive` reports the SDK output handler
+  process, and `port_alive` reports the registered Port or test PID backing the
+  provider CLI.
+  """
+  def health(session_id) do
+    case Registry.lookup(@registry, {:session, session_id}) do
+      [{pid, provider}] ->
+        if Process.alive?(pid) do
+          GenServer.call(pid, :health)
+        else
+          stopped_health(provider)
+        end
+
+      [] ->
+        stopped_health(nil)
+    end
+  catch
+    :exit, _ -> stopped_health(nil)
+  end
+
   def remove_queued_prompt(session_id, prompt_id) do
     with_worker(
       session_id,
@@ -184,7 +209,9 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # A worker is evictable when it holds no work: idle or failed, empty queue.
   # :running / :retry_wait always have in-flight or queued work; idle-with-queue
   # is about to process. Never evict those.
-  defp evictable?(%__MODULE__{status: status, queue: []}) when status in [:idle, :failed], do: true
+  defp evictable?(%__MODULE__{status: status, queue: []}) when status in [:idle, :failed],
+    do: true
+
   defp evictable?(%__MODULE__{}), do: false
 
   defp with_worker(session_id, fun, default) do
@@ -251,6 +278,28 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   end
 
   @impl true
+  def handle_call(:health, _from, state) do
+    port = if state.sdk_ref, do: SDKRegistry.lookup(state.sdk_ref)
+
+    health = %{
+      alive: true,
+      provider: state.provider,
+      status: Atom.to_string(state.status),
+      processing: state.status == :running,
+      handler_alive: pid_alive?(state.handler_pid),
+      sdk_active: not is_nil(state.sdk_ref),
+      port_alive: port_alive?(port),
+      port_type: port_type(port),
+      os_pid: os_pid(port),
+      current_job_active: not is_nil(state.current_job),
+      current_job_id: if(state.current_job, do: state.current_job.id),
+      queue_depth: length(state.queue)
+    }
+
+    {:reply, health, state}
+  end
+
+  @impl true
   def handle_call(:eviction_snapshot, _from, state) do
     {:reply, {evictable?(state), state.idle_since}, state}
   end
@@ -313,7 +362,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
         %__MODULE__{sdk_ref: ref} = state
       ) do
     channel_id = if state.current_job, do: state.current_job.context[:channel_id], else: nil
-    job_context = if state.current_job, do: state.current_job.context, else: nil
+    job_context = if state.current_job, do: Job.reply_context(state.current_job), else: nil
 
     WorkerEvents.on_result_received(state.session_id, %{
       provider: state.provider,
@@ -344,8 +393,7 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   # Hook failure — save to DB as a warning message so it appears in the DM transcript
   @impl true
   def handle_info(
-        {:claude_message, ref,
-         %Message{type: :hook_failure, content: stderr, metadata: meta}},
+        {:claude_message, ref, %Message{type: :hook_failure, content: stderr, metadata: meta}},
         %__MODULE__{sdk_ref: ref} = state
       ) do
     WorkerEvents.on_hook_failure(
@@ -585,14 +633,58 @@ defmodule EyeInTheSky.Claude.AgentWorker do
   @impl true
   def terminate(reason, %__MODULE__{} = state) do
     SdkLifecycle.cancel_active_sdk(state)
+    stop_owned_codex_app_server(state)
     Reconciliation.maybe_mark_session_failed(reason, state)
     :ok
   end
 
   # --- Private ---
 
+  defp stop_owned_codex_app_server(%__MODULE__{provider: "codex", session_id: session_id}) do
+    EyeInTheSky.Codex.AppServer.stop_owner(session_id)
+  end
+
+  defp stop_owned_codex_app_server(_state), do: :ok
+
   # Provider-polymorphic stream assembler factory
   defp stream_assembler_for("codex"), do: CodexStreamAssembler.new()
   # "pi" intentionally uses the default (delta-based) assembler.
   defp stream_assembler_for(_provider), do: StreamAssembler.new()
+
+  defp stopped_health(provider) do
+    %{
+      alive: false,
+      provider: provider,
+      status: nil,
+      processing: false,
+      handler_alive: false,
+      sdk_active: false,
+      port_alive: false,
+      port_type: nil,
+      os_pid: nil,
+      current_job_active: false,
+      current_job_id: nil,
+      queue_depth: 0
+    }
+  end
+
+  defp pid_alive?(pid) when is_pid(pid), do: Process.alive?(pid)
+  defp pid_alive?(_), do: false
+
+  defp port_alive?(port) when is_port(port), do: not is_nil(Port.info(port))
+  defp port_alive?(pid) when is_pid(pid), do: Process.alive?(pid)
+  defp port_alive?(_), do: false
+
+  defp port_type(port) when is_port(port), do: "port"
+  defp port_type(pid) when is_pid(pid), do: "pid"
+  defp port_type(_), do: nil
+
+  defp os_pid(port) when is_port(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, pid} -> pid
+      _ -> nil
+    end
+  end
+
+  defp os_pid(_), do: nil
 end

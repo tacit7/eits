@@ -120,12 +120,9 @@ defmodule EyeInTheSkyWeb.NavHook.PaletteHandlers do
   # ---------------------------------------------------------------------------
 
   def handle_palette_event("palette:projects", _params, socket) do
-    projects = Projects.list_projects()
-
     results =
-      Enum.map(projects, fn p ->
-        %{id: p.id, name: p.name}
-      end)
+      Projects.list_projects_for_sidebar()
+      |> Enum.map(&%{id: &1.id, name: &1.name})
 
     {:halt, push_event(socket, "palette:projects-result", %{projects: results})}
   end

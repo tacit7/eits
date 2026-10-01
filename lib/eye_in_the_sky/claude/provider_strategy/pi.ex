@@ -70,12 +70,12 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Pi do
   end
 
   @eits_cli_reference """
-      eits tasks begin --title "<title>"
-      eits tasks annotate <id> --body "..."
-      eits tasks update <id> --state 4
-      eits dm --to <session_uuid> --message "<text>"
-      eits commits create --hash <hash>
-    """
+    eits tasks begin --title "<title>"
+    eits tasks annotate <id> --body "..."
+    eits tasks update <id> --state 4
+    eits dm --to <session_uuid> --message "<text>"
+    eits commits create --hash <hash>
+  """
 
   defp pi_eits_init_prompt(state) do
     """

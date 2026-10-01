@@ -1,0 +1,255 @@
+{
+  "schema": "impeccable.design.v2",
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-26T07:16:01Z",
+  "source": {
+    "mode": "scan",
+    "productPath": "PRODUCT.md",
+    "designPath": "DESIGN.md",
+    "evidence": [
+      "assets/css/app.css",
+      "lib/eye_in_the_sky_web/components/core_components.ex",
+      "lib/eye_in_the_sky_web/components/layouts/app.html.heex",
+      "lib/eye_in_the_sky_web/components/rail/flyout.ex",
+      "lib/eye_in_the_sky_web/components/session_card.ex"
+    ]
+  },
+  "northStar": "The Agent Control Room",
+  "traits": [
+    "compact",
+    "state-first",
+    "calm",
+    "operational",
+    "traceable",
+    "tactile"
+  ],
+  "colorMeta": {
+    "warm_rail": {
+      "value": "hsl(30 3.3% 10%)",
+      "role": "persistent navigation anchor",
+      "tone": "warm black",
+      "ramp": [
+        "hsl(30 3.3% 8%)",
+        "hsl(30 3.3% 10%)",
+        "hsl(30 3.3% 11.8%)",
+        "hsl(30 3.3% 14%)"
+      ]
+    },
+    "warm_canvas": {
+      "value": "hsl(60 2.7% 14.5%)",
+      "role": "primary dark workspace",
+      "tone": "warm charcoal",
+      "ramp": [
+        "hsl(60 2.7% 10%)",
+        "hsl(60 2.7% 14.5%)",
+        "hsl(60 2.7% 18%)",
+        "hsl(60 2.7% 22%)"
+      ]
+    },
+    "warm_card": {
+      "value": "hsl(60 2.1% 18.4%)",
+      "role": "raised local surface",
+      "tone": "soft charcoal",
+      "ramp": [
+        "hsl(60 2.1% 16%)",
+        "hsl(60 2.1% 18.4%)",
+        "hsl(60 2.1% 21%)",
+        "hsl(60 2.1% 24%)"
+      ]
+    },
+    "warm_accent": {
+      "value": "hsl(15 63.1% 59.6%)",
+      "role": "primary action and selection",
+      "tone": "warm coral",
+      "ramp": [
+        "hsl(15 63.1% 36%)",
+        "hsl(15 63.1% 48%)",
+        "hsl(15 63.1% 59.6%)",
+        "hsl(15 63.1% 72%)"
+      ]
+    },
+    "pampas_canvas": {
+      "value": "oklch(97.5% 0.004 85)",
+      "role": "primary light workspace",
+      "tone": "paper warm",
+      "ramp": [
+        "oklch(91% 0.012 90)",
+        "oklch(94.5% 0.006 85)",
+        "oklch(97.5% 0.004 85)",
+        "oklch(99% 0.002 85)"
+      ]
+    },
+    "tokyo_accent": {
+      "value": "#7aa2f7",
+      "role": "cool technical alternate accent",
+      "tone": "terminal blue",
+      "ramp": [
+        "#3d59a1",
+        "#5c7ed6",
+        "#7aa2f7",
+        "#a9bffc"
+      ]
+    },
+    "status_success": {
+      "value": "hsl(97 59.1% 46.1%)",
+      "role": "complete or healthy state",
+      "tone": "green"
+    },
+    "status_warning": {
+      "value": "hsl(40 71% 50%)",
+      "role": "waiting, needs attention, or caution state",
+      "tone": "amber"
+    },
+    "status_error": {
+      "value": "hsl(0 67% 59.6%)",
+      "role": "failed, blocked, or destructive state",
+      "tone": "red"
+    },
+    "status_info": {
+      "value": "hsl(210 65.5% 67.1%)",
+      "role": "neutral progress or informational state",
+      "tone": "blue"
+    }
+  },
+  "typeMeta": {
+    "title": {
+      "role": "compact panel and row headings",
+      "usage": "Use for entity titles, active task names, selected session names, and topbar labels."
+    },
+    "body": {
+      "role": "dense operational text",
+      "usage": "Use for readable descriptions, summaries, DM previews, and short explanatory text."
+    },
+    "label": {
+      "role": "controls and section labels",
+      "usage": "Use for buttons, filters, uppercase panel labels, and compact UI metadata."
+    },
+    "metadata": {
+      "role": "technical identifiers",
+      "usage": "Use for UUIDs, git refs, timestamps, model names, command names, and counters."
+    }
+  },
+  "components": {
+    "primary_button": {
+      "intent": "Compact, high-confidence action.",
+      "states": [
+        "default",
+        "hover",
+        "focus-visible",
+        "disabled",
+        "loading"
+      ],
+      "implementationNotes": "Prefer existing CoreComponents button classes and icon-plus-text composition for task creation, commit logging, dispatch, approval, and submit actions."
+    },
+    "ghost_icon_button": {
+      "intent": "Low-chrome utility control.",
+      "states": [
+        "default",
+        "hover",
+        "active",
+        "focus-visible",
+        "disabled"
+      ],
+      "implementationNotes": "Use square buttons with hero icons for rail actions, panel controls, close buttons, refresh, copy, filter toggles, and compact navigation."
+    },
+    "rail_flyout": {
+      "intent": "Persistent navigation and scannable object lists.",
+      "states": [
+        "expanded",
+        "collapsed",
+        "mobile-open",
+        "mobile-closed"
+      ],
+      "implementationNotes": "Keep the 236px flyout width, dark tonal background, sticky header/filter/content zones, and short 150ms transitions."
+    },
+    "session_row": {
+      "intent": "Scannable operational entity row.",
+      "states": [
+        "default",
+        "hover",
+        "selected",
+        "checkbox-visible",
+        "inactive"
+      ],
+      "implementationNotes": "Use status dots, subtle selected accent wash, mono metadata, tight row spacing, and stable dimensions."
+    },
+    "square_checkbox": {
+      "intent": "Batch selection without visual noise.",
+      "states": [
+        "unchecked",
+        "checked",
+        "focus-visible",
+        "disabled"
+      ],
+      "implementationNotes": "Keep the custom 1rem square control with clear checked icon and focus treatment."
+    },
+    "search_input": {
+      "intent": "Scoped filtering and command entry.",
+      "states": [
+        "empty",
+        "filled",
+        "focused",
+        "disabled"
+      ],
+      "implementationNotes": "Place search near the affected list or panel, keep it compact, and do not make it look like a marketing form field."
+    },
+    "context_menu": {
+      "intent": "Fast secondary actions.",
+      "states": [
+        "closed",
+        "open",
+        "item-hover",
+        "item-disabled",
+        "danger-item"
+      ],
+      "implementationNotes": "Use an 8px menu radius, crisp item hover states, keyboard focus, and only the heavier shadow where a floating layer truly needs separation."
+    },
+    "code_block": {
+      "intent": "Readable command, log, diff, and EITS-CMD output.",
+      "states": [
+        "static",
+        "copyable",
+        "wrapped",
+        "overflowing"
+      ],
+      "implementationNotes": "Preserve monospace text, copy affordances, syntax color, and obvious boundaries."
+    }
+  },
+  "layout": {
+    "density": "compact",
+    "navigation": "persistent rail plus contextual flyout",
+    "surfaceModel": [
+      "rail",
+      "flyout",
+      "canvas",
+      "tool",
+      "row",
+      "floating-menu"
+    ],
+    "avoid": [
+      "oversized heroes",
+      "nested cards",
+      "decorative gradient blobs",
+      "heavy shadows",
+      "marketing-page sections",
+      "visible how-to prose"
+    ]
+  },
+  "motion": {
+    "duration": {
+      "fast": "100ms",
+      "normal": "150ms"
+    },
+    "easing": "ease-out",
+    "reducedMotion": "Collapse nonessential motion to near-zero duration."
+  },
+  "accessibility": {
+    "requirements": [
+      "Visible focus states for every interactive control.",
+      "Stable dimensions across hover, loading, and selected states.",
+      "Non-color cues for failed, waiting, blocked, active, approved, and complete states.",
+      "Keyboard paths for command and supervision workflows.",
+      "Readable contrast in warm, Pampas, Tokyo Night, and Catppuccin themes."
+    ]
+  }
+}

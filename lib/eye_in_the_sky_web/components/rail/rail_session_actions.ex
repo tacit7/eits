@@ -138,7 +138,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
 
   def handle_archive_session(%{"session_id" => session_id_str}, socket) do
     case parse_int(session_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       session_id ->
         case Sessions.get_session(session_id) do
           {:error, :not_found} ->
@@ -191,7 +193,9 @@ defmodule EyeInTheSkyWeb.Components.Rail.RailSessionActions do
   def handle_rename_session(%{"session_id" => session_id_str, "name" => name}, socket)
       when is_binary(name) and name != "" do
     case parse_int(session_id_str) do
-      nil -> {:noreply, socket}
+      nil ->
+        {:noreply, socket}
+
       session_id ->
         case Sessions.get_session(session_id) do
           {:error, :not_found} ->

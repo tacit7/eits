@@ -188,12 +188,27 @@ const liveSocket = new LiveSocket("/live", Socket, {
 })
 
 // Show progress bar on live navigation and form submits
-topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
+function configureTopbarColors() {
+  // Canvas colors cannot resolve CSS variables. Let CSS compute concrete colors
+  // on each navigation so the progress bar follows the currently selected theme.
+  const probe = document.createElement("span")
+  probe.hidden = true
+  probe.style.color = "var(--color-primary, #6366f1)"
+  probe.style.backgroundColor = "color-mix(in oklch, var(--color-base-content, #000) 30%, transparent)"
+  document.body.appendChild(probe)
+  const colors = getComputedStyle(probe)
+  topbar.config({
+    barColors: {0: colors.color},
+    shadowColor: colors.backgroundColor,
+  })
+  probe.remove()
+}
 // Track navigation kind so we can reset main scroll on full navigations only.
 // phx:page-loading-stop doesn't carry detail; capture kind from start and apply on stop.
 let _pendingNavKind = null
 window.addEventListener("phx:page-loading-start", (e) => {
   _pendingNavKind = e.detail?.kind ?? null
+  configureTopbarColors()
   topbar.show(300)
 })
 window.addEventListener("phx:page-loading-stop", (_info) => {
@@ -279,7 +294,7 @@ document.addEventListener("click", (e) => {
   })
 }, true)
 
-// Rail divider double-click = collapse/expand (bonus gesture; the hover
+// Rail divider double-click = disclosure/expand (bonus gesture; the hover
 // chevron #rail-collapse-toggle is the discoverable affordance). Persistence
 // happens server-side via the RailState hook's save_rail_state patch.
 window.addEventListener("dblclick", (e) => {
@@ -295,6 +310,7 @@ window.addEventListener("dblclick", (e) => {
 // Since ES modules are keyed by URL, these are treated as distinct module instances.
 // The guard ensures the second evaluation is a no-op — the first LiveSocket wins.
 if (!window.liveSocket) {
+  liveSocket.enableDebug()
   liveSocket.connect()
   window.liveSocket = liveSocket
 }

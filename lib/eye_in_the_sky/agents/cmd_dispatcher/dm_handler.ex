@@ -12,6 +12,7 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
   alias EyeInTheSky.{Agents, Messages, Sessions}
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.Agents.CmdDispatcher.Helpers
+  alias EyeInTheSky.Messaging.DMDelivery
   alias EyeInTheSky.Utils.ToolHelpers
 
   import Helpers, only: [notify_success: 2, notify_error: 3, extract_flag: 2]
@@ -87,37 +88,24 @@ defmodule EyeInTheSky.Agents.CmdDispatcher.DmHandler do
 
     display_name = agent_name || from_session.name || "session:#{from_session.id}"
 
-    dm_body =
-      "[DM from agent: #{display_name}]\n#{message}\n\nReply: eits dm --to #{from_session.id} --message \"\""
+    from_ref = from_session.uuid || from_session.id
+    dm_body = "DM from:#{display_name} (session:#{from_ref}) #{message}"
 
-    attrs = %{
-      uuid: Ecto.UUID.generate(),
-      session_id: to_session.id,
+    metadata = %{
+      sender_name: display_name,
+      agent_name: agent_name,
+      session_name: from_session.name,
       from_session_id: from_session.id,
-      to_session_id: to_session.id,
-      body: dm_body,
-      sender_role: "agent",
-      recipient_role: "agent",
-      direction: "inbound",
-      status: "sent",
-      provider: "claude",
-      metadata: %{
-        sender_name: display_name,
-        agent_name: agent_name,
-        session_name: from_session.name,
-        from_session_id: from_session.id,
-        from_session_uuid: from_session.uuid,
-        to_session_uuid: to_session.uuid
-      }
+      from_session_uuid: from_session.uuid,
+      to_session_uuid: to_session.uuid
     }
 
-    case Messages.create_message(attrs) do
-      {:ok, msg} ->
-        EyeInTheSky.Events.session_new_dm(to_session.id, msg)
+    case DMDelivery.deliver_or_persist(to_session.id, from_session.id, dm_body, metadata) do
+      {:ok, _msg} ->
         notify_success(from_session_id, "dm sent to session #{to_session.id}")
 
       {:error, reason} ->
-        notify_error(from_session_id, "dm persist", reason)
+        notify_error(from_session_id, "dm", reason)
     end
   end
 end

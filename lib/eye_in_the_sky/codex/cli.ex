@@ -92,7 +92,10 @@ defmodule EyeInTheSky.Codex.CLI do
     * `:prompt` (required) - the user prompt (positional arg after flags)
     * `:resume` - `--resume <thread_id>`
     * `:model` - `-m <model>`
-    * `:full_auto` - `--full-auto` (default: true)
+    * `:full_auto` - current equivalent of the removed `--full-auto` shortcut
+      (`--sandbox workspace-write` plus approval policy `on-request`)
+    * `:sandbox` - `--sandbox <mode>`
+    * `:ask_for_approval` - approval policy passed through `-c`
     * `:bypass_sandbox` - `--dangerously-bypass-approvals-and-sandbox` (default: true; overrides full_auto)
     * `:max_turns` - not directly supported by Codex; ignored
 
@@ -113,6 +116,7 @@ defmodule EyeInTheSky.Codex.CLI do
     # New session uses: codex exec [flags] [prompt]
     # NOT codex exec --resume <id> — that flag does not exist in the Codex CLI.
     resume_id = opts[:resume]
+    resume? = not is_nil(resume_id)
 
     base_args =
       if resume_id do
@@ -126,19 +130,33 @@ defmodule EyeInTheSky.Codex.CLI do
 
     # Model
     args =
-      if model = opts[:model] do
-        args ++ ["-m", to_string(model)]
+      if model = codex_model_arg(opts[:model]) do
+        args ++ ["-m", model]
       else
         args
       end
 
-    # Bypass sandbox takes precedence over full_auto
+    # Bypass takes precedence. Current Codex versions removed --full-auto, so
+    # expand that legacy setting to its supported sandbox/approval equivalent.
+    full_auto =
+      Keyword.get_lazy(opts, :full_auto, fn ->
+        is_nil(opts[:sandbox]) and is_nil(opts[:ask_for_approval])
+      end)
+
     args =
-      if Keyword.get(opts, :bypass_sandbox, true) do
-        args ++ ["--dangerously-bypass-approvals-and-sandbox"]
-      else
-        full_auto = Keyword.get(opts, :full_auto, true)
-        if full_auto, do: args ++ ["--full-auto"], else: args
+      cond do
+        Keyword.get(opts, :bypass_sandbox, true) ->
+          args ++ ["--dangerously-bypass-approvals-and-sandbox"]
+
+        full_auto ->
+          args
+          |> add_sandbox("workspace-write", resume?)
+          |> add_approval_policy("on-request")
+
+        true ->
+          args
+          |> add_sandbox(opts[:sandbox], resume?)
+          |> add_approval_policy(opts[:ask_for_approval])
       end
 
     # Inject EITS env vars via shell_environment_policy.set so they're
@@ -154,6 +172,7 @@ defmodule EyeInTheSky.Codex.CLI do
         {"EITS_PROJECT_ID", opts[:eits_project_id]},
         {"EITS_CHANNEL_ID", opts[:eits_channel_id]},
         {"EITS_MODEL", opts[:eits_model]},
+        {"ENTRYPOINT", opts[:entrypoint] || "cli"},
         {"EITS_URL",
          opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")}
       ]
@@ -175,6 +194,31 @@ defmodule EyeInTheSky.Codex.CLI do
       args
     end
   end
+
+  defp add_sandbox(args, nil, _resume?), do: args
+
+  # `codex exec resume` does not accept the top-level --sandbox shortcut, but it
+  # does accept equivalent config overrides.
+  defp add_sandbox(args, sandbox, true), do: args ++ ["-c", ~s(sandbox_mode="#{sandbox}")]
+
+  defp add_sandbox(args, sandbox, false), do: args ++ ["--sandbox", to_string(sandbox)]
+
+  defp add_approval_policy(args, nil), do: args
+
+  # on-failure was accepted by older Codex releases but is no longer a valid
+  # policy. Preserve legacy saved settings with the closest current behavior.
+  defp add_approval_policy(args, "on-failure"),
+    do: add_approval_policy(args, "on-request")
+
+  defp add_approval_policy(args, policy),
+    do: args ++ ["-c", ~s(approval_policy="#{policy}")]
+
+  # ChatGPT-account Codex auth rejects the base GPT-5.2 slug. Keep the UI/storage
+  # value backward compatible, but send the Codex-scoped slug to the CLI.
+  defp codex_model_arg("gpt-5.2"), do: "gpt-5.2-codex"
+  defp codex_model_arg(model) when is_binary(model), do: model
+  defp codex_model_arg(model) when not is_nil(model), do: to_string(model)
+  defp codex_model_arg(nil), do: nil
 
   # ---------------------------------------------------------------------------
   # Binary cache
@@ -223,7 +267,10 @@ defmodule EyeInTheSky.Codex.CLI do
 
         flags = Enum.slice(args, 0..(length(args) - 2)//1)
         cmd_string = "codex " <> Enum.join(flags, " ") <> prompt_summary
-        Logger.warning("[spawn] Codex path=#{project_path} model=#{opts[:model]} cmd=#{cmd_string}")
+
+        Logger.warning(
+          "[spawn] Codex path=#{project_path} model=#{opts[:model]} cmd=#{cmd_string}"
+        )
 
         env = build_env(opts)
 
@@ -257,7 +304,6 @@ defmodule EyeInTheSky.Codex.CLI do
           model: opts[:model]
         })
 
-
         {:ok, port, session_ref}
 
       {:error, reason} ->
@@ -277,6 +323,7 @@ defmodule EyeInTheSky.Codex.CLI do
     ANTHROPIC_API_KEY
     CLAUDECODE
     CLAUDE_CODE_ENTRYPOINT
+    ENTRYPOINT
     BINDIR
     ROOTDIR
     EMU
@@ -312,6 +359,7 @@ defmodule EyeInTheSky.Codex.CLI do
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_AGENT_ID", opts[:eits_agent_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_PROJECT_ID", opts[:eits_project_id])
     |> EyeInTheSky.CLI.Port.maybe_add_env("EITS_MODEL", opts[:eits_model])
+    |> EyeInTheSky.CLI.Port.maybe_add_env("ENTRYPOINT", opts[:entrypoint] || "cli")
     |> EyeInTheSky.CLI.Port.maybe_add_env(
       "EITS_URL",
       opts[:eits_url] || System.get_env("EITS_URL", "http://localhost:5001/api/v1")

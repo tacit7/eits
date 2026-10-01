@@ -45,7 +45,9 @@ defmodule EyeInTheSky.Workers.DisableJobWorker do
     else
       {succeeded, failed} = ScheduledJobs.bulk_update_enabled(target_ids, false, job.project_id)
 
-      Logger.info("[DisableJobWorker] disabled #{succeeded} job(s), #{failed} failed/unauthorized")
+      Logger.info(
+        "[DisableJobWorker] disabled #{succeeded} job(s), #{failed} failed/unauthorized"
+      )
 
       if failed > 0 do
         {:error, "Disabled #{succeeded}, failed/unauthorized #{failed}"}

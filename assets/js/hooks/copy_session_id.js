@@ -29,7 +29,7 @@ export const CopySessionId = {
     // Create tooltip element
     const tooltip = document.createElement("div");
     tooltip.textContent = message;
-    tooltip.className = "absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 dark:bg-gray-700 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none";
+    tooltip.className = "absolute -top-8 left-1/2 z-50 -translate-x-1/2 whitespace-nowrap rounded-box bg-base-300 px-2 py-1 text-mini text-base-content shadow-lg pointer-events-none";
 
     // Position relative to button
     this.el.style.position = "relative";

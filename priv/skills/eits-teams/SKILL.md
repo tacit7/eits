@@ -1,13 +1,25 @@
 ---
 name: eits-teams
 description: Create and manage EITS agent teams for coordinated multi-agent work. Use this skill whenever the user wants to spawn multiple agents to work together, coordinate parallel tasks, run a swarm, delegate work across agents, or says things like "create a team", "spin up agents to", "have agents work on this together", "coordinate agents", or "run agents in parallel". EITS teams are fully server-owned — membership is tracked in Postgres, not local files.
-user-invocable: true
 allowed-tools: Bash
 ---
 
 # EITS Teams
 
 EITS teams coordinate multiple Claude agents in parallel. Membership is server-side — agents auto-join on spawn.
+
+Use `eits-team-member` in spawned-agent instructions for the mandatory member
+protocol: inbox checkpoints, task claim, no duplicate tasks, completion, explicit
+DM-back, and final inbox check. Use `eits-team-worker` when the member is doing
+code implementation in a worktree.
+
+For the spawned agent's own session snapshot, use `eits work status` or
+`eits work checkpoint`. That command is the agent-local view of claimed tasks,
+team memberships, inbox summary, git/worktree health, and commit tracking.
+Use it at session start/resume, after task claim, after major handoff points,
+and before DM-back or completion. Use `eits teams status <team_id> --wait` for
+whole-team completion tracking instead of trying to infer team state from the
+work checkpoint alone.
 
 ---
 
@@ -21,11 +33,13 @@ eits teams delete <id>
 eits teams members <id>
 eits teams join <team_id> --name <alias> [--role member|admin] [--session <uuid>]
 eits teams status <id> [--wait] [--watch [<n>]] [--json]
+eits tasks status --team <team_id> [--json]
 # --wait   blocks until all members have member_status=done/spawn_failed (polls every 5s)
 #          exits 0 when all done, 1 if any spawn_failed
 #          bare invocation (no flags) prints a hint reminding you about --wait
 eits teams update-member <team_id> <member_id> --status <active|idle|done|failed>
 eits teams leave <team_id> <member_id>
+eits tasks claim <task_id>   # worker claims an orchestrator-assigned task
 ```
 
 Spawn an agent:
@@ -156,8 +170,12 @@ eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SES
 eits tasks create --title "Research X" --description "Details" --team <team_id>
 # Use 'create' (not 'begin') here — creates the task in Todo state for workers to claim.
 # 'begin' would mark it In Progress immediately, which is wrong for pre-assigned tasks.
-# Workers claim with: eits tasks begin --id <task_id>
+# Workers claim with: eits tasks claim <task_id>
 ```
+Do not tell workers to run plain `eits tasks begin --title ...` for
+pre-created team work; that creates a duplicate task. Assigned workers must use
+`eits tasks claim <task_id>` (or the compatibility alias
+`eits tasks begin --id <task_id>`).
 
 ### 4. Get orchestrator IDs
 
@@ -170,7 +188,7 @@ Pass `--parent-session-id` only — the server derives `parent_agent_id` from th
 ```bash
 eits agents spawn \
   --interpolate-env \
-  --instructions "Your task. team_id: <team_id>. Run mix compile before finishing. DM back: eits dm --to $EITS_SESSION_ID --message 'done'" \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: <task_id>. Claim it with: eits tasks claim <task_id>. Do not create a duplicate task. team_id: <team_id>. Run mix compile before finishing. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=<task_id> result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet \
   --team-name my-team \
   --member-name researcher \
@@ -187,6 +205,13 @@ eits agents spawn \
 ```
 
 Spawn all agents sequentially. Each gets a unique `--member-name`.
+Every worker instruction must include:
+- assigned task id
+- `eits tasks claim <task_id>`
+- "Do not create a duplicate task"
+- "Use `eits-team-member` and follow its required sequence"
+- the orchestrator session id to DM on completion
+- the expected DM format
 
 ### 6. Monitor
 
@@ -202,6 +227,7 @@ eits teams status <team_id> --wait
 For spot checks or ad-hoc DMs:
 ```bash
 eits teams status <team_id>   # snapshot (also hints you about --wait)
+eits tasks status --team <team_id>   # task state, task ids, and linked session_ids
 eits dm --to $UUID_1 --message "Status update?"   # sequential only — never parallel
 eits dm --to $UUID_2 --message "Status update?"
 # Parallel DM Bash calls share the same connection pool; the CLI cancels siblings on
@@ -220,13 +246,19 @@ git log --oneline main..<worktree-branch>
 git log --oneline --merges | head -5
 ```
 
+If you need the current agent's own session snapshot during this review, run
+`eits work checkpoint` rather than re-polling every team command. It gives the
+claimed-task and git context that `teams status` does not.
+
 ### 8. Review and close out
 
 After merges are confirmed, collect results:
 
 ```bash
-eits dm inbox --since-session   # only DMs since this session started; suppresses stale resume noise
+eits dm inbox --since-session --team-only --json   # only current team DMs since this session started
 ```
+
+After a major state transition, before claiming more work, before closing a worker task, and after a completion DM, poll the inbox again with `eits dm inbox --since-session --team-only --json`.
 
 If a specific agent's DM is needed before the team is fully done:
 ```bash
@@ -248,15 +280,23 @@ eits teams delete <id>   # only when explicitly instructed
 Agents auto-receive team context. They are expected to:
 
 ```bash
-eits tasks begin --title "<task name>"   # or: eits tasks begin --id <id> if orchestrator pre-assigned a task ID
+eits dm inbox --since-session --team-only --json
+eits tasks claim <assigned_task_id>      # claim the orchestrator-created task
+eits dm inbox --since-session --team-only --json
 # ... do work ...
 mix compile                              # MUST pass before DM-back — never DM done with a broken branch
+eits dm inbox --since-session --team-only --json
 eits tasks complete <task_id> --message "Summary of what was done"
 # complete: annotates + marks task Done (one round-trip)
 # team member_status → done fires automatically when the agent session ends (Stop hook)
 # DM-back to orchestrator must be explicit — it is NOT sent by tasks complete
-eits dm --to <ORC_SESSION_ID> --message "done:<branch-name>"
+eits dm --to <ORC_SESSION_ID> --message "done task=<task_id> result=<summary> branch=<branch-or-pr>"
+eits dm inbox --since-session --team-only --json   # catch any follow-up work after the completion DM
 ```
+
+If no task id was assigned, the worker must DM the orchestrator and wait. It
+must not create a new task with `eits tasks begin --title ...` unless the
+orchestrator explicitly asks it to define new work.
 
 If `complete` fails, fall back:
 
@@ -279,7 +319,7 @@ eits tasks update <task_id> --state done
 - **`--worktree` names must be unique per spawn** — duplicates fail at the git layer with a confusing error.
 - **`EITS_PROJECT_ID` is not in spawned agent environments** — pass it explicitly in instructions or via `--interpolate-env`.
 - `--worktree` requires a clean working tree — commit or stash first.
-- **Poll inbound DMs without the browser**: `eits dm list` shows the orchestrator's inbox; use `--session <uuid>` to check any member's inbox.
+- **Poll inbound DMs without the browser**: use `eits dm inbox --since-session --team-only --json` for current-team replies, and re-run it at the claim/transition/closeout checkpoints.
 
 ---
 
@@ -295,15 +335,15 @@ eits teams create --name "docs-team" --description "Research flags and write REA
 eits teams join <team_id> --name "orchestrator" --role admin --session $EITS_SESSION_UUID
 
 # 3. Create tasks
-eits tasks create --title "Research Claude CLI flags" --team <team_id>
-eits tasks create --title "Write README from research" --team <team_id>
+RESEARCH_TASK=$(eits tasks create --title "Research Claude CLI flags" --team <team_id> | jq -r '.task_id')
+WRITE_TASK=$(eits tasks create --title "Write README from research" --team <team_id> | jq -r '.task_id')
 
 # 4. No lookup needed — $EITS_SESSION_ID and $EITS_AGENT_ID are set by the startup hook
 
 # 5a. Spawn researcher first
 eits agents spawn \
   --interpolate-env \
-  --instructions "Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. DM back to $EITS_SESSION_ID when done." \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $RESEARCH_TASK. Claim it with: eits tasks claim $RESEARCH_TASK. Do not create a duplicate task. Investigate all claude --help flags. Write findings to /tmp/research.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$RESEARCH_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet --team-name docs-team --member-name researcher \
   --parent-session-id $EITS_SESSION_ID
 
@@ -313,7 +353,7 @@ eits teams status <team_id> --wait
 # 5b. Only then spawn writer (producer/consumer — must be sequenced)
 eits agents spawn \
   --interpolate-env \
-  --instructions "Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. DM back to $EITS_SESSION_ID when done." \
+  --instructions "Use eits-team-member and follow its required sequence. Assigned task: $WRITE_TASK. Claim it with: eits tasks claim $WRITE_TASK. Do not create a duplicate task. Read /tmp/research.md and write docs/README.md. team_id: <team_id>. Run mix compile. Complete the task, then DM back: eits dm --to $EITS_SESSION_ID --message 'done task=$WRITE_TASK result=<summary> branch=<branch-or-pr> commit=<sha-or-none>'" \
   --model sonnet --team-name docs-team --member-name writer \
   --parent-session-id $EITS_SESSION_ID
 
@@ -321,7 +361,7 @@ eits agents spawn \
 eits teams status <team_id> --wait
 
 # 7. Verify merges, then collect results
-eits dm inbox --since-session
+eits dm inbox --since-session --team-only --json
 ```
 
 ---
@@ -332,4 +372,4 @@ eits dm inbox --since-session
 - **Use descriptive `--member-name` values** — DMs identify agents by this alias.
 - **Teams LiveView at `/teams`** — real-time member status and per-member task lists.
 - **One team per logical unit of work** — don't reuse teams across unrelated tasks.
-- **Task must be linked to session** for Stop hook to gate. `eits tasks begin --id <task_id>` claims and links atomically. Verify: `psql -d eits_dev -c "SELECT task_id FROM task_sessions WHERE session_id = (SELECT id FROM sessions WHERE uuid = '$EITS_SESSION_UUID')"`
+- **Task must be linked to session** for Stop hook to gate. `eits tasks claim <task_id>` claims and links atomically. Verify with `eits tasks active --json`.

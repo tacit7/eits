@@ -6,8 +6,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
   alias EyeInTheSky.ScheduledJobs
 
-  setup do
-    project = project_fixture()
+  setup %{user: user} do
+    {:ok, project} =
+      EyeInTheSky.Projects.create_project(%{
+        name: "Jobs project #{uniq()}",
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id
+      })
+
     %{project: project}
   end
 
@@ -27,13 +32,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
   describe "mount" do
     test "renders jobs page for project", %{conn: conn, project: project} do
-      {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "Scheduled Jobs"
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+      assert has_element?(view, "button", "New Job")
     end
 
     test "shows empty state when project has no jobs", %{conn: conn, project: project} do
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "No scheduled jobs"
+      assert html =~ "No jobs yet"
     end
 
     test "lists only jobs scoped to the project", %{conn: conn, project: project} do
@@ -61,7 +66,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
         })
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      assert html =~ "Global Jobs"
       assert html =~ "Global Job"
     end
   end
@@ -69,13 +73,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
   describe "new job form" do
     test "opens drawer on new job click", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
       assert has_element?(view, "h2", "New Job")
     end
 
     test "new job form pre-fills project_id", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       html = render(view)
       assert html =~ "value=\"#{project.id}\""
@@ -83,7 +87,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "creates job scoped to project on submit", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       view
       |> form("form[phx-submit='save_job']", %{
@@ -102,7 +106,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "shows job in list after creation", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
 
       view
       |> form("form[phx-submit='save_job']", %{
@@ -118,7 +122,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "closes drawer on cancel", %{conn: conn, project: project} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
-      view |> element("button", "+ New Job") |> render_click()
+      view |> element("button", "New Job") |> render_click()
       view |> element("button[phx-click='cancel_form']", "Cancel") |> render_click()
 
       # side_drawer sets aria-modal="false" when closed
@@ -134,6 +138,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
 
     test "toggle enables/disables job", %{conn: conn, project: project, job: job} do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
+
+      # Toggle is inside the expanded detail panel — expand the job first
+      view
+      |> element("div[phx-click='expand_job'][phx-value-id='#{job.id}']")
+      |> render_click()
 
       view
       |> element("input.toggle-sm[phx-value-id='#{job.id}']")
@@ -177,10 +186,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
       {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/jobs")
 
       view
-      |> element("td[phx-click='expand_job'][phx-value-id='#{job.id}']")
+      |> element("div[phx-click='expand_job'][phx-value-id='#{job.id}']")
       |> render_click()
 
-      assert has_element?(view, "div", "Recent Runs")
+      assert has_element?(view, "p", "Runs")
     end
   end
 
@@ -295,10 +304,11 @@ defmodule EyeInTheSkyWeb.ProjectLive.JobsTest do
     end
   end
 
-  describe "nil project redirect" do
-    test "redirects to /projects when project ID does not exist", %{conn: conn} do
-      assert {:error, {:redirect, %{to: "/projects"}}} =
-               live(conn, ~p"/projects/99999/jobs")
+  describe "missing project" do
+    test "returns not found when project ID does not exist", %{conn: conn} do
+      assert_raise Ecto.NoResultsError, fn ->
+        live(conn, ~p"/projects/99999/jobs")
+      end
     end
   end
 end

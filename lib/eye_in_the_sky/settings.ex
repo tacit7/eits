@@ -31,6 +31,7 @@ defmodule EyeInTheSky.Settings do
     "cli_idle_timeout_ms" => "0",
     "log_claude_raw" => "false",
     "log_codex_raw" => "false",
+    "codex_app_server_enabled" => "false",
     "tts_voice" => "Ava",
     "tts_rate" => "200",
     "pricing_opus_input" => "15.0",

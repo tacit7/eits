@@ -1,0 +1,14 @@
+Create a To Do task, optionally assigning it to a session
+
+Usage: eits tasks create [OPTIONS] --title <TITLE>
+
+Options:
+      --pretty                     Pretty-print JSON output (default: compact; or EITS_PRETTY=1)
+  -t, --title <TITLE>
+  -p, --project <PROJECT>
+  -q, --quiet                      Print only the created/affected ID on success (mutations)
+      --team <TEAM>
+  -d, --description <DESCRIPTION>
+      --priority <PRIORITY>
+      --assign-to <ASSIGN_TO>      Assign the new task to a session (UUID or integer ID)
+  -h, --help                       Print help

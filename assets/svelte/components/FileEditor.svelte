@@ -147,7 +147,7 @@
 
 <div class="h-full overflow-hidden flex flex-col">
   {#if loadError}
-    <div class="text-xs text-error px-3 py-1 bg-base-200 border-b border-base-300 shrink-0">
+    <div class="text-mini text-error px-3 py-1 bg-base-200 border-b border-base-300 shrink-0">
       {loadError}
     </div>
   {/if}

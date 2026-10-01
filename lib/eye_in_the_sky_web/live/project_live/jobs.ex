@@ -52,7 +52,13 @@ defmodule EyeInTheSkyWeb.ProjectLive.Jobs do
   end
 
   def handle_event("edit_schedule", %{"job_id" => job_id} = params, socket) do
-    JobsLiveHandlers.handle_guarded_event("edit_schedule", job_id, params, socket, socket.assigns.project_id)
+    JobsLiveHandlers.handle_guarded_event(
+      "edit_schedule",
+      job_id,
+      params,
+      socket,
+      socket.assigns.project_id
+    )
   end
 
   def handle_event("switch_tab", params, socket) do

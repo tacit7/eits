@@ -11,33 +11,50 @@ defmodule EyeInTheSky.Claude.SDKTest do
     end
 
     test "returns {:ok, ref, handler_pid} when successful" do
-      # This would spawn a real Claude process - skip in CI
-      unless System.get_env("CI") do
-        {:ok, ref, _handler} = SDK.start("Say hello", to: self(), model: "haiku", max_turns: 1)
-        assert is_reference(ref)
+      {:ok, ref, _handler} =
+        SDK.start("Say hello",
+          to: self(),
+          cli_module: EyeInTheSky.Claude.MockCLI,
+          model: "haiku",
+          max_turns: 1
+        )
 
-        # Receive at least one message
-        assert_receive {:claude_message, ^ref, %Message{}}, 30_000
+      assert is_reference(ref)
 
-        # Clean up
-        SDK.cancel(ref)
-      end
+      mock_port = SDK.Registry.lookup(ref)
+      assert is_pid(mock_port)
+
+      send(mock_port, {:send_output, assistant_line("hello")})
+
+      assert_receive {:claude_message, ^ref, %Message{type: :text, content: "hello"}}, 1_000
+
+      SDK.cancel(ref)
     end
 
     test "sends parsed messages to caller" do
-      unless System.get_env("CI") do
-        {:ok, ref, _handler} = SDK.start("Count to 3", to: self(), model: "haiku", max_turns: 1)
+      {:ok, ref, _handler} =
+        SDK.start("Count to 3",
+          to: self(),
+          cli_module: EyeInTheSky.Claude.MockCLI,
+          model: "haiku",
+          max_turns: 1
+        )
 
-        messages = collect_messages(ref, [])
+      mock_port = SDK.Registry.lookup(ref)
+      assert is_pid(mock_port)
 
-        # Should receive text messages
-        text_messages = Enum.filter(messages, &(&1.type == :text))
-        assert text_messages != []
+      send(mock_port, {:send_output, assistant_line("one two three")})
+      send(mock_port, {:send_output, result_line("session-123", "done")})
+      send(mock_port, {:exit, 0})
 
-        # Should get completion
-        assert_receive {:claude_complete, ^ref, session_id}, 30_000
-        assert is_binary(session_id)
-      end
+      {messages, session_id} = collect_messages_until_complete(ref, [])
+
+      # Should receive text messages
+      text_messages = Enum.filter(messages, &(&1.type == :text))
+      assert text_messages != []
+
+      # Should get completion
+      assert session_id == "session-123"
     end
   end
 
@@ -146,19 +163,34 @@ defmodule EyeInTheSky.Claude.SDKTest do
     end
   end
 
-  # Helper to collect messages until completion or timeout
-  defp collect_messages(ref, acc) do
+  defp collect_messages_until_complete(ref, acc) do
     receive do
       {:claude_message, ^ref, message} ->
-        collect_messages(ref, [message | acc])
+        collect_messages_until_complete(ref, [message | acc])
 
-      {:claude_complete, ^ref, _session_id} ->
-        Enum.reverse(acc)
+      {:claude_complete, ^ref, session_id} ->
+        {Enum.reverse(acc), session_id}
 
       {:claude_error, ^ref, _reason} ->
-        Enum.reverse(acc)
+        {Enum.reverse(acc), nil}
     after
-      30_000 -> Enum.reverse(acc)
+      1_000 -> {Enum.reverse(acc), nil}
     end
+  end
+
+  defp assistant_line(text) do
+    Jason.encode!(%{
+      "type" => "assistant",
+      "message" => %{"content" => [%{"type" => "text", "text" => text}]}
+    })
+  end
+
+  defp result_line(session_id, result) do
+    Jason.encode!(%{
+      "type" => "result",
+      "session_id" => session_id,
+      "result" => result,
+      "is_error" => false
+    })
   end
 end

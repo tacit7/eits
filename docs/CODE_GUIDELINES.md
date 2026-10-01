@@ -89,6 +89,26 @@ LiveViews mount twice (disconnected + connected). Only do side effects when `con
 - timers
 - DB writes / external calls
 
+### Detecting Router-Mounted vs Embedded LiveViews
+
+Use `socket.router` (a struct field) — **not** `socket.private[:router]` (a private map lookup) — to check whether a LiveView was mounted via the router.
+
+Router-mounted views (wired through `live/3` in the router) always have `socket.router` set to the router module. Views embedded with `live_render/3` (e.g., Rail) do not — `socket.router` is `nil`.
+
+**Why this matters:** Certain hooks (e.g., `handle_params`) are only safe to attach on router-mounted views. Calling them on embedded views crashes or silently misbehaves.
+
+**Pattern (commit 0b3b6085 — NavHook):**
+
+```elixir
+# ❌ Old: private map lookup — fragile, internal API
+router_mounted? = Map.get(socket.private, :router) != nil
+
+# ✅ Correct: struct field — stable, documented
+router_mounted? = socket.router != nil
+```
+
+**Rule:** Always use `socket.router != nil` to guard router-only socket behaviour. Never read from `socket.private` for router detection.
+
 ### Safe Resource Lookups in LiveViews
 
 Use the safe `get_project/1` (returns `{:ok, project} | {:error, :not_found}`) instead of `get_project!/1` (raises) when loading resources based on user input (params, route IDs). This allows proper error handling in `mount/3` without crashing the session.
@@ -146,8 +166,26 @@ Keep the Tailwind v4 directives in `assets/css/app.css`:
   - hover/focus micro-interactions
   - loading/empty states
 
-### daisyUI usage (project rule)
-daisyUI is available (themes + some existing UI), but new UI should be **Tailwind-composed** and app-specific. Don’t blindly stack daisyUI component classes for new design work—use them sparingly, and keep patterns consistent with nearby UI.
+### CSS Component Classes (project rule)
+
+DaisyUI was removed as an npm/Tailwind dependency (commit e71e271b). All form and UI component styles — `input`, `select`, `textarea`, `checkbox`, `toggle`, `label`, `dropdown`, `tabs`, `tooltip`, `table`, `stats`, `skeleton`, etc. — are now **locally implemented** in `assets/css/app.css` using `@theme` CSS custom properties (`oklch` color tokens, `--radius-*` tokens). The legacy daisy-named class names (e.g. `.input`, `.btn`, `.checkbox`) are kept as-is for backward compatibility with existing markup; do not rename them in bulk.
+
+**Preferred naming for new UI:** use the `eits-*` prefixed aliases introduced in commit f0c6a264. These coexist with the legacy names and are the canonical app-owned identifiers going forward:
+
+| eits-* class | Purpose |
+|---|---|
+| `eits-field` | Text input field (replaces `.input`) |
+| `eits-select` | Select/dropdown element |
+| `eits-textarea` | Multiline text area |
+| `eits-checkbox` | Checkbox input |
+| `eits-toggle` | Toggle/switch input |
+| `eits-label` | Label wrapper element |
+| `eits-label__text` | Label text span |
+| `eits-label__hint` | Label hint/helper text span |
+
+Size modifiers follow the `--xs`, `--sm`, `--md` suffix pattern (e.g. `eits-field--sm`). Bordered and error state variants: `eits-field--bordered`, `eits-field--error`.
+
+New UI should use `eits-*` classes for form primitives. Tailwind utility composition remains the standard for layout, spacing, and typography — keep patterns consistent with nearby UI.
 
 ### Icons (required)
 Use the imported `<.icon>` component. Don’t use Heroicons modules directly.
@@ -531,6 +569,58 @@ end
 **Also applies to UUID/ID pre-validation:** Use `Ecto.UUID.cast/1` to validate UUID format before running a DB query, instead of catching `Ecto.Query.CastError` in a rescue clause.
 
 **Rule:** Never rescue `ArgumentError` for type coercion. In LiveViews, prefer `parse_int/1`; elsewhere use `Integer.parse`, `Float.parse`, or `Ecto.UUID.cast`.
+
+---
+
+## Logging
+
+### Log Level Convention (dev.exs)
+
+`config/dev.exs` sets the global log level to `:warning`:
+
+```elixir
+config :logger, level: :warning
+```
+
+This silences all `Logger.debug` and `Logger.info` calls in development. The rationale is noise reduction — most debug/info chatter is not useful during normal development.
+
+**Consequence:** Any log line you want visible in dev must be `Logger.warning/1` or higher.
+
+### Session Spawn Logs Must Be `Logger.warning`
+
+Session lifecycle events are operationally important and must remain visible even with the `:warning` floor. These are the current promoted callsites:
+
+| Module | Log event | Level |
+|--------|-----------|-------|
+| `SessionBridge` | `ensure_worker_running` — found existing worker | `warning` |
+| `SessionBridge` | `ensure_worker_running` — no worker found, starting new | `warning` |
+| `SessionBridge` | `start_worker` — loading session | `warning` |
+| `SessionBridge` | `start_worker` — loaded session + agent | `warning` |
+| `SessionBridge` | `spawn_worker` — started | `warning` |
+| `SessionBridge` | `spawn_worker` — already started | `warning` |
+| `SessionBridge` | `spawn_worker` — evicted parked worker | `warning` |
+| `Claude.CLI` | `[spawn]` — provider spawn | `warning` |
+| `Codex.CLI` | `[spawn]` — provider spawn | `warning` |
+| `Pi.CLI` | `[spawn]` — provider spawn | `warning` |
+
+**Rule:** Any log message in the session spawn / worker lifecycle path must use `Logger.warning`. Do not use `Logger.info` or `Logger.debug` for these — they will be silenced in dev.
+
+### Claude CLI Spawn Log Format
+
+The Claude CLI spawn log is a single line consolidating all relevant options:
+
+```
+[spawn] Claude path=<project_path> model=<model> effort=<effort_level> budget=<max_budget_usd> permission_mode=<permission_mode> args=<cli_args>
+```
+
+Example:
+```
+[warn] [spawn] Claude path=/Users/user/project model=claude-opus-4-7 effort="high" budget=nil permission_mode=nil args=--output-format stream-json --verbose
+```
+
+Previously this was two separate `Logger.info` lines (one for args, one for CLI env/telemetry). They were collapsed into a single `Logger.warning` for scanability and to survive the `:warning` level floor.
+
+**Rule:** When adding new spawn-time diagnostics for Claude, append to this single `[spawn]` line rather than adding a second log call.
 
 ---
 
@@ -1703,6 +1793,10 @@ Key functions:
 - Dirty state check filters untracked files (`git status --porcelain` with `??` filter) — untracked files are irrelevant since worktrees branch from HEAD
 - Promotes agent from pending to running on successful SDK start via `promote_agent_if_pending/1` (synchronous for test sandbox safety)
 
+**Auto-Naming (centralized):** All three `AgentManager` creation paths (`create_pty_session/1`, `create_agent_without_start/1`, `create_agent/1`) call the private `maybe_auto_name/2` helper immediately after record creation. It fires `Sessions.Naming.try_auto_name/3` in an async `Task` when `opts[:instructions]` or `opts[:description]` is a non-empty string. `HookRegistrar` performs the same call for sessions registered via Claude Code hooks (using `params["description"]`).
+
+**Rule:** Do not call `Sessions.Naming.try_auto_name/3` from LiveView action modules or controllers. Auto-naming belongs in `AgentManager` and `HookRegistrar` — the two infrastructure entry points that own session creation. LiveView action modules (`ProjectLive.Sessions.Actions`, `WorkspaceLive.Sessions.Actions`) must not duplicate this logic.
+
 ---
 
 ## Model Configuration
@@ -2124,7 +2218,7 @@ Kanban task cards use a `...` overflow menu for actions (copy, delete, move) ins
 
 ---
 
-## Dropdown & Submenu Patterns (DaisyUI)
+## Dropdown & Submenu Patterns
 
 Two dropdown patterns are used depending on context:
 
@@ -2198,7 +2292,7 @@ For action dropdowns triggered by a button click (e.g., "more actions" menu):
 - Menu stays open until another element is clicked
 
 **Why these patterns:**
-- **DaisyUI handles positioning:** z-stacking, overflow clipping, and positioning are automatic
+- **Local CSS handles positioning:** z-stacking, overflow clipping, and positioning are implemented in `assets/css/app.css`
 - **Keyboard accessible:** `<details>` and `tabindex` provide native keyboard navigation
 - **Mobile-friendly:** Tap-to-open for both patterns; no hover-dependence on touch
 - **No custom JS needed:** CSS classes and HTML semantics do the work
@@ -2380,7 +2474,7 @@ Replace hardcoded `oklch(...)` and `hsl(...)` color values with semantic Tailwin
 
 **Why:**
 - Hardcoded `oklch`/`hsl` values break theme switching (dark mode, custom themes)
-- Semantic classes (e.g., `text-primary`, `bg-base-200`, `border-base-300`) adapt automatically to the active daisyUI/Tailwind theme
+- Semantic classes (e.g., `text-primary`, `bg-base-200`, `border-base-300`) adapt automatically to the active `@theme` token set defined in `assets/css/app.css`
 - Reduces diff noise when colors are adjusted globally
 
 **Migration pattern:**
@@ -2398,7 +2492,7 @@ Replace hardcoded `oklch(...)` and `hsl(...)` color values with semantic Tailwin
 - `hsl(220 14% ...)` dark backgrounds → `bg-base-100`, `bg-base-200`, `bg-base-300`
 - Border colors → `border-base-300`, `border-primary`
 
-**Rule:** No hardcoded color functions in class attributes or inline styles. Use semantic Tailwind/daisyUI classes. If a color has no semantic equivalent, add a CSS custom property via the theme, not inline.
+**Rule:** No hardcoded color functions in class attributes or inline styles. Use semantic Tailwind classes backed by `@theme` tokens in `assets/css/app.css`. If a color has no semantic equivalent, add a CSS custom property via the theme, not inline.
 
 ---
 

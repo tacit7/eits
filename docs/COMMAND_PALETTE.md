@@ -99,6 +99,12 @@ Available current project commands:
 - **Group:** Workspace
 - **Behavior:** Lists all active projects with quick navigation to project overview
 
+### Rail Project Selection Persistence
+
+Both "Switch Project" (in `palette_commands/projects.js`) and "Go to Project" (in `palette_commands/navigation.js`) results carry a `railProjectId` field alongside `href`. When a command with `type: "navigate"` is activated, `CommandPalette.activate/1` (`assets/js/hooks/command_palette.js`) calls `saveRailProjectSelection(cmd.railProjectId)` before navigating.
+
+`saveRailProjectSelection/1` (`assets/js/command_palette.js`) writes the selected project ID into the `rail_state` localStorage entry (merging with any existing state), so the rail restores the palette-selected project after the page navigates instead of silently keeping the previous one. See [RAIL_MENU.md](RAIL_MENU.md) for how the rail consumes `rail_state`.
+
 ---
 
 ## Quick Create Commands

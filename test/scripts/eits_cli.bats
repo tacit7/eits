@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# Tests for scripts/eits CLI
+# Tests for legacy scripts/eits-extras CLI
 # Runs against the real server at http://localhost:5001/api/v1
 
-EITS="$BATS_TEST_DIRNAME/../../scripts/eits"
+EITS="$BATS_TEST_DIRNAME/../../scripts/eits-extras"
 export EITS_URL="http://localhost:5001/api/v1"
 export EITS_PROJECT_ID="1"
 
@@ -1163,13 +1163,13 @@ teardown_teams() {
 
 @test "sessions list: --include-archived flag produces include_archived=true in URL" {
   export EITS_SESSION_UUID="test-uuid-001"
-  run bash -c 'source scripts/eits; BASE_URL=mock; _curl() { echo "URL: $1"; }; cmd_sessions list --include-archived'
+  run bash -c 'source scripts/eits-extras; BASE_URL=mock; _curl() { echo "URL: $1"; }; cmd_sessions list --include-archived'
   [[ "$output" == *"include_archived=true"* ]]
 }
 
 @test "sessions update: --ended-at flag included in patch body" {
   export EITS_SESSION_UUID="test-uuid-001"
-  run bash -c 'source scripts/eits; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
+  run bash -c 'source scripts/eits-extras; BASE_URL=mock; _patch() { echo "BODY: $2"; }; cmd_sessions update some-uuid --status completed --ended-at "2026-01-01T00:00:00Z"'
   [[ "$output" == *"ended_at"* ]]
 }
 

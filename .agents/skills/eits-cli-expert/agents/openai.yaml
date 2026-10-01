@@ -1,0 +1,4 @@
+interface:
+  display_name: "EITS CLI Expert"
+  short_description: "EITS CLI commands and workflow guidance"
+  default_prompt: "Use $eits-cli-expert to choose the correct EITS CLI command or workflow."

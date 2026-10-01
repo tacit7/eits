@@ -1,9 +1,29 @@
 defmodule EyeInTheSkyWeb.Api.V1.PromptControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
+  alias EyeInTheSky.{Projects, Workspaces}
   alias EyeInTheSky.Prompts
 
   import EyeInTheSky.Factory
+
+  defp create_project_in_workspace(workspace_id, overrides \\ %{}) do
+    n = uniq()
+
+    {:ok, project} =
+      Projects.create_project(
+        Map.merge(
+          %{
+            name: "Prompt Project #{n}",
+            slug: "prompt-project-#{n}",
+            path: "/tmp/prompt-project-#{n}",
+            workspace_id: workspace_id
+          },
+          overrides
+        )
+      )
+
+    project
+  end
 
   defp valid_prompt_params(overrides \\ %{}) do
     n = uniq()
@@ -119,6 +139,29 @@ defmodule EyeInTheSkyWeb.Api.V1.PromptControllerTest do
       assert prompt.uuid != nil
       assert prompt.created_at != nil
       assert prompt.updated_at != nil
+    end
+
+    test "rejects prompts outside the current workspace when session scope is present", %{
+      conn: conn
+    } do
+      current_user = user_fixture()
+      current_workspace = Workspaces.default_workspace_for_user!(current_user)
+      own_project = create_project_in_workspace(current_workspace.id)
+      agent = create_agent()
+      session = create_session(agent, %{project_id: own_project.id})
+
+      foreign_user = user_fixture()
+      foreign_workspace = Workspaces.default_workspace_for_user!(foreign_user)
+      foreign_project = create_project_in_workspace(foreign_workspace.id)
+
+      conn =
+        conn
+        |> put_req_header("x-eits-session", session.uuid)
+        |> post(~p"/api/v1/prompts", valid_prompt_params(%{"project_id" => foreign_project.id}))
+
+      resp = json_response(conn, 403)
+
+      assert resp["error"] == "Access denied"
     end
   end
 end

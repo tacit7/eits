@@ -23,6 +23,17 @@ defmodule EyeInTheSkyWeb.Api.V1.MockWorkerExitAgentManager do
   def send_message(_session_id, _message, _opts \\ []), do: {:error, {:worker_exit, :killed}}
 end
 
+defmodule EyeInTheSkyWeb.Api.V1.MockRecordingAgentManager do
+  @moduledoc "Test double that records send_message calls to the current test."
+  def send_message(session_id, message, opts \\ []) do
+    if pid = Process.whereis(:messaging_controller_test) do
+      send(pid, {:agent_manager_send_message, session_id, message, opts})
+    end
+
+    :ok
+  end
+end
+
 defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
   use EyeInTheSkyWeb.ConnCase, async: false
 
@@ -191,6 +202,157 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       assert json_response(conn, 404)["error"] == "Target session not found"
     end
 
+    test "stores a DM for a completed target session without a live worker", %{conn: conn} do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockWorkerNotFoundAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+      target_session = create_session(target_agent, %{status: "completed"})
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Status update?"
+        })
+
+      resp = json_response(conn, 201)
+
+      assert resp["success"] == true
+
+      [dm] = Messages.list_inbound_dms(target_session.id)
+
+      assert dm.from_session_id == sender_session.id
+      assert dm.to_session_id == target_session.id
+      assert String.contains?(dm.body, "Status update?")
+    end
+
+    test "stores a DM for a terminal-owned target session without starting an app worker", %{
+      conn: conn
+    } do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockFailingAgentManager
+      )
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+
+      target_session =
+        create_session(target_agent, %{
+          provider: "codex",
+          entrypoint: "cli",
+          managed_by_app: false
+        })
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Terminal should poll this"
+        })
+
+      resp = json_response(conn, 201)
+
+      assert resp["success"] == true
+
+      [dm] = Messages.list_inbound_dms(target_session.id)
+
+      assert dm.from_session_id == sender_session.id
+      assert dm.to_session_id == target_session.id
+      assert String.contains?(dm.body, "Terminal should poll this")
+    end
+
+    test "delivers a DM through a live Codex worker even when session is marked terminal-owned",
+         %{
+           conn: conn
+         } do
+      original_module = Application.get_env(:eye_in_the_sky, :agent_manager_module)
+
+      Process.register(self(), :messaging_controller_test)
+
+      Application.put_env(
+        :eye_in_the_sky,
+        :agent_manager_module,
+        EyeInTheSkyWeb.Api.V1.MockRecordingAgentManager
+      )
+
+      on_exit(fn ->
+        if Process.whereis(:messaging_controller_test) == self() do
+          Process.unregister(:messaging_controller_test)
+        end
+
+        Application.put_env(:eye_in_the_sky, :agent_manager_module, original_module)
+      end)
+
+      sender_agent = create_agent()
+      sender_session = create_session(sender_agent)
+      target_agent = create_agent()
+
+      target_session =
+        create_session(target_agent, %{
+          provider: "codex",
+          entrypoint: "cli",
+          managed_by_app: false
+        })
+
+      parent = self()
+
+      worker =
+        spawn(fn ->
+          Registry.register(
+            EyeInTheSky.Claude.AgentRegistry,
+            {:session, target_session.id},
+            "codex"
+          )
+
+          send(parent, :registered)
+
+          receive do
+            :stop -> :ok
+          end
+        end)
+
+      assert_receive :registered
+
+      conn =
+        post(conn, ~p"/api/v1/dm", %{
+          "from_session_id" => sender_session.uuid,
+          "to_session_id" => target_session.uuid,
+          "message" => "Live worker should receive this"
+        })
+
+      resp = json_response(conn, 201)
+
+      assert resp["success"] == true
+
+      assert_receive {:agent_manager_send_message, session_id, body, opts}
+      assert session_id == target_session.id
+      assert body =~ "Live worker should receive this"
+      assert opts[:dm_metadata].from_session_uuid == sender_session.uuid
+
+      send(worker, :stop)
+    end
+
     test "returns 503 with delivery_failed when agent manager returns unknown error", %{
       conn: conn
     } do
@@ -348,7 +510,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
           "already here"
         )
 
-      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+        |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+
       resp = json_response(conn, 200)
 
       assert resp["count"] == 1
@@ -364,7 +530,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       test_pid = self()
 
       spawn(fn ->
-        conn = get(api_conn(), ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=5")
+        conn =
+          api_conn()
+          |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+          |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=5")
+
         send(test_pid, {:wait_result, json_response(conn, 200)})
       end)
 
@@ -387,7 +557,11 @@ defmodule EyeInTheSkyWeb.Api.V1.MessagingControllerTest do
       agent = create_agent()
       session = create_session(agent)
 
-      conn = get(conn, ~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+      conn =
+        conn
+        |> Plug.Conn.put_req_header("x-eits-session", session.uuid)
+        |> get(~p"/api/v1/dm/wait?session=#{session.uuid}&timeout=1")
+
       resp = json_response(conn, 200)
 
       assert resp["count"] == 0

@@ -108,11 +108,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.Usage do
         <%= cond do %>
           <% not @totals.ok? and @totals.failed == nil -> %>
             <div class="flex items-center justify-center py-16">
-              <span class="loading loading-spinner loading-lg text-base-content/30"></span>
+              <span class=" spinner spinner--lg text-base-content/30"></span>
             </div>
           <% @totals.failed != nil -> %>
             <div class="flex items-center justify-center py-16">
-              <p class="text-sm text-error/70">Failed to load usage data. Try refreshing.</p>
+              <p class="text-message text-error/70">Failed to load usage data. Try refreshing.</p>
             </div>
           <% true -> %>
             <.usage_totals totals={@totals.result} recalculating={@recalculating} />

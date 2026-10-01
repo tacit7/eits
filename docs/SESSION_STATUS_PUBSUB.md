@@ -80,6 +80,38 @@ Also runs every 5 minutes. Archives sessions that are `"idle"` for >30 minutes w
 
 After archiving, broadcasts `Events.session_updated(updated)` on the `"agents"` topic so the rail removes the entry from the active list.
 
+## Idle ticket nudges (`IdleTicketNudger` scheduler)
+
+Also runs every 5 minutes. It finds unarchived sessions in `idle` status that
+are older than the nudge cutoff and still have open linked tasks. Instead of
+changing session status, it sends a DM asking the session to update the ticket
+status or notes if applicable.
+
+**File:** `lib/eye_in_the_sky/scheduler/idle_ticket_nudger.ex`
+
+Delivery uses `DMDelivery.deliver_or_persist/4`, so terminal-owned sessions get
+a durable inbox record and the Phoenix app does not start an `AgentWorker` for
+them. The worker uses cooldown and recent-message dedupe; it is a reminder path,
+not a lifecycle cleanup path.
+
+## Terminal-owned sessions
+
+Terminal-launched Codex sessions are recorded with `entrypoint="cli"` and
+`managed_by_app=false`. They are process-external from the Phoenix app's
+perspective: incoming messages may be logged to the inbox, but the app must not
+start or resume an `AgentWorker` for them.
+
+`AgentStatus` filters terminal-owned sessions out of dead-idle archive and
+zombie sweep candidates. `IdleTicketNudger` still includes terminal-owned idle
+sessions with open tasks, but delivery persists the DM only and does not start
+an app worker.
+
+The Codex Stop hook can mark a terminal session `idle` between turns, and that
+does not mean there is a dead app-owned worker to reclaim. If a terminal session
+later appears as `status="working"` with `archived_at` still set, it was revived
+without being unarchived. Clear `archived_at` with `eits sessions unarchive
+<uuid>` or by the resume path before treating it as an active visible session.
+
 ---
 
 ## Adding a new UI surface that shows session status

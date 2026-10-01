@@ -25,8 +25,13 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
     System.put_env("EITS_PI_SESSION_ROOT", session_root)
 
     on_exit(fn ->
-      if prev_harness, do: System.put_env("EITS_PI_HARNESS", prev_harness), else: System.delete_env("EITS_PI_HARNESS")
-      if prev_root, do: System.put_env("EITS_PI_SESSION_ROOT", prev_root), else: System.delete_env("EITS_PI_SESSION_ROOT")
+      if prev_harness,
+        do: System.put_env("EITS_PI_HARNESS", prev_harness),
+        else: System.delete_env("EITS_PI_HARNESS")
+
+      if prev_root,
+        do: System.put_env("EITS_PI_SESSION_ROOT", prev_root),
+        else: System.delete_env("EITS_PI_SESSION_ROOT")
     end)
 
     :ok
@@ -84,7 +89,12 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
   test "1. happy path: preamble → deltas → turn_end → clean complete", ctx do
     fake_harness!(ctx.tmp_dir, [
       "WAIT:start_session",
-      encode(%{"type" => "ready", "sessionId" => "sess-happy", "sessionFile" => "/x", "model" => "m"}),
+      encode(%{
+        "type" => "ready",
+        "sessionId" => "sess-happy",
+        "sessionFile" => "/x",
+        "model" => "m"
+      }),
       "WAIT:prompt",
       encode(%{"type" => "assistant_delta", "delta" => "hel"}),
       encode(%{"type" => "assistant_delta", "delta" => "lo"}),
@@ -100,8 +110,12 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
 
     {:ok, ref, _handler} = start_pi("hi", session_id: "sess-happy")
 
-    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "hel", delta: true}}, 5_000
-    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "lo", delta: true}}, 5_000
+    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "hel", delta: true}},
+                   5_000
+
+    assert_receive {:claude_message, ^ref, %Message{type: :text, content: "lo", delta: true}},
+                   5_000
+
     assert_receive {:claude_message, ^ref, %Message{type: :result}}, 5_000
     assert_receive {:claude_complete, ^ref, "sess-happy"}, 5_000
     refute_receive {:claude_error, ^ref, _}, 200
@@ -117,7 +131,12 @@ defmodule EyeInTheSky.Pi.IntegrationTest do
     # accepting start_session.
     fake_harness!(ctx.tmp_dir, [
       "WAIT:initialize",
-      encode(%{"type" => "ready", "sessionId" => "sess-ready-first", "sessionFile" => "/x", "model" => "m"}),
+      encode(%{
+        "type" => "ready",
+        "sessionId" => "sess-ready-first",
+        "sessionFile" => "/x",
+        "model" => "m"
+      }),
       "WAIT:start_session",
       "WAIT:prompt",
       encode(%{"type" => "turn_end", "aggregate" => %{}}),

@@ -244,7 +244,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
     socket =
       if socket.assigns.active_canvas_id == id do
-        assign(socket, :page_title, updated.name <> " — Canvas")
+        assign(socket, :page_title, updated.name <> " | Canvas")
       else
         socket
       end
@@ -282,17 +282,17 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     {:noreply, remove_canvas_session(socket, cs_id)}
   end
 
-  # Scroll buffer replay on (re-)subscribe — route same as live output
+  # Scroll buffer replay on (re-)subscribe | route same as live output
   def handle_info({:pty_scroll_buffer, terminal_id, data}, socket) when byte_size(data) > 0,
     do: TerminalHandlers.handle_pty_scroll_buffer(terminal_id, data, socket)
 
   def handle_info({:pty_scroll_buffer, _terminal_id, _empty}, socket), do: {:noreply, socket}
 
-  # PTY output — tagged with terminal id
+  # PTY output | tagged with terminal id
   def handle_info({:pty_output, terminal_id, data}, socket),
     do: TerminalHandlers.handle_pty_output(terminal_id, data, socket)
 
-  # PTY exited — remove terminal window and clean up
+  # PTY exited | remove terminal window and clean up
   def handle_info({:pty_exited, terminal_id}, socket),
     do: TerminalHandlers.handle_pty_exited(terminal_id, socket)
 
@@ -362,11 +362,11 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       id="canvas-tablist"
       role="tablist"
       phx-hook="CanvasStatusHook"
-      class="tabs tabs-border px-2 border-b border-base-300 bg-base-200/70 shrink-0"
+      class="eits-tabs px-2 border-b border-base-300 bg-base-200/70 shrink-0"
     >
       <button
         onclick="history.length > 1 ? history.back() : window.location.href = '/'"
-        class="btn btn-ghost btn-xs px-1.5 self-center mr-1 text-base-content/50 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon mr-1 self-center"
         aria-label="Go back"
         title="Go back"
       >
@@ -384,7 +384,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
               type="text"
               name="name"
               value={canvas.name}
-              class="input input-xs w-28 text-base"
+              class="input input-xs w-28 text-message"
               phx-keydown="cancel_rename"
               phx-key="Escape"
               phx-blur={JS.dispatch("submit", to: "#rename-canvas-form-#{canvas.id}")}
@@ -397,7 +397,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             id={"canvas-tab-#{canvas.id}"}
             data-canvas-id={canvas.id}
             phx-hook="CanvasTabHook"
-            class={["tab tab-sm group/tab", if(@active_canvas_id == canvas.id, do: "tab-active")]}
+            class={["eits-tab group/tab", if(@active_canvas_id == canvas.id, do: "eits-tab--active")]}
             phx-click="switch_tab"
             phx-value-canvas-id={canvas.id}
           >
@@ -418,23 +418,32 @@ defmodule EyeInTheSkyWeb.CanvasLive do
           <input
             type="text"
             name="name"
-            class="input input-xs w-28 text-base"
+            class="input input-xs w-28 text-message"
             placeholder="Canvas name"
             autofocus
           />
-          <button type="submit" class="btn btn-primary btn-xs min-h-[44px]">+</button>
+          <button
+            type="submit"
+            class="eits-action eits-action--primary eits-action--icon"
+            aria-label="Create canvas"
+          >
+            <.icon name="hero-plus-mini" class="size-3.5" />
+          </button>
         </form>
       <% else %>
         <a
           role="tab"
-          class="tab tab-sm text-base-content/40"
+          class="eits-tab gap-1 text-base-content/40"
           phx-click="start_new_canvas"
         >
-          + New
+          <.icon name="hero-plus-mini" class="size-3.5" /> New
         </a>
       <% end %>
-      <span id="canvas-ws-badge" class="badge badge-warning badge-sm gap-1 self-center mx-2 hidden">
-        <span class="loading loading-spinner loading-xs"></span> Reconnecting...
+      <span
+        id="canvas-ws-badge"
+        class="eits-chip eits-chip--warning mx-2 hidden self-center px-2 py-1"
+      >
+        <span class=" spinner spinner--xs"></span> Reconnecting...
       </span>
       <button
         :if={not is_nil(@active_canvas_id)}
@@ -444,16 +453,18 @@ defmodule EyeInTheSkyWeb.CanvasLive do
             detail: %{commandId: "canvas-add-session"}
           )
         }
-        class="ml-auto btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+        class="eits-action eits-action--ghost eits-action--icon ml-auto"
         title="Add session to canvas"
+        aria-label="Add session to canvas"
       >
         <.icon name="hero-plus-mini" class="size-3.5" />
       </button>
       <button
         :if={not is_nil(@active_canvas_id)}
         phx-click="add_terminal"
-        class="btn btn-ghost btn-xs text-base-content/40 hover:text-base-content flex items-center gap-1"
+        class="eits-action eits-action--ghost eits-action--icon"
         title="Add terminal to canvas"
+        aria-label="Add terminal to canvas"
       >
         <.icon name="hero-command-line" class="size-3.5" />
       </button>
@@ -464,8 +475,9 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         data-layout-btn="auto"
         data-session-count={length(@canvas_sessions)}
         phx-update="ignore"
-        class="mr-2 btn btn-ghost btn-xs px-1.5 text-base-content/50 hover:text-base-content"
+        class="eits-action eits-action--ghost eits-action--icon mr-2"
         title="Auto layout"
+        aria-label="Auto layout"
       >
         <.icon name="hero-squares-2x2" class="size-4" />
       </button>
@@ -500,19 +512,24 @@ defmodule EyeInTheSkyWeb.CanvasLive do
       <%= if @canvas_sessions == [] and @canvas_terminals == [] and not is_nil(@active_canvas_id) do %>
         <div class="flex flex-col items-center justify-center h-full gap-2 select-none">
           <.icon name="hero-squares-2x2" class="w-10 h-10 text-base-content/20" />
-          <span class="text-base-content/40 text-sm font-medium">No sessions on this canvas</span>
-          <span class="text-base-content/30 text-xs">
+          <span class="text-base-content/40 text-message font-medium">
+            No sessions on this canvas
+          </span>
+          <span class="text-base-content/30 text-mini">
             Go to Sessions and use Add to Canvas to attach one.
           </span>
-          <.link navigate={~p"/sessions"} class="btn btn-sm btn-ghost text-base-content/40 mt-1">
+          <.link
+            navigate={~p"/sessions"}
+            class="eits-action eits-action--ghost mt-1"
+          >
             Go to Sessions
           </.link>
         </div>
       <% end %>
       <%= if @canvases == [] do %>
-        <div class="flex flex-col items-center justify-center h-full gap-3 text-base-content/30 text-sm select-none">
+        <div class="flex flex-col items-center justify-center h-full gap-3 text-base-content/30 text-message select-none">
           <.icon name="hero-squares-2x2" class="w-8 h-8" />
-          <span>No canvases yet. Create one with "+ New" above.</span>
+          <span>No canvases yet. Create one with New above.</span>
         </div>
       <% end %>
       <%= if @focus_session_id do %>
@@ -530,14 +547,15 @@ defmodule EyeInTheSkyWeb.CanvasLive do
     ~H"""
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-base-300/60" phx-click="close_session_picker"></div>
-      <div class="relative z-10 card bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
-        <div class="card-body p-4 flex flex-col gap-3 min-h-0">
+      <div class="relative z-10 eits-panel bg-base-100 shadow-xl w-96 max-h-[70vh] flex flex-col">
+        <div class="eits-panel__body p-4 flex flex-col gap-3 min-h-0">
           <div class="flex items-center justify-between shrink-0">
-            <h3 class="font-semibold text-sm">Add Session to Canvas</h3>
+            <h3 class="font-semibold text-message">Add Session to Canvas</h3>
             <button
               type="button"
               phx-click="close_session_picker"
-              class="btn btn-ghost btn-xs btn-circle"
+              class="eits-action eits-action--ghost eits-action--icon"
+              aria-label="Close session picker"
             >
               <.icon name="hero-x-mark-mini" class="size-4" />
             </button>
@@ -559,14 +577,14 @@ defmodule EyeInTheSkyWeb.CanvasLive do
                 type="button"
                 phx-click="pick_session"
                 phx-value-session-id={s.id}
-                class="btn btn-ghost btn-sm justify-start gap-2 text-left w-full"
+                class="eits-action eits-action--ghost w-full justify-start gap-2 text-left text-message"
               >
                 <span class="truncate flex-1 text-left">{s.name || "Session #{s.id}"}</span>
                 <.status_badge status={s.status} size="xs" class="shrink-0" label={s.status} />
               </button>
             <% end %>
             <%= if @filtered_sessions == [] do %>
-              <p class="text-center text-base-content/40 text-xs py-4">No sessions found</p>
+              <p class="text-center text-base-content/40 text-mini py-4">No sessions found</p>
             <% end %>
           </div>
         </div>
@@ -664,7 +682,7 @@ defmodule EyeInTheSkyWeb.CanvasLive do
         end)
 
       base_canvas_assigns(socket, canvas_id)
-      |> assign(:page_title, canvas_name <> " — Canvas")
+      |> assign(:page_title, canvas_name <> " | Canvas")
       |> assign(:canvas_sessions, sessions)
       |> assign(:subscribed_session_ids, session_ids)
       |> assign(:canvas_terminals, terminals)
@@ -701,5 +719,4 @@ defmodule EyeInTheSkyWeb.CanvasLive do
 
     socket
   end
-
 end

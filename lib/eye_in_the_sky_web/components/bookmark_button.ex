@@ -12,20 +12,20 @@ defmodule EyeInTheSkyWeb.Components.BookmarkButton do
     ~H"""
     <button
       phx-click={@click_event}
-      class="btn btn-ghost btn-sm gap-2 transition-colors"
+      class="focus-ring inline-flex h-7 items-center gap-2 rounded-box px-2 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
       title={if @is_bookmarked, do: "Remove bookmark", else: "Bookmark this file"}
       aria-pressed={@is_bookmarked}
       aria-label={if @is_bookmarked, do: "Remove bookmark", else: "Add bookmark"}
     >
       <%= if @is_bookmarked do %>
         <.icon name="hero-bookmark-solid" class="size-5 text-warning transition-colors" />
-        <span class="text-sm">Bookmarked</span>
+        <span>Bookmarked</span>
       <% else %>
         <.icon
           name="hero-bookmark"
           class="size-5 text-base-content/40 group-hover:text-warning transition-colors"
         />
-        <span class="text-sm">Bookmark</span>
+        <span>Bookmark</span>
       <% end %>
     </button>
     """

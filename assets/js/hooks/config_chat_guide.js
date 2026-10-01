@@ -110,7 +110,7 @@ export const ConfigChatGuide = {
 
     const el = document.createElement('span')
     el.id = 'config-guide-btn-error'
-    el.className = 'text-error text-xs ml-2'
+    el.className = 'text-error text-mini ml-2'
     el.textContent = message
     this.el.insertAdjacentElement('afterend', el)
     setTimeout(() => el.remove(), 4000)
@@ -118,9 +118,9 @@ export const ConfigChatGuide = {
 
   _setButtonLoading(loading) {
     this.el.disabled = loading
-    const existing = this.el.querySelector('.loading-spinner')
+    const existing = this.el.querySelector('.spinner')
     if (loading && !existing) {
-      this.el.insertAdjacentHTML('afterbegin', '<span class="loading loading-spinner loading-xs mr-1"></span>')
+      this.el.insertAdjacentHTML('afterbegin', '<span class="spinner spinner--xs mr-1"></span>')
     } else if (!loading && existing) {
       existing.remove()
     }

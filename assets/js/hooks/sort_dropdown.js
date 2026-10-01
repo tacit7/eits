@@ -1,7 +1,7 @@
 /**
  * SortDropdown hook
  *
- * Syncs the visible sort label inside a phx-update="ignore" <details> dropdown.
+ * Syncs the visible sort label inside a phx-update="ignore" <details> relative.
  *
  * Why MutationObserver instead of updated():
  *   LiveView's updated() callback never fires on phx-update="ignore" elements —
@@ -13,12 +13,12 @@
  * Why phx-update="ignore" at all:
  *   Without it, any background LiveView re-render (PubSub task/session events)
  *   morphs the <details> element back to its server-rendered state (no `open`
- *   attribute), forcibly closing the dropdown mid-interaction before the user
+ *   attribute), forcibly closing the relative mid-interaction before the user
  *   can click an option.
  *
  * Usage:
  *   <details id="stable-id" phx-update="ignore" phx-hook="SortDropdown"
- *            data-label={@computed_label} class="dropdown">
+ *            data-label={@computed_label} class="relative">
  *     <summary>Sort: <span class="js-sort-label">{@computed_label}</span> ...</summary>
  *     <ul>...</ul>
  *   </details>

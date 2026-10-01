@@ -36,6 +36,19 @@ defmodule EyeInTheSky.Workspaces do
   end
 
   @doc """
+  Returns the first default workspace, or nil if none exists.
+
+  Used by local auth-bypass flows where there may be no browser session user.
+  """
+  def default_workspace do
+    Workspace
+    |> where([w], w.default == true)
+    |> order_by([w], asc: w.inserted_at)
+    |> limit(1)
+    |> Repo.one()
+  end
+
+  @doc """
   Gets a workspace by id. Returns nil if not found.
   """
   def get_workspace(id), do: Repo.get(Workspace, id)

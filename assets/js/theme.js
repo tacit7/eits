@@ -1,4 +1,4 @@
-// Daisy UI Theme Controller Integration
+// Theme Controller Integration
 // Handles theme persistence and synchronization across tabs
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Listen for theme changes from Daisy UI theme controller
+  // Listen for theme changes from checkbox theme controllers
   themeControllers.forEach(controller => {
     controller.addEventListener('change', (e) => {
       const theme = e.target.checked ? 'dark' : 'light';

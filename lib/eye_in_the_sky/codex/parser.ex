@@ -29,6 +29,7 @@ defmodule EyeInTheSky.Codex.Parser do
   """
 
   alias EyeInTheSky.Claude.Message
+  alias EyeInTheSky.Codex.Error
   require Logger
 
   @doc """
@@ -39,13 +40,15 @@ defmodule EyeInTheSky.Codex.Parser do
   - `{:session_id, thread_id}` - extracted thread/session ID
   - `{:result, map}` - turn completed with usage metadata
   - `{:error, reason}` - parse error or Codex error
-  - `:skip` - line should be ignored (non-JSON, turn.started, etc.)
+  - `{:protocol, map}` - non-JSON provider diagnostic for exit-error context
+  - `:skip` - recognized JSON event should be ignored (turn.started, etc.)
   """
   @spec parse_stream_line(String.t()) ::
           {:ok, Message.t()}
           | {:session_id, String.t()}
           | {:result, map()}
           | {:error, term()}
+          | {:protocol, map()}
           | :skip
   def parse_stream_line(line) when is_binary(line) do
     line = String.trim(line)
@@ -58,8 +61,9 @@ defmodule EyeInTheSky.Codex.Parser do
           parse_event(json)
 
         {:error, _reason} ->
-          # Non-JSON lines (stderr, tracing output) are expected; skip them
-          :skip
+          # stderr is merged into stdout by the Port. Retain it in bounded SDK
+          # state so a later non-zero exit can explain what the provider reported.
+          {:protocol, %{type: :provider_diagnostic, message: line}}
       end
     end
   end
@@ -239,23 +243,23 @@ defmodule EyeInTheSky.Codex.Parser do
 
   # Turn failed
   defp parse_event(%{"type" => "turn.failed"} = event) do
-    message = event["message"] || event["error"] || "Turn failed"
+    message = Error.normalize(event, "Turn failed").message
     {:error, {:turn_failed, message}}
   end
 
   # Top-level error
   defp parse_event(%{"type" => "error"} = event) do
-    message = event["message"] || event["error"] || "Unknown error"
+    message = Error.normalize(event, "Unknown error").message
     {:error, {:codex_error, message}}
   end
 
   # Error object without type
   defp parse_event(%{"error" => error}) when is_binary(error) do
-    {:error, {:codex_error, error}}
+    {:error, {:codex_error, Error.normalize(error, "Unknown error").message}}
   end
 
   defp parse_event(%{"error" => %{"message" => message}}) do
-    {:error, {:codex_error, message}}
+    {:error, {:codex_error, Error.normalize(%{"message" => message}, "Unknown error").message}}
   end
 
   # Unknown event type

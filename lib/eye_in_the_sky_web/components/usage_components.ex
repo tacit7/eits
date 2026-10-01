@@ -10,34 +10,25 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
   def usage_header(assigns) do
     ~H"""
     <div class="flex items-center justify-between">
-      <div class="join">
+      <div class="flex items-center gap-1 rounded-box bg-base-200/40 p-0.5">
         <button
           phx-click="set_range"
           phx-value-range="7d"
-          class={[
-            "join-item btn btn-sm min-h-[44px]",
-            if(@date_range == "7d", do: "btn-primary", else: "btn-outline")
-          ]}
+          class={range_button_class(@date_range == "7d")}
         >
           7d
         </button>
         <button
           phx-click="set_range"
           phx-value-range="30d"
-          class={[
-            "join-item btn btn-sm min-h-[44px]",
-            if(@date_range == "30d", do: "btn-primary", else: "btn-outline")
-          ]}
+          class={range_button_class(@date_range == "30d")}
         >
           30d
         </button>
         <button
           phx-click="set_range"
           phx-value-range="all"
-          class={[
-            "join-item btn btn-sm min-h-[44px]",
-            if(@date_range == "all", do: "btn-primary", else: "btn-outline")
-          ]}
+          class={range_button_class(@date_range == "all")}
         >
           All time
         </button>
@@ -45,7 +36,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
       <button
         phx-click="recalculate"
         disabled={@recalculating}
-        class="btn btn-sm min-h-[44px] btn-outline"
+        class="focus-ring inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-box border border-base-content/10 px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80 disabled:pointer-events-none disabled:opacity-45"
       >
         <.icon
           name="hero-arrow-path"
@@ -57,6 +48,14 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
     """
   end
 
+  defp range_button_class(true) do
+    "focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
+  end
+
+  defp range_button_class(false) do
+    "focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
+  end
+
   attr :totals, :map, required: true
   attr :recalculating, :boolean, required: true
 
@@ -64,40 +63,40 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
     ~H"""
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       <%= if @recalculating do %>
-        <div :for={_ <- 1..5} class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center space-y-2">
-            <div class="skeleton h-3 w-20 mx-auto"></div>
-            <div class="skeleton h-8 w-24 mx-auto"></div>
+        <div :for={_ <- 1..5} class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center space-y-2">
+            <div class="eits-skeleton h-3 w-20 mx-auto"></div>
+            <div class="eits-skeleton h-8 w-24 mx-auto"></div>
           </div>
         </div>
       <% else %>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center">
-            <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Cost</p>
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center">
+            <p class="text-mini text-base-content/60 uppercase tracking-normal">Total Cost</p>
             <p class="text-3xl font-bold text-warning">
               {ViewHelpers.format_cost(@totals.cost)}
             </p>
           </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center">
-            <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Tokens</p>
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center">
+            <p class="text-mini text-base-content/60 uppercase tracking-normal">Total Tokens</p>
             <p class="text-3xl font-bold text-base-content">
               {ViewHelpers.format_number(@totals.tokens)}
             </p>
           </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center">
-            <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Requests</p>
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center">
+            <p class="text-mini text-base-content/60 uppercase tracking-normal">Total Requests</p>
             <p class="text-3xl font-bold text-base-content">
               {ViewHelpers.format_number(@totals.requests)}
             </p>
           </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center">
-            <p class="text-xs text-base-content/60 uppercase tracking-wider">
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center">
+            <p class="text-mini text-base-content/60 uppercase tracking-normal">
               Sessions w/ Metrics
             </p>
             <p class="text-3xl font-bold text-info">
@@ -105,9 +104,9 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
             </p>
           </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
-          <div class="card-body p-4 text-center">
-            <p class="text-xs text-base-content/60 uppercase tracking-wider">Total Subagents</p>
+        <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+          <div class="eits-panel__body p-4 text-center">
+            <p class="text-mini text-base-content/60 uppercase tracking-normal">Total Subagents</p>
             <p class="text-3xl font-bold text-base-content">
               {ViewHelpers.format_number(@totals.subagents)}
             </p>
@@ -138,14 +137,16 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
 
   def usage_table(assigns) do
     ~H"""
-    <div class="card bg-base-100 border border-base-300 shadow-sm">
-      <div class="card-body p-4">
+    <div class="eits-panel bg-base-100 border border-base-300 shadow-sm">
+      <div class="eits-panel__body p-4">
         <h2 class="text-lg font-semibold mb-3">
           {@title}
-          <span :if={@subtitle} class="text-sm font-normal text-base-content/40">{@subtitle}</span>
+          <span :if={@subtitle} class="text-message font-normal text-base-content/40">
+            {@subtitle}
+          </span>
         </h2>
         <div class="overflow-x-auto">
-          <table class="table table-sm">
+          <table class="eits-table eits-table--sm">
             <thead>
               <tr class="text-base-content/60">
                 <th :for={col <- @column_defs} class={header_class(col)}>
@@ -162,7 +163,7 @@ defmodule EyeInTheSkyWeb.Components.UsageComponents do
               <%= if @recalculating do %>
                 <tr :for={_ <- 1..@loading_rows} class="hover">
                   <td :for={_ <- 1..length(@column_defs)}>
-                    <div class="skeleton h-4 w-full"></div>
+                    <div class="eits-skeleton h-4 w-full"></div>
                   </td>
                 </tr>
               <% else %>

@@ -4,9 +4,10 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
 
   alias EyeInTheSky.Projects
 
-  setup do
+  setup %{user: user} do
     {:ok, project} =
       Projects.create_project(%{
+        workspace_id: EyeInTheSky.Workspaces.default_workspace_for_user!(user).id,
         name: "Test Project",
         path: "/tmp/test_project"
       })
@@ -21,7 +22,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
   # The agents page renders two forms with phx-change="search":
   # one in the TopBar toolbar and one in the page body (class="ml-auto").
   # Target the body form specifically via its child input's data attribute.
-  defp body_search_form(lv), do: element(lv, "form[phx-change='search'].ml-auto")
+  defp body_search_form(lv), do: element(lv, "#agents-top-bar-search")
 
   # Sort and scope phx-change is on the parent <form>, not the <select>.
   defp sort_form(lv), do: element(lv, "form[phx-change='sort_agents']")
@@ -149,7 +150,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
       refute has_element?(lv, "form[phx-submit='create_agent']")
 
       lv
-      |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']")
+      |> element("button.ml-auto[phx-click='toggle_new_agent_form']")
       |> render_click()
 
       assert has_element?(lv, "form[phx-submit='create_agent']")
@@ -159,14 +160,14 @@ defmodule EyeInTheSkyWeb.ProjectLive.AgentsTest do
       {:ok, lv, _html} = live(conn, ~p"/projects/#{project.id}/agents")
 
       lv
-      |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']")
+      |> element("button.ml-auto[phx-click='toggle_new_agent_form']")
       |> render_click()
 
       assert has_element?(lv, "form[phx-submit='create_agent']")
 
       # Click the cancel button (also toggles the form off)
       lv
-      |> element("button[phx-click='toggle_new_agent_form'][title='Create new agent']")
+      |> element("button.ml-auto[phx-click='toggle_new_agent_form']")
       |> render_click()
 
       refute has_element?(lv, "form[phx-submit='create_agent']")

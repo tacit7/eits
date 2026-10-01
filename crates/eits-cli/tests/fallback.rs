@@ -12,7 +12,7 @@ fn fake_extras(dir: &tempfile::TempDir) -> std::path::PathBuf {
 fn unknown_root_subcommand_execs_extras_with_argv() {
     let dir = tempfile::tempdir().unwrap();
     let extras = fake_extras(&dir);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_EXTRAS", &extras)
         .args(["worktree", "list", "--flag", "x y"])
@@ -23,10 +23,10 @@ fn unknown_root_subcommand_execs_extras_with_argv() {
 
 #[test]
 fn missing_extras_is_json_error_exit_1() {
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_EXTRAS", "/nonexistent/nope")
-        .env("PATH", "/usr/bin:/bin") // no bash eits on PATH
+        .env("PATH", "/usr/bin:/bin") // no eits-extras on PATH
         .args(["worktree", "list"])
         .assert()
         .code(1)
@@ -37,7 +37,7 @@ fn missing_extras_is_json_error_exit_1() {
 fn global_flags_are_not_forwarded_to_extras() {
     let dir = tempfile::tempdir().unwrap();
     let extras = fake_extras(&dir);
-    Command::cargo_bin("eitsr")
+    Command::cargo_bin("eits")
         .unwrap()
         .env("EITS_EXTRAS", &extras)
         .args(["--pretty", "worktree", "list"])

@@ -68,12 +68,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
 
     case create_fn.(opts) do
       {:ok, %{session: session}} ->
-        if description && description != "" do
-          Task.start(fn ->
-            EyeInTheSky.Sessions.Naming.try_auto_name(session.id, description, session.name)
-          end)
-        end
-
         socket =
           socket
           |> assign(:show_new_session_drawer, false)
@@ -375,8 +369,12 @@ defmodule EyeInTheSkyWeb.ProjectLive.Sessions.Actions do
            {:ok, _} <- Sessions.update_session(session, %{name: name}) do
         socket
       else
-        false -> socket
-        {:error, :not_found} -> socket
+        false ->
+          socket
+
+        {:error, :not_found} ->
+          socket
+
         {:error, reason} ->
           Logger.warning("Failed to rename session #{session_id}: #{inspect(reason)}")
           put_flash(socket, :error, "Failed to rename session")

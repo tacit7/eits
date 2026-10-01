@@ -221,7 +221,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      error -> handle_team_errors(error)
+      error ->
+        handle_team_errors(error)
     end
   end
 
@@ -237,7 +238,8 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
       {:error, :member_not_found} ->
         {:error, :not_found, "Member not found"}
 
-      error -> handle_team_errors(error)
+      error ->
+        handle_team_errors(error)
     end
   end
 
@@ -401,8 +403,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
         Enum.filter(members, fn m ->
           not is_nil(m.session_id) and
             m.session_id != from_session.id and
-            not is_nil(m.session) and
-            m.session.status not in Sessions.terminated_statuses()
+            not is_nil(m.session)
         end)
 
       sender_name = from_session.name || "agent"
@@ -412,7 +413,7 @@ defmodule EyeInTheSkyWeb.Api.V1.TeamController do
 
       results =
         Enum.map(targets, fn m ->
-          case DMDelivery.deliver_and_persist(m.session_id, from_session.id, dm_body, %{
+          case DMDelivery.deliver_or_persist(m.session_id, from_session.id, dm_body, %{
                  from_session_uuid: from_session.uuid,
                  to_session_id: m.session_id,
                  broadcast: true

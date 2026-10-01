@@ -14,12 +14,13 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
           <.icon name="hero-magnifying-glass-mini" class="size-3" />
         </span>
         <input
+          id="rail-agent-search"
           type="text"
           value={@agent_search}
-          placeholder="Search agents…"
+          placeholder="Search agents..."
           phx-keyup="update_agent_search"
           phx-debounce="200"
-          class="w-full pl-6 pr-2 py-1 text-xs bg-base-content/5 border border-base-content/10 rounded focus:outline-none focus:border-primary/40 placeholder:text-base-content/30"
+          class="focus-ring h-7 w-full rounded-box border border-base-content/10 bg-base-content/5 pl-6 pr-2 text-micro text-base-content/80 placeholder:text-base-content/30 focus:border-primary/40"
         />
       </div>
 
@@ -54,7 +55,7 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
     ~H"""
     <.agent_row :for={agent <- @agents} agent={agent} />
     <%= if @agents == [] do %>
-      <div class="px-3 py-4 text-xs text-base-content/35 text-center">No agents</div>
+      <div class="px-3 py-4 text-mini text-base-content/35 text-center">No agents</div>
     <% end %>
     """
   end
@@ -69,10 +70,10 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
       phx-value-slug={@agent.slug}
       phx-value-name={@agent.name || @agent.slug}
       data-vim-flyout-item
-      class="w-full flex items-center gap-2 px-3 py-2 text-sm text-base-content/65 hover:text-base-content/90 hover:bg-base-content/5 transition-colors text-left [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50 [&.vim-nav-focused]:rounded"
+      class="focus-ring flex h-8 w-full items-center gap-2 rounded-box px-3 text-left text-mini text-base-content/65 transition-colors hover:bg-base-content/5 hover:text-base-content/90 [&.vim-nav-focused]:ring-2 [&.vim-nav-focused]:ring-primary/50"
     >
       <.custom_icon name="lucide-robot" class="size-3 flex-shrink-0 text-base-content/30" />
-      <span class="truncate text-xs font-medium">{@agent.name || @agent.slug}</span>
+      <span class="truncate text-mini font-medium">{@agent.name || @agent.slug}</span>
     </button>
     """
   end
@@ -86,10 +87,11 @@ defmodule EyeInTheSkyWeb.Components.Rail.Flyout.AgentsSection do
     ~H"""
     <% active = @current == @value %>
     <button
+      type="button"
       phx-click={@event}
       phx-value-scope={@value}
       class={[
-        "text-nano px-1.5 py-0.5 rounded transition-colors",
+        "focus-ring rounded-box px-1.5 py-0.5 text-nano transition-colors",
         if(active,
           do: "bg-primary/15 text-primary font-medium",
           else: "text-base-content/45 hover:text-base-content/70 hover:bg-base-content/8"

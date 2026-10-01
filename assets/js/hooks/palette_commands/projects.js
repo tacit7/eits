@@ -24,6 +24,7 @@ export function projectCommands(hook) {
           shortcut: null,
           type: "navigate",
           href: "/projects/" + p.id + "/sessions",
+          railProjectId: p.id,
           when: null
         })))
       },

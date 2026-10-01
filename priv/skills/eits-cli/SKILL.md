@@ -1,8 +1,12 @@
 ---
 name: eits-cli
-description: Use when an agent needs the correct eits CLI command syntax, flags, dispatch mode, environment setup, or subcommand behavior. Triggers on: "how do I use eits", "what's the eits command for", "eits CLI reference", sessions/tasks/notes/commits/agents/jobs/timer/channels/teams/prompts/notifications flags, dispatch mode confusion (cli vs sdk-cli), EITS_URL setup, or any eits subcommand question.
-user-invocable: true
-context: fork
+description: >-
+  Use when an agent needs the correct eits CLI command syntax, flags, dispatch
+  mode, environment setup, or subcommand behavior. Triggers on: "how do I use
+  eits", "what's the eits command for", "eits CLI reference",
+  sessions/tasks/notes/commits/agents/jobs/timer/channels/teams/prompts/notifications
+  flags, dispatch mode confusion (cli vs sdk-cli), EITS_URL setup, or any eits
+  subcommand question.
 allowed-tools: Bash
 ---
 
@@ -13,7 +17,7 @@ This skill has three files:
 - **`commands.md`** — full command syntax and flags for every subcommand
 - **`gotchas.md`** — environment issues, known bugs, and failure modes
 
-The `eits` bash script is the sole interface to the EITS REST API. It defaults to `http://localhost:5001/api/v1`; override with `EITS_URL`. All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the same `eits` script. Do not use deprecated EITS-CMD directives.
+The `eits` command is the Rust CLI and the sole interface agents should call for EITS work. It defaults to `http://localhost:5001/api/v1`; override with `EITS_URL`. All agents — interactive (`cli`) and spawned (`sdk-cli`) — use the same `eits` command. Legacy Bash remains available only as the Rust fallback executable (`eits-extras`) for subcommands not yet ported. Do not use deprecated EITS-CMD directives.
 
 ## Live Session Context
 
@@ -52,11 +56,11 @@ Both modes use the **same `eits` command syntax**. Dispatch mode is informationa
 
 ```bash
 # 1. Start work — creates task, links to session, sets In Progress atomically
-eits tasks begin --title "What you're doing" [--description "..."] [-p <project_id>] [--priority <p>] [--tag <id|name>]
+eits tasks begin --title "What you're doing" [--description "..."] [-p <project_id>] [--team <team_id>] [--priority <p>] [--tag <id|name>]
 # --tag is repeatable: --tag bug --tag auth
 
 # 2. OR claim an orchestrator-assigned task (ownership transfer — removes prior session links)
-eits tasks claim <task_id>
+eits tasks claim <task_id> [--team <team_id>]
 
 # 3. Annotate after the fact
 eits tasks annotate <task_id> --body "What changed, what was learned, what remains"
@@ -76,11 +80,16 @@ eits tasks complete <task_id> --message "..." --commit <sha1> --commit <sha2>
 | Goal | Command |
 |---|---|
 | Create a new task and start it | `eits tasks begin --title "..."` |
+| Create a team-scoped task and start it | `eits tasks begin --title "..." --team <team_id>` |
 | Claim an orchestrator-assigned task | `eits tasks claim <id>` |
 | `tasks begin --id <id>` | compatibility alias for `claim`; works but prefer `claim` |
 | `tasks start <id>` | **deprecated** — prints a warning; use `claim` instead |
+| Create unassigned worker work | `eits tasks create --title "..."` |
+| Create work assigned to a session | `eits tasks create --title "..." --assign-to <session>` |
 
-`tasks claim <id>` transfers ownership to the current session by removing prior session links. Use it only for orchestrator-assigned tasks or when intentionally taking over work.
+`tasks claim <id>` transfers ownership to the current session by removing prior session links. Use it only for orchestrator-assigned tasks or when intentionally taking over work. `--team` is accepted on claim/begin-by-id for orchestration parity, but it does not alter the existing task's team.
+
+`tasks begin` requires exactly one intent flag: `--title` creates and claims new self-owned work, while `--id` claims an existing task. `tasks create` records the caller as creator but does not assign the task unless `--assign-to` is present.
 
 ---
 
@@ -95,6 +104,7 @@ If blocked:
 ```bash
 # Check what's active (use --json when you need task IDs for follow-up)
 eits tasks active --json
+eits tasks status --team <team_id> --json   # task-centric team view with linked session_ids
 
 # Start a new task
 eits tasks begin --title "Describe the work"
@@ -112,6 +122,17 @@ eits tasks claim <task_id>
 If `EITS_SESSION_UUID` is not set, `tasks begin`, `tasks annotate`, `tasks complete`, and `commits create` may not attach work to the intended session. Do not assume session linkage unless `EITS_SESSION_UUID` is present.
 
 If `EITS_PROJECT_ID` is not set and a command requires a project, read `commands.md` for the command-specific flag — the flag name varies by subcommand (`-p` for most, `--project-id` for `sessions update` and `agents spawn`).
+
+---
+
+## Inbox Checkpoints
+
+Use `eits dm inbox --since-session --team-only --json`:
+
+- before claiming work
+- after `eits tasks begin` / `eits tasks claim` and other major state transitions
+- before `eits tasks complete`
+- after sending a completion DM, to catch follow-up work
 
 ---
 
@@ -187,7 +208,7 @@ On resume, inspect current state before acting:
 
 ```bash
 eits tasks active --json          # check for in-progress tasks; In Review does not unblock writes
-eits dm inbox --since-session --json   # check for DMs since this session started; --unread does not exist
+eits dm inbox --since-session --team-only --json   # check for team DMs since this session started; --unread does not exist
 ```
 
 Do not create a new task or respond to stale DMs until current session context is confirmed.

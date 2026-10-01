@@ -11,9 +11,9 @@ defmodule EyeInTheSkyWeb.Layouts do
   # The app.html.heex template provides the sidebar layout.
   embed_templates "layouts/*"
 
-  # ── Public top bar helpers (used by app.html.heex shell) ────────────────────
+  # Public top bar helpers used by app.html.heex shell.
 
-  @doc "Section label slot: section name or DM session name. No project breadcrumb — chrome spec shows label only."
+  @doc "Section label slot: section name or DM session name. No project breadcrumb; chrome spec shows label only."
   attr :sidebar_tab, :atom, required: true
   attr :dm_session_name, :string, default: nil
   attr :dm_session_status, :string, default: nil
@@ -34,13 +34,13 @@ defmodule EyeInTheSkyWeb.Layouts do
             phx-blur="update_session_name"
             phx-keydown={JS.push("update_session_name") |> JS.focus(to: "#message-input")}
             phx-key="Enter"
-            class="text-[14px] font-semibold text-base-content/90 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
+            class="text-message font-semibold text-base-content/90 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:bg-base-content/5 rounded-box px-1 min-w-[8rem] max-w-[24rem] w-auto placeholder:text-base-content/25 transition-colors"
           />
         </div>
       <% @sidebar_tab == :chat -> %>
         <%!-- chat toolbar renders #channel-name itself; no label here --%>
       <% true -> %>
-        <span class="text-sm font-semibold text-base-content/90 px-1 mr-4 flex-shrink-0">
+        <span class="text-message font-semibold text-base-content/90 px-1 mr-4 flex-shrink-0">
           {top_bar_section_label(@sidebar_tab)}
         </span>
     <% end %>
@@ -58,7 +58,7 @@ defmodule EyeInTheSkyWeb.Layouts do
       <%= if @href do %>
         <.link
           navigate={@href}
-          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-box text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
           <.icon name="hero-plus" class="size-3" />
           {@label}
@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWeb.Layouts do
       <% else %>
         <button
           phx-click={@event}
-          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-md text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
+          class="ml-auto flex items-center gap-1 h-7 px-2.5 rounded-box text-mini font-medium bg-primary text-primary-content hover:bg-primary/90 transition-colors"
         >
           <.icon name="hero-plus" class="size-3" />
           {@label}

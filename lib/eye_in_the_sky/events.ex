@@ -40,6 +40,8 @@ defmodule EyeInTheSky.Events do
   """
 
   @pubsub EyeInTheSky.PubSub
+  alias EyeInTheSky.Workspaces
+  alias EyeInTheSky.Workspaces.Workspace
 
   # ---------------------------------------------------------------------------
   # Subscribe helpers
@@ -455,8 +457,26 @@ defmodule EyeInTheSky.Events do
   # LiveView process. RailLive is now a standalone process; PubSub is the
   # correct cross-process channel.
 
+  @doc """
+  Build a browser-session-scoped topic for rail context updates.
+
+  The rail is rendered as a sticky child LiveView while the page content is a
+  separate LiveView process. A global rail context topic lets one window's page
+  broadcasts overwrite another window's selected project, so routed views pass
+  this scoped topic into the embedded rail.
+  """
+  def rail_context_topic(%{"_csrf_token" => token}) when is_binary(token) and token != "" do
+    digest =
+      :crypto.hash(:sha256, token)
+      |> Base.url_encode64(padding: false)
+
+    "rail:context:#{digest}"
+  end
+
+  def rail_context_topic(_session), do: "rail:context"
+
   @doc "Subscribe to rail context updates. Call from RailLive.mount/3 (connected? guard)."
-  def subscribe_rail_context, do: sub("rail:context")
+  def subscribe_rail_context(topic \\ "rail:context"), do: sub(topic)
 
   @doc """
   Broadcast current rail context from a page LiveView.
@@ -465,12 +485,16 @@ defmodule EyeInTheSky.Events do
   Reads sidebar_tab, sidebar_project, and active_channel_id from socket.assigns.
   """
   def broadcast_rail_context(socket) do
-    broadcast("rail:context", {
+    topic = socket.assigns[:rail_context_topic] || "rail:context"
+    workspace = workspace_for_assigns(socket.assigns)
+
+    broadcast(topic, {
       :rail_context,
       %{
         sidebar_tab: socket.assigns[:sidebar_tab] || :sessions,
         sidebar_project: socket.assigns[:sidebar_project],
-        active_channel_id: socket.assigns[:active_channel_id]
+        active_channel_id: socket.assigns[:active_channel_id],
+        workspace_id: workspace && workspace.id
       }
     })
   end
@@ -488,6 +512,10 @@ defmodule EyeInTheSky.Events do
   @doc "Broadcast a single session update to RailLive (replaces send_update session_updated:)."
   def broadcast_rail_session_updated(session),
     do: broadcast("rail:session_update", {:rail_session_updated, session})
+
+  @doc "Signal RailLive to reload its filtered sessions list."
+  def broadcast_rail_sessions_refresh,
+    do: broadcast("rail:session_update", :rail_sessions_refresh)
 
   @doc "Subscribe to notification-count refresh signals for the Rail."
   def subscribe_rail_notifications_refresh, do: sub("rail:refresh:notifications")
@@ -509,6 +537,45 @@ defmodule EyeInTheSky.Events do
   @doc "Signal RailLive to refresh its flyout channel list."
   def broadcast_rail_refresh_channels,
     do: broadcast("rail:refresh:channels", :rail_refresh_channels)
+
+  @doc """
+  Resolve the current workspace from LiveView assigns.
+
+  Prefers an explicit `:workspace`, then derives from `:sidebar_project`, then
+  falls back to the current user's default workspace when available.
+  """
+  def workspace_for_assigns(assigns) when is_map(assigns) do
+    case Map.get(assigns, :workspace) || Map.get(assigns, "workspace") do
+      %Workspace{} = workspace ->
+        workspace
+
+      _ ->
+        case Map.get(assigns, :sidebar_project) || Map.get(assigns, "sidebar_project") do
+          %{workspace_id: workspace_id} when is_integer(workspace_id) ->
+            Workspaces.get_workspace(workspace_id)
+
+          _ ->
+            case Map.get(assigns, :current_user) || Map.get(assigns, "current_user") do
+              nil -> default_workspace_for_auth_bypass()
+              user -> Workspaces.default_workspace_for_user(user)
+            end
+        end
+    end
+  end
+
+  @doc "Resolve the current workspace id from LiveView assigns."
+  def workspace_id_for_assigns(assigns) when is_map(assigns) do
+    case workspace_for_assigns(assigns) do
+      %Workspace{id: id} -> id
+      _ -> nil
+    end
+  end
+
+  defp default_workspace_for_auth_bypass do
+    if Application.get_env(:eye_in_the_sky, :disable_auth, false) do
+      Workspaces.default_workspace()
+    end
+  end
 
   defp broadcast(topic, message), do: Phoenix.PubSub.broadcast(@pubsub, topic, message)
   defp sub(topic), do: Phoenix.PubSub.subscribe(@pubsub, topic)

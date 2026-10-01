@@ -15,17 +15,21 @@
     <div class="space-y-1">
       {#each commits as commit (commit.commit_hash)}
         <button
-          class="btn btn-ghost w-full justify-start text-left p-3 h-auto"
-          class:btn-active={selectedCommit?.commit_hash === commit.commit_hash}
+          class={[
+            "eits-action w-full justify-start p-3 text-left h-auto",
+            selectedCommit?.commit_hash === commit.commit_hash
+              ? "eits-action--primary"
+              : "eits-action--ghost"
+          ].join(" ")}
           on:click={() => (selectedCommit = commit)}
         >
           <div class="w-full">
-            <div class="font-mono text-xs opacity-70">
+            <div class="font-mono text-mini opacity-70">
               {commit.commit_hash.slice(0, 8)}
             </div>
-            <div class="text-sm font-medium mt-1">{commit.commit_message}</div>
+            <div class="text-message font-medium mt-1">{commit.commit_message}</div>
             {#if commit.created_at}
-              <div class="text-xs opacity-70 mt-1">
+              <div class="text-mini opacity-70 mt-1">
                 {commit.created_at.slice(0, 16)}
               </div>
             {/if}
@@ -38,14 +42,14 @@
   <!-- Right: Diff Viewer (placeholder) -->
   <div class="overflow-y-auto border-l border-base-300 pl-4">
     {#if selectedCommit}
-      <div class="font-mono text-xs">
+      <div class="font-mono text-mini">
         <div class="mb-2 opacity-70">
           Commit: {selectedCommit.commit_hash.slice(0, 8)}
         </div>
         <pre class="whitespace-pre-wrap opacity-70">Git diff viewer coming soon...</pre>
       </div>
     {:else}
-      <p class="opacity-70">Select a commit to view diff</p>
+      <p class="text-message opacity-70">Select a commit to view diff</p>
     {/if}
   </div>
 </div>

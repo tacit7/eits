@@ -45,6 +45,7 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
         name: "Test Session",
         agent_id: nil,
         project_name: "web",
+        git_worktree_path: nil,
         started_at: DateTime.utc_now() |> DateTime.to_iso8601(),
         ended_at: nil,
         last_activity_at: nil,
@@ -118,6 +119,25 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
       assert html =~ ~s(aria-label="Open task Sample task")
     end
 
+    test "list DM link uses the shared robot icon" do
+      task =
+        sample_task(%{
+          sessions: [%{id: 1, uuid: "session-uuid"}]
+        })
+
+      html =
+        render_component(&TaskCard.task_card/1,
+          task: task,
+          variant: "list",
+          on_click: "open_task",
+          on_delete: nil
+        )
+
+      assert html =~ ~s(aria-label="Open agent direct message")
+      assert html =~ ~s(<rect width="16" height="12" x="4" y="8" rx="2")
+      refute html =~ "hero-chat-bubble-left-ellipsis"
+    end
+
     test "list delete button has aria-label" do
       task = sample_task()
 
@@ -177,6 +197,18 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityTest do
         )
 
       assert html =~ ~s(aria-label="Open session: Test Session - Idle")
+    end
+
+    test "failed row renders a red status dot and failed aria status" do
+      session = sample_session(%{status: "failed", status_reason: "retry_exhausted"})
+
+      html =
+        render_component(&SessionCard.session_row/1,
+          session: session
+        )
+
+      assert html =~ "bg-error"
+      assert html =~ ~s(aria-label="Open session: Test Session - Failed")
     end
 
     test "row is keyboard accessible with role=button and tabindex" do
@@ -266,16 +298,19 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias EyeInTheSky.{Projects, Tasks}
+  alias EyeInTheSky.{Projects, Tasks, Workspaces}
 
   defp uniq, do: System.unique_integer([:positive])
 
-  defp create_project do
+  defp create_project(user) do
+    workspace = Workspaces.default_workspace_for_user!(user)
+
     {:ok, project} =
       Projects.create_project(%{
         name: "a11y-lv-#{uniq()}",
         path: "/tmp/a11y-lv-#{uniq()}",
-        slug: "a11y-lv-#{uniq()}"
+        slug: "a11y-lv-#{uniq()}",
+        workspace_id: workspace.id
       })
 
     project
@@ -300,8 +335,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
   end
 
   describe "Project tasks list - TaskCard accessibility attributes" do
-    test "list row has role=button and aria-label", %{conn: conn} do
-      project = create_project()
+    test "list row has role=button and aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project, %{title: "A11y list task"})
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -310,8 +345,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
       assert html =~ "Open task A11y list task"
     end
 
-    test "delete button has aria-label", %{conn: conn} do
-      project = create_project()
+    test "delete button has aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -319,8 +354,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
       assert html =~ ~s(aria-label="Delete task")
     end
 
-    test "delete button has min-h-[44px] touch target", %{conn: conn} do
-      project = create_project()
+    test "delete button has min-h-[44px] touch target", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/tasks")
@@ -333,8 +368,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
     # Kanban delete is now inside a dropdown (details/summary), not an inline button.
     # The aria-label and focus-visible patterns have changed; these tests are stale.
     @tag :skip
-    test "kanban inline delete button has aria-label", %{conn: conn} do
-      project = create_project()
+    test "kanban inline delete button has aria-label", %{conn: conn, user: user} do
+      project = create_project(user)
       task = create_task(project, %{title: "Kanban task"})
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")
@@ -343,8 +378,8 @@ defmodule EyeInTheSkyWeb.Components.AccessibilityLiveTest do
     end
 
     @tag :skip
-    test "kanban inline delete button has focus-visible ring", %{conn: conn} do
-      project = create_project()
+    test "kanban inline delete button has focus-visible ring", %{conn: conn, user: user} do
+      project = create_project(user)
       _task = create_task(project)
 
       {:ok, _view, html} = live(conn, ~p"/projects/#{project.id}/kanban")

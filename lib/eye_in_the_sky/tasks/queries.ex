@@ -8,6 +8,7 @@ defmodule EyeInTheSky.Tasks.Queries do
   alias EyeInTheSky.QueryHelpers
   alias EyeInTheSky.Repo
   alias EyeInTheSky.Search.PgSearch
+  alias EyeInTheSky.Sessions.Session
   alias EyeInTheSky.Tasks.{Task, WorkflowState}
 
   @full_task_preloads [:state, :tags, :sessions, :checklist_items, :agent]
@@ -140,8 +141,8 @@ defmodule EyeInTheSky.Tasks.Queries do
   Returns team tasks with their linked session IDs from task_sessions.
   Each task has a :session_ids key with a list of session integer IDs.
   """
-  def list_tasks_for_team_with_sessions(team_id) do
-    tasks = list_tasks_for_team(team_id)
+  def list_tasks_for_team_with_sessions(team_id, opts \\ []) do
+    tasks = list_tasks_for_team(team_id, opts)
     task_ids = Enum.map(tasks, & &1.id)
 
     session_rows =
@@ -173,6 +174,46 @@ defmodule EyeInTheSky.Tasks.Queries do
     |> limit(1)
     |> preload([:state])
     |> Repo.one()
+  end
+
+  @doc """
+  Returns idle sessions with their linked open tasks.
+
+  The cutoff applies to `last_activity_at`, falling back to `started_at` when a
+  session has never recorded activity. Terminal-owned sessions are included; the
+  delivery layer decides whether to wake a live worker or persist-only.
+  """
+  def list_open_tasks_for_idle_sessions(cutoff, opts \\ []) do
+    row_limit = Keyword.get(opts, :row_limit, 500)
+    done_id = WorkflowState.done_id()
+
+    rows =
+      from(s in Session,
+        join: ts in "task_sessions",
+        on: ts.session_id == s.id,
+        join: t in Task,
+        on: t.id == ts.task_id,
+        where: s.status == "idle",
+        where: is_nil(s.archived_at),
+        where: not is_nil(s.started_at),
+        where:
+          (not is_nil(s.last_activity_at) and s.last_activity_at < ^cutoff) or
+            (is_nil(s.last_activity_at) and s.started_at < ^cutoff),
+        where: t.state_id != ^done_id and t.archived == false,
+        order_by: [asc: s.id, desc: t.priority, asc: t.created_at],
+        limit: ^row_limit,
+        select: {s, t}
+      )
+      |> Repo.all()
+
+    rows
+    |> Enum.group_by(fn {session, _task} -> session.id end)
+    |> Enum.map(fn {_session_id, grouped_rows} ->
+      {session, _task} = hd(grouped_rows)
+      tasks = Enum.map(grouped_rows, fn {_session, task} -> task end)
+      %{session: session, tasks: tasks}
+    end)
+    |> Enum.sort_by(& &1.session.id)
   end
 
   @doc """

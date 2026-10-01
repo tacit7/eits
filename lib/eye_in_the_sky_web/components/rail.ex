@@ -5,9 +5,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   alias EyeInTheSky.Events
 
   import EyeInTheSkyWeb.Components.Rail.Flyout
-  import EyeInTheSkyWeb.Components.Rail.ProjectSwitcher, only: [project_switcher: 1]
-  import EyeInTheSkyWeb.Components.Rail.Helpers, only: [project_initial: 1]
   import EyeInTheSkyWeb.Components.Rail.FilePanel, only: [file_panel: 1, rail_item: 1]
+  import EyeInTheSkyWeb.ControllerHelpers, only: [parse_int: 1]
 
   # Modals previously embedded inside flyout.ex — now rendered at rail top level
   # so the flyout component stays focused on navigation concerns only.
@@ -18,6 +17,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   alias EyeInTheSky.Claude.RateLimitClient
   alias EyeInTheSky.{Editors, Notifications, Projects, Settings}
+  alias EyeInTheSky.Workspaces
   alias EyeInTheSkyWeb.Components.NewSessionModal
 
   alias EyeInTheSkyWeb.Components.Rail.{
@@ -53,26 +53,31 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   }
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    rail_context_topic = session["rail_context_topic"] || "rail:context"
+    sidebar_tab = Loader.parse_section(session["sidebar_tab"])
+    sidebar_project = initial_sidebar_project(session["sidebar_project_id"])
+    workspace_id = initial_workspace_id(session, sidebar_project)
+    workspace = initial_workspace(workspace_id)
+
     socket =
       assign(socket,
-        projects: [],
+        projects: workspace_projects(workspace_id),
+        rail_context_topic: rail_context_topic,
         flyout_open: true,
-        proj_picker_open: false,
         active_section: nil,
         flyout_sessions: [],
         flyout_channels: [],
         unread_counts: %{},
         notification_count: 0,
-        new_project_path: nil,
         renaming_project_id: nil,
         rename_value: "",
         mobile_open: false,
-        sidebar_project: nil,
-        sidebar_tab: :sessions,
+        sidebar_project: sidebar_project,
+        workspace: workspace,
+        workspace_id: workspace_id,
+        sidebar_tab: sidebar_tab,
         active_channel_id: nil,
-        workspace: nil,
-        scope_type: :project,
         flyout_canvases: [],
         flyout_teams: [],
         team_search: "",
@@ -118,7 +123,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     # Skip DB queries on the dead render (mount runs twice — static + connected).
     # This LiveView mounts once and persists across navigation.
     if connected?(socket) do
-      Events.subscribe_rail_context()
+      Events.subscribe_rail_context(rail_context_topic)
+      Events.subscribe_tasks()
       Events.subscribe_rail_unread_counts()
       Events.subscribe_rail_session_update()
       Events.subscribe_rail_notifications_refresh()
@@ -128,7 +134,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
       {:ok,
        assign(socket,
-         projects: Projects.list_projects_for_sidebar(),
+         projects: workspace_projects(socket.assigns[:workspace_id]),
          flyout_sessions: Loader.load_flyout_sessions(nil),
          notification_count: Notifications.unread_count()
        ), layout: false}
@@ -137,24 +143,86 @@ defmodule EyeInTheSkyWeb.Components.Rail do
     end
   end
 
+  defp initial_sidebar_project(nil), do: nil
+
+  defp initial_sidebar_project(id) do
+    case Projects.get_project(id) do
+      {:ok, project} -> project
+      {:error, _} -> nil
+    end
+  end
+
+  defp initial_workspace_id(session, sidebar_project) do
+    session
+    |> Map.get("workspace_id")
+    |> normalize_workspace_id()
+    |> case do
+      nil -> sidebar_project && sidebar_project.workspace_id
+      workspace_id -> workspace_id
+    end
+  end
+
+  defp normalize_workspace_id(id) when is_integer(id), do: id
+  defp normalize_workspace_id(id) when is_binary(id), do: parse_int(id)
+  defp normalize_workspace_id(_), do: nil
+
+  defp initial_workspace(nil), do: nil
+  defp initial_workspace(workspace_id), do: Workspaces.get_workspace(workspace_id)
+
+  defp workspace_projects(_workspace_id), do: Projects.list_projects_for_sidebar()
+
+  defp settings_href(%{sidebar_project: %{id: id}}) do
+    "/settings?return_to=#{URI.encode_www_form("/projects/#{id}/sessions")}"
+  end
+
+  defp settings_href(_assigns), do: "/settings?return_to=#{URI.encode_www_form("/sessions")}"
+
+  defp maybe_reload_projects(socket, previous_workspace_id, workspace_id)
+       when previous_workspace_id == workspace_id do
+    socket
+  end
+
+  defp maybe_reload_projects(socket, _previous_workspace_id, workspace_id) do
+    assign(socket, :projects, workspace_projects(workspace_id))
+  end
+
   # Page LiveView navigation — adopt new sidebar context broadcast by page LiveViews.
   @impl true
-  def handle_info({:rail_context, %{sidebar_tab: sidebar_tab, sidebar_project: sidebar_project, active_channel_id: active_channel_id}}, socket) do
+  def handle_info(
+        {:rail_context, payload},
+        socket
+      ) do
+    sidebar_tab = Map.get(payload, :sidebar_tab) || Map.get(payload, "sidebar_tab") || :sessions
+    sidebar_project = Map.get(payload, :sidebar_project) || Map.get(payload, "sidebar_project")
+
+    active_channel_id =
+      Map.get(payload, :active_channel_id) || Map.get(payload, "active_channel_id")
+
+    workspace_id = Map.get(payload, :workspace_id) || Map.get(payload, "workspace_id")
+
     previous_tab = socket.assigns[:sidebar_tab]
     previous_project = socket.assigns[:sidebar_project]
+    previous_workspace_id = socket.assigns[:workspace_id]
     next_section = Map.get(@section_map, sidebar_tab, :sessions)
+    workspace_id = normalize_workspace_id(workspace_id) || previous_workspace_id
+    workspace = initial_workspace(workspace_id)
 
     socket =
       socket
       |> assign(:sidebar_tab, sidebar_tab)
       |> assign(:active_channel_id, active_channel_id)
+      |> assign(:workspace_id, workspace_id)
+      |> assign(:workspace, workspace)
 
     # Only adopt sidebar_project if non-nil — prevents pages without a project
-    # from clearing a project locally selected via the rail's own project picker.
+    # from clearing the project restored from persisted rail state.
     socket =
-      if is_nil(sidebar_project), do: socket, else: assign(socket, :sidebar_project, sidebar_project)
+      if is_nil(sidebar_project),
+        do: socket,
+        else: assign(socket, :sidebar_project, sidebar_project)
 
     socket = maybe_reload_on_project_change(socket, previous_project, sidebar_project)
+    socket = maybe_reload_projects(socket, previous_workspace_id, workspace_id)
     socket = maybe_reload_on_tab_change(socket, previous_tab, sidebar_tab, next_section)
 
     {:noreply, socket}
@@ -166,23 +234,18 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   end
 
   # Session update pushed by nav_hook
-  def handle_info({:rail_session_updated, session}, socket) do
-    sessions = socket.assigns[:flyout_sessions] || []
-
-    updated_sessions =
-      if Enum.any?(sessions, &(&1.id == session.id)) do
-        Enum.map(sessions, fn s -> if s.id == session.id, do: session, else: s end)
-      else
-        Loader.load_flyout_sessions(
-          socket.assigns[:sidebar_project],
-          socket.assigns[:session_sort] || :last_activity,
-          socket.assigns[:session_name_filter] || "",
-          socket.assigns[:session_show] || :twenty
-        )
-      end
-
-    {:noreply, assign(socket, :flyout_sessions, updated_sessions)}
+  def handle_info({:rail_session_updated, _session}, socket) do
+    {:noreply, reload_flyout_sessions(socket)}
   end
+
+  def handle_info(:rail_sessions_refresh, socket),
+    do: {:noreply, reload_flyout_sessions(socket)}
+
+  def handle_info(:tasks_changed, socket),
+    do: {:noreply, reload_flyout_tasks(socket)}
+
+  def handle_info({:tasks_changed, _entity}, socket),
+    do: {:noreply, reload_flyout_tasks(socket)}
 
   # Notification refresh from floating_chat_live
   def handle_info(:rail_refresh_notifications, socket) do
@@ -191,12 +254,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   # Project list refresh from floating_chat_live
   def handle_info(:rail_refresh_projects, socket) do
-    {:noreply, assign(socket, :projects, Projects.list_projects_for_sidebar())}
+    {:noreply, assign(socket, :projects, workspace_projects(socket.assigns[:workspace_id]))}
   end
 
   # Channel list refresh from floating_chat_live
   def handle_info(:rail_refresh_channels, socket) do
-    {:noreply, assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
+    {:noreply,
+     assign(socket, :flyout_channels, Loader.load_flyout_channels(socket.assigns.sidebar_project))}
   end
 
   def handle_info({:settings_changed, "preferred_editor", _val}, socket) do
@@ -235,40 +299,12 @@ defmodule EyeInTheSkyWeb.Components.Rail do
   def handle_event("restore_rail_state", params, socket),
     do: RailStateActions.handle_restore_rail_state(params, socket)
 
-  def handle_event("toggle_proj_picker", params, socket),
-    do: RailStateActions.handle_toggle_proj_picker(params, socket)
-
-  def handle_event("close_proj_picker", params, socket),
-    do: RailStateActions.handle_close_proj_picker(params, socket)
-
   def handle_event("open_mobile", params, socket),
     do: RailStateActions.handle_open_mobile(params, socket)
-
-  def handle_event("select_project", params, socket),
-    do: ProjectActions.handle_select_project_with_reload(params, socket)
-
-  def handle_event("select_workspace", _params, socket),
-    do: ProjectActions.handle_select_workspace(socket)
-
-  def handle_event("show_new_project", _params, socket),
-    do: ProjectActions.handle_show_new_project(socket)
-
-  # Tauri JS bridge pushes this after the user picks a folder in the native dialog.
-  def handle_event("folder_picked", params, socket),
-    do: ProjectActions.handle_folder_picked(params, socket)
 
   # Tauri JS bridge: open a project in its own window.
   def handle_event("open_in_window", params, socket),
     do: ProjectActions.handle_open_in_window(params, socket)
-
-  def handle_event("cancel_new_project", _params, socket),
-    do: ProjectActions.handle_cancel_new_project(socket)
-
-  def handle_event("update_project_path", params, socket),
-    do: ProjectActions.handle_update_project_path(params, socket)
-
-  def handle_event("create_project", params, socket),
-    do: ProjectActions.handle_create_project(params, socket)
 
   def handle_event("new_session", params, socket),
     do: ProjectActions.handle_new_session(params, socket)
@@ -490,6 +526,31 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
   defp maybe_start_usage_async(socket, _section), do: socket
 
+  defp reload_flyout_sessions(socket) do
+    assign(
+      socket,
+      :flyout_sessions,
+      Loader.load_flyout_sessions(
+        socket.assigns[:sidebar_project],
+        socket.assigns[:session_sort] || :last_activity,
+        socket.assigns[:session_name_filter] || "",
+        socket.assigns[:session_show] || :twenty
+      )
+    )
+  end
+
+  defp reload_flyout_tasks(socket) do
+    assign(
+      socket,
+      :flyout_tasks,
+      Loader.load_flyout_tasks(
+        socket.assigns[:sidebar_project],
+        socket.assigns[:task_search] || "",
+        socket.assigns[:task_state_filter]
+      )
+    )
+  end
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -505,31 +566,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         class="md:hidden fixed inset-0 z-40 bg-black/40"
       />
 
-      <%!-- Collapse chevron: pill attached to the rail's right edge, revealed on
-           rail hover or keyboard focus. Same toggle as the vsbar button and the
-           divider double-click (see #rail-divider + app.js). --%>
-      <button
-        id="rail-collapse-toggle"
-        phx-click="toggle_collapsed"
-        aria-expanded={to_string(@flyout_open)}
-        aria-label={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
-        title={if @flyout_open, do: "Collapse sidebar", else: "Expand sidebar"}
-        class={[
-          "hidden md:grid place-items-center absolute -right-[13px] top-11 w-[26px] h-11 z-30",
-          "rounded-full border border-base-content/15 bg-base-200 shadow-sm",
-          "text-base-content/60 hover:text-base-content hover:border-primary/60",
-          "opacity-0 group-hover/rail:opacity-100 focus-visible:opacity-100",
-          "transition-opacity duration-150"
-        ]}
-      >
-        <.icon
-          name={if @flyout_open, do: "hero-chevron-left", else: "hero-chevron-right"}
-          class="size-3.5"
-        />
-      </button>
-
       <%!-- Divider strip: invisible 6px double-click target on the rail's right
-           edge (bonus gesture — the chevron is the discoverable affordance).
+           edge (bonus gesture - the chevron is the discoverable affordance).
            dblclick wiring in app.js clicks #rail-collapse-toggle. --%>
       <div
         id="rail-divider"
@@ -541,92 +579,135 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         id="rail-icon-strip"
         class="w-[52px] flex-shrink-0 flex flex-col items-center py-2 gap-1 border-r border-base-content/8 bg-base-100 z-20"
       >
+        <%!-- Flyout toggle lives in the rail so it stays aligned with the icon strip.
+             Desktop uses the persisted disclosure event; mobile opens/closes the drawer. --%>
         <button
-          phx-click="toggle_proj_picker"
+          id="rail-collapse-toggle"
+          phx-click="toggle_collapsed"
+          aria-expanded={to_string(@flyout_open)}
+          aria-label={if @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
+          title={if @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
           class={[
-            "w-8 h-8 rounded-lg mb-2 flex items-center justify-center text-sm font-bold text-white transition-all",
-            "bg-primary hover:opacity-90",
-            if(@proj_picker_open, do: "ring-2 ring-primary ring-offset-2 ring-offset-base-100")
+            "hidden md:flex w-8 h-8 items-center justify-center rounded-box",
+            "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/[0.06]",
+            "focus-ring transition-colors"
           ]}
-          title="Switch project"
-          aria-label="Switch project"
         >
-          {project_initial(@sidebar_project)}
+          <.icon
+            name={if @flyout_open, do: "hero-chevron-double-left", else: "hero-chevron-double-right"}
+            class="size-4"
+          />
         </button>
 
-        <div class="mb-3" />
+        <button
+          id="rail-mobile-flyout-toggle"
+          phx-click={if @mobile_open && @flyout_open, do: "close_flyout", else: "open_mobile"}
+          aria-expanded={to_string(@mobile_open && @flyout_open)}
+          aria-label={
+            if @mobile_open && @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"
+          }
+          title={if @mobile_open && @flyout_open, do: "Hide flyout menu", else: "Show flyout menu"}
+          class={[
+            "md:hidden flex w-8 h-8 items-center justify-center rounded-box",
+            "text-base-content/45 hover:text-base-content/80 hover:bg-base-content/[0.06] active:bg-base-content/10",
+            "focus-ring transition-colors"
+          ]}
+        >
+          <.icon
+            name={
+              if @mobile_open && @flyout_open,
+                do: "hero-chevron-double-left",
+                else: "hero-chevron-double-right"
+            }
+            class="size-4"
+          />
+        </button>
+
+        <div class="mb-2" />
         <.rail_item
           section={:files}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-folder"
-          label="Files"        />
+          label="Files"
+        />
         <.rail_item
           section={:sessions}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-bot-message-square"
-          label="Sessions"        />
+          label="Sessions"
+        />
         <.rail_item
           section={:tasks}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-kanban"
-          label="Tasks"        />
+          label="Tasks"
+        />
         <.rail_item
           section={:notes}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-pencil-square"
-          label="Notes"        />
+          label="Notes"
+        />
         <.rail_item
           section={:agents}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="lucide-robot"
-          label="Agents"        />
+          label="Agents"
+        />
         <.rail_item
           section={:skills}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-bolt"
-          label="Skills"        />
+          label="Skills"
+        />
         <.rail_item
           section={:prompts}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-document-text"
-          label="Prompts"        />
+          label="Prompts"
+        />
         <.rail_item
           section={:teams}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-users"
-          label="Teams"        />
+          label="Teams"
+        />
         <.rail_item
           section={:jobs}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-clock"
-          label="Jobs"        />
+          label="Jobs"
+        />
         <.rail_item
           section={:canvas}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-squares-2x2"
-          label="Canvas"        />
+          label="Canvas"
+        />
         <.rail_item
           section={:chat}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chat-bubble-left-ellipsis"
-          label="Chat"        />
+          label="Chat"
+        />
         <.rail_item
           section={:usage}
           active_section={@active_section}
           flyout_open={@flyout_open}
           icon="hero-chart-bar"
-          label="Usage"        />
+          label="Usage"
+        />
 
         <div class="flex-1" />
         <div class="mb-3" />
@@ -635,15 +716,15 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           <.link
             navigate="/notifications"
             class={[
-              "relative w-8 h-8 flex items-center justify-center rounded-lg transition-colors",
-              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg"
+              "relative w-8 h-8 flex items-center justify-center rounded-box transition-colors",
+              "text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box"
             ]}
             aria-label="Notifications"
           >
             <.icon name="hero-bell-mini" class="size-4" />
             <span
               :if={@notification_count > 0}
-              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-white text-nano font-bold rounded-full flex items-center justify-center px-0.5"
+              class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] bg-error text-error-content text-nano font-bold rounded-full flex items-center justify-center px-0.5"
             >
               {@notification_count}
             </span>
@@ -653,7 +734,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="tooltip tooltip-right" data-tip="IAM Policies">
           <.link
             navigate="/iam/policies"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="IAM Policies"
           >
             <.icon name="hero-shield-check-mini" class="size-4" />
@@ -663,7 +744,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
         <div class="tooltip tooltip-right" data-tip="Claude Config">
           <.link
             navigate="/config"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Claude Config"
           >
             <.custom_icon name="lucide-file-cog" class="size-4" />
@@ -672,8 +753,8 @@ defmodule EyeInTheSkyWeb.Components.Rail do
 
         <div class="tooltip tooltip-right" data-tip="Settings">
           <.link
-            navigate="/settings"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            navigate={settings_href(assigns)}
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Settings"
           >
             <.icon name="hero-cog-6-tooth-mini" class="size-4" />
@@ -684,23 +765,13 @@ defmodule EyeInTheSkyWeb.Components.Rail do
           <.link
             href="/auth/logout"
             method="delete"
-            class="w-8 h-8 flex items-center justify-center rounded-lg text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-lg transition-colors"
+            class="w-8 h-8 flex items-center justify-center rounded-box text-base-content/45 hover:bg-base-content/[0.06] hover:rounded-box transition-colors"
             aria-label="Sign out"
           >
             <.icon name="hero-arrow-left-on-rectangle-mini" class="size-4" />
           </.link>
         </div>
       </nav>
-
-      <.project_switcher
-        :if={@proj_picker_open}
-        projects={@projects}
-        sidebar_project={@sidebar_project}
-        open={@proj_picker_open}
-        new_project_path={@new_project_path}
-        workspace={@workspace}
-        scope_type={@scope_type}
-      />
 
       <.flyout
         open={@flyout_open}
@@ -748,9 +819,7 @@ defmodule EyeInTheSkyWeb.Components.Rail do
       />
 
       <%!-- ── Channel modal ── --%>
-      <.new_channel_modal
-        :if={@show_new_channel_form}
-      />
+      <.new_channel_modal :if={@show_new_channel_form} />
 
       <%!-- ── Rail modal (new task / new prompt) ── --%>
       <.rail_modal

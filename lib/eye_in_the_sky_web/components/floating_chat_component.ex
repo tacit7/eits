@@ -6,7 +6,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
   client (localStorage) and live statuses fetched from the server.
 
   The JS hook `FavoriteFab` handles only positioning, CSS transitions, and
-  click events (expand/collapse, chat open).
+  click events (expand/disclosure, chat open).
   """
 
   use EyeInTheSkyWeb, :live_component
@@ -39,7 +39,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
           tabindex="0"
           role="button"
           style="position:absolute;bottom:0;right:0;z-index:2;pointer-events:auto"
-          class="btn btn-primary btn-circle shadow-lg outline-none"
+          class="eits-action eits-action--primary eits-action--icon rounded-full shadow-lg outline-none"
         >
           <.icon name="hero-user" class="size-6" />
         </div>
@@ -49,7 +49,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
           <% status_style = agent_status_style(agent, @statuses) %>
           <a
             href={"/dm/#{agent["session_id"]}"}
-            class="btn btn-circle bg-base-100 shadow-md hover:bg-base-200 border border-base-content/10 relative group fab-agent-btn"
+            class="eits-action eits-action--icon relative rounded-full border border-base-content/10 bg-base-100 shadow-md hover:bg-base-200 group fab-agent-btn"
             style="position:absolute;bottom:0;right:0;opacity:0;transform:translate(0,0) scale(0.5);transition:opacity 0.18s,transform 0.18s;pointer-events:none"
             title={agent["name"] || "Agent"}
             data-agent-index={index}
@@ -57,7 +57,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
             data-agent-name={agent["name"]}
             data-agent-status={agent_live_status(agent, @statuses)}
           >
-            <span class="font-bold text-xs text-base-content/70">
+            <span class="font-bold text-mini text-base-content/70">
               {initials(agent["name"])}
             </span>
 
@@ -93,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.FloatingChatComponent do
             </span>
 
             <%!-- Tooltip --%>
-            <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-xs rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <span class="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-base-300 text-base-content text-mini rounded-box shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               {agent["name"] || "Agent"}
             </span>
           </a>

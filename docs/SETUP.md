@@ -177,10 +177,10 @@ EITS ships a set of skills that live in `~/.claude/skills/`. These are loaded au
 | `eits-dm` | `DM from:` prefix | Receive and reply to inter-agent DMs |
 | `eits-chat` | `eits-chat:` prefix | Handle @mentions from the web UI chat |
 | `eits-teams` | `eits-teams` | Create teams, spawn agents, monitor coordinated work |
-| `team-worker` | Spawned as team member | Worker side of team work: claim task first, work, compile, complete, DM back |
+| `eits-team-worker` | Spawned as team member | Worker side of team work: claim task first, work, compile, complete, DM back |
 | `eits-superpowers` | `eits-superpowers` | EITS-native dev workflow: task tracking, team spawning, mockup-first UI |
-| `i-end-session` | `i-end-session` | Clean session close: update tracking → commit → mark completed (commits auto-logged by hook) |
-| `task-workable` | `task-workable` | Create tasks for the auto-worker (haiku or sonnet model) |
+| `eits-end-session` | `eits-end-session` | Clean session close: update tracking -> commit -> mark completed (commits auto-logged by hook) |
+| `eits-task-workable` | `eits-task-workable` | Create tasks for the auto-worker (haiku or sonnet model) |
 
 **Entrypoint rule** — all skills respect `$CLAUDE_CODE_ENTRYPOINT`:
 
@@ -189,16 +189,39 @@ EITS ships a set of skills that live in `~/.claude/skills/`. These are loaded au
 | `sdk-cli` | Spawned/headless agent | `EITS-CMD:` directives in stdout |
 | `cli` | Interactive session | `eits` bash script |
 
-Skills are version-controlled in `priv/skills/`. Install them by copying to `~/.claude/skills/`:
+Skills are version-controlled in `priv/skills/`. Install them by symlinking repo-owned sources to `~/.claude/skills/`. Move or remove any existing copied skill directories before running these commands:
 
 ```bash
-cp -r priv/skills/eits-* ~/.claude/skills/
-cp -r priv/skills/i-end-session ~/.claude/skills/
-cp -r priv/skills/task-workable ~/.claude/skills/
-cp -r priv/skills/team-worker ~/.claude/skills/
+ln -sfn "$PWD/priv/skills/eits-chat" ~/.claude/skills/eits-chat
+ln -sfn "$PWD/priv/skills/eits-cli" ~/.claude/skills/eits-cli
+ln -sfn "$PWD/priv/skills/eits-dm" ~/.claude/skills/eits-dm
+ln -sfn "$PWD/priv/skills/eits-end-session" ~/.claude/skills/eits-end-session
+ln -sfn "$PWD/priv/skills/eits-init" ~/.claude/skills/eits-init
+ln -sfn "$PWD/priv/skills/eits-pr" ~/.claude/skills/eits-pr
+ln -sfn "$PWD/priv/skills/eits-superpowers" ~/.claude/skills/eits-superpowers
+ln -sfn "$PWD/priv/skills/eits-task-workable" ~/.claude/skills/eits-task-workable
+ln -sfn "$PWD/priv/skills/eits-team-worker" ~/.claude/skills/eits-team-worker
+ln -sfn "$PWD/priv/skills/eits-teams" ~/.claude/skills/eits-teams
+ln -sfn "$PWD/priv/skills/eits-workflow" ~/.claude/skills/eits-workflow
 ```
 
 Re-run this any time a skill is updated in the repo.
+
+Codex uses the same public `eits-*` skill names. Codex-specific implementations live under `priv/skills/codex/` and should be symlinked into `~/.codex/skills/` after moving or removing stale copied directories:
+
+```bash
+ln -sfn "$PWD/priv/skills/codex/eits-dm" ~/.codex/skills/eits-dm
+ln -sfn "$PWD/priv/skills/codex/eits-end-session" ~/.codex/skills/eits-end-session
+ln -sfn "$PWD/priv/skills/codex/eits-init" ~/.codex/skills/eits-init
+ln -sfn "$PWD/priv/skills/codex/eits-teams" ~/.codex/skills/eits-teams
+ln -sfn "$PWD/priv/skills/codex/eits-workflow" ~/.codex/skills/eits-workflow
+ln -sfn "$PWD/priv/skills/eits-chat" ~/.codex/skills/eits-chat
+ln -sfn "$PWD/priv/skills/eits-cli" ~/.codex/skills/eits-cli
+ln -sfn "$PWD/priv/skills/eits-pr" ~/.codex/skills/eits-pr
+ln -sfn "$PWD/priv/skills/eits-superpowers" ~/.codex/skills/eits-superpowers
+ln -sfn "$PWD/priv/skills/eits-task-workable" ~/.codex/skills/eits-task-workable
+ln -sfn "$PWD/priv/skills/eits-team-worker" ~/.codex/skills/eits-team-worker
+```
 
 ## 7. MCP Server
 

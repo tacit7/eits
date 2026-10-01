@@ -86,21 +86,15 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         {:noreply, put_flash(socket, :error, "Select at least one document.")}
 
       true ->
-        socket =
-          case IAM.attach_documents_to_agent_type(agent_type, selected_docs) do
-            {:ok, _count} ->
-              socket
-              |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
-              |> assign(:show_add_form, false)
-              |> assign(:add_agent_type, "")
-              |> assign(:add_selected_docs, [])
-              |> assign_agent_types()
+        {:ok, _count} = IAM.attach_documents_to_agent_type(agent_type, selected_docs)
 
-            {:error, _reason} ->
-              socket
-              |> put_flash(:error, "Failed to attach document(s) to \"#{agent_type}\". No changes were made.")
-              |> assign_agent_types()
-          end
+        socket =
+          socket
+          |> put_flash(:info, "Document(s) attached to \"#{agent_type}\".")
+          |> assign(:show_add_form, false)
+          |> assign(:add_agent_type, "")
+          |> assign(:add_selected_docs, [])
+          |> assign_agent_types()
 
         {:noreply, socket}
     end
@@ -128,12 +122,12 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         <div class="flex items-center gap-3">
           <.icon name="hero-users" class="size-6 text-primary" />
           <h1 class="text-2xl font-bold">Agent Types</h1>
-          <span class="badge badge-ghost">{length(@agent_types)}</span>
+          <span class="eits-chip eits-chip--muted">{length(@agent_types)}</span>
         </div>
 
         <button
           type="button"
-          class="btn btn-primary btn-sm"
+          class="eits-action eits-action--primary gap-1.5"
           phx-click="toggle_add_form"
         >
           <.icon name="hero-plus" class="size-4" />
@@ -142,13 +136,13 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
       </div>
 
       <%= if @show_add_form do %>
-        <section class="card bg-base-200">
-          <div class="card-body p-4 space-y-4">
-            <h2 class="card-title text-base">Attach documents to agent type</h2>
+        <section class="eits-panel bg-base-200">
+          <div class="eits-panel__body p-4 space-y-4">
+            <h2 class="eits-panel__title text-message">Attach documents to agent type</h2>
 
             <div class="space-y-3">
               <label class="form-control">
-                <span class="label-text text-xs">Agent type</span>
+                <span class="label-text text-mini">Agent type</span>
                 <input
                   type="text"
                   placeholder="e.g. code-reviewer"
@@ -160,13 +154,15 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
               </label>
 
               <div>
-                <span class="label-text text-xs">Documents</span>
-                <div class="mt-1 space-y-1 max-h-48 overflow-y-auto border border-base-content/10 rounded p-2">
+                <span class="label-text text-mini">Documents</span>
+                <div class="mt-1 space-y-1 max-h-48 overflow-y-auto border border-base-content/10 rounded-box p-2">
                   <%= if @available_documents == [] do %>
-                    <p class="text-xs text-base-content/50 py-2 text-center">No documents available</p>
+                    <p class="text-mini text-base-content/50 py-2 text-center">
+                      No documents available
+                    </p>
                   <% end %>
                   <%= for doc <- @available_documents do %>
-                    <label class="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-base-content/5 rounded">
+                    <label class="flex items-center gap-2 cursor-pointer py-1 px-1 hover:bg-base-content/5 rounded-box">
                       <input
                         type="checkbox"
                         class="checkbox checkbox-sm"
@@ -174,9 +170,9 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                         phx-click="toggle_doc_selection"
                         phx-value-doc_id={doc.id}
                       />
-                      <span class="text-sm font-medium">{doc.name}</span>
+                      <span class="text-message font-medium">{doc.name}</span>
                       <%= if doc.description do %>
-                        <span class="text-xs text-base-content/50 truncate">{doc.description}</span>
+                        <span class="text-mini text-base-content/50 truncate">{doc.description}</span>
                       <% end %>
                     </label>
                   <% end %>
@@ -185,7 +181,7 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
 
               <button
                 type="button"
-                class="btn btn-primary btn-sm"
+                class="eits-action eits-action--primary"
                 phx-click="attach_documents"
               >
                 Attach
@@ -195,8 +191,8 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
         </section>
       <% end %>
 
-      <section class="card bg-base-200">
-        <div class="card-body p-0">
+      <section class="eits-panel bg-base-200">
+        <div class="eits-panel__body p-0">
           <div class="overflow-x-auto">
             <table class="table table-sm">
               <thead>
@@ -227,11 +223,11 @@ defmodule EyeInTheSkyWeb.IAMLive.AgentTypes do
                     <td class="max-w-sm">
                       <div class="flex flex-wrap gap-1">
                         <%= for doc <- docs do %>
-                          <span class="badge badge-ghost badge-sm">{doc.name}</span>
+                          <span class="eits-chip eits-chip--muted">{doc.name}</span>
                         <% end %>
                       </div>
                     </td>
-                    <td class="font-mono text-sm">{length(docs)}</td>
+                    <td class="font-mono text-message">{length(docs)}</td>
                   </tr>
                 <% end %>
               </tbody>

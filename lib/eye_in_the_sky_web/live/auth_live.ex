@@ -31,15 +31,15 @@ defmodule EyeInTheSkyWeb.AuthLive do
     ~H"""
     <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6 text-center">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-          <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-box bg-primary mb-4">
+          <.icon name="hero-eye" class="size-6 text-primary-content" />
         </div>
-        <p class="text-sm text-red-500 dark:text-red-400 mt-2">
+        <p class="text-message text-error mt-2">
           This registration link is invalid or has expired.
         </p>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+        <p class="text-mini text-base-content/50 mt-2">
           Run
-          <code class="font-mono bg-zinc-100 dark:bg-zinc-800 px-1 rounded">
+          <code class="font-mono bg-base-200 text-base-content px-1 rounded-box">
             mix eits.register &lt;username&gt;
           </code>
           to get a new one.
@@ -54,13 +54,13 @@ defmodule EyeInTheSkyWeb.AuthLive do
     <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-            <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-box bg-primary mb-4">
+            <.icon name="hero-eye" class="size-6 text-primary-content" />
           </div>
-          <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-[Bricolage_Grotesque]">
+          <h1 class="text-2xl font-bold text-base-content font-[Bricolage_Grotesque]">
             Register Passkey
           </h1>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Touch your passkey to register</p>
+          <p class="text-message text-base-content/50 mt-1">Touch your passkey to register</p>
         </div>
 
         <div
@@ -68,25 +68,25 @@ defmodule EyeInTheSkyWeb.AuthLive do
           phx-hook="PasskeyAuth"
           data-mode="register"
           data-token={@token}
-          class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4"
+          class="bg-base-200 rounded-box border border-base-content/10 p-6 space-y-4"
         >
           <div
             :if={@error}
-            class="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950 rounded-lg px-3 py-2"
+            class="text-mini text-error bg-error/10 rounded-box px-3 py-2"
           >
             {@error}
           </div>
 
           <div
             id="passkey-status"
-            class="hidden text-xs text-zinc-500 dark:text-zinc-400 text-center py-1"
+            class="hidden text-mini text-base-content/50 text-center py-1"
           >
           </div>
 
           <button
             id="btn-register"
             type="button"
-            class="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full px-4 py-2.5 text-message font-medium rounded-box bg-primary text-primary-content hover:bg-primary/85 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Register passkey
           </button>
@@ -101,23 +101,23 @@ defmodule EyeInTheSkyWeb.AuthLive do
     <div class="min-h-[100dvh] flex items-center justify-center bg-base-100">
       <div class="w-full max-w-sm px-6">
         <div class="mb-8 text-center">
-          <div class="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 dark:bg-zinc-100 mb-4">
-            <.icon name="hero-eye" class="size-6 text-white dark:text-zinc-900" />
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-box bg-primary mb-4">
+            <.icon name="hero-eye" class="size-6 text-primary-content" />
           </div>
-          <h1 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100 font-[Bricolage_Grotesque]">
+          <h1 class="text-2xl font-bold text-base-content font-[Bricolage_Grotesque]">
             Eye in the Sky
           </h1>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Sign in with your passkey</p>
+          <p class="text-message text-base-content/50 mt-1">Sign in with your passkey</p>
         </div>
 
         <div
           id="passkey-auth"
           phx-hook="PasskeyAuth"
           data-mode="login"
-          class="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-6 space-y-4"
+          class="bg-base-200 rounded-box border border-base-content/10 p-6 space-y-4"
         >
           <div>
-            <label class="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1.5">
+            <label class="block text-mini font-medium text-base-content/60 mb-1.5">
               Username
             </label>
             <input
@@ -125,27 +125,27 @@ defmodule EyeInTheSkyWeb.AuthLive do
               type="text"
               placeholder="your username"
               autocomplete="username"
-              class="w-full px-3 py-2.5 text-base rounded-lg border border-zinc-200 dark:border-zinc-700 bg-transparent text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
+              class="w-full px-3 py-2.5 text-message rounded-box border border-base-content/15 bg-base-100 text-base-content placeholder:text-base-content/35 focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           <div
             :if={@error}
-            class="text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-950 rounded-lg px-3 py-2"
+            class="text-mini text-error bg-error/10 rounded-box px-3 py-2"
           >
             {@error}
           </div>
 
           <div
             id="passkey-status"
-            class="hidden text-xs text-zinc-500 dark:text-zinc-400 text-center py-1"
+            class="hidden text-mini text-base-content/50 text-center py-1"
           >
           </div>
 
           <button
             id="btn-signin"
             type="button"
-            class="w-full px-4 py-2.5 text-sm font-medium rounded-lg bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="w-full px-4 py-2.5 text-message font-medium rounded-box bg-primary text-primary-content hover:bg-primary/85 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Sign in
           </button>

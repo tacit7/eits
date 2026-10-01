@@ -50,14 +50,17 @@ defmodule EyeInTheSky.Application do
           {Registry, keys: :unique, name: EyeInTheSky.Claude.ChatRegistry},
           # SDK registry for tracking running Claude CLI processes
           EyeInTheSky.Claude.SDK.Registry,
+          # Codex app-server ownership: one long-lived JSON-RPC server per AgentWorker/session.
+          {Registry, keys: :unique, name: EyeInTheSky.Codex.AppServerRegistry},
+          {DynamicSupervisor,
+           name: EyeInTheSky.Codex.AppServerSupervisor, strategy: :one_for_one},
           # DynamicSupervisor for persistent agent workers.
           # max_children caps concurrent live AgentWorkers; tune via
           # AGENT_SUPERVISOR_MAX_CHILDREN (see config/runtime.exs). Default 50.
           {DynamicSupervisor,
            name: EyeInTheSky.Claude.AgentSupervisor,
            strategy: :one_for_one,
-           max_children:
-             Application.get_env(:eye_in_the_sky, :agent_supervisor_max_children, 50)},
+           max_children: Application.get_env(:eye_in_the_sky, :agent_supervisor_max_children, 50)},
           # DynamicSupervisor for per-channel chat workers
           {DynamicSupervisor, name: EyeInTheSky.Claude.ChatSupervisor, strategy: :one_for_one},
           # Oban job processing (includes Cron plugin for JobDispatcherWorker)
@@ -114,6 +117,8 @@ defmodule EyeInTheSky.Application do
           EyeInTheSky.Tasks.Poller,
           # Process incoming GitHub webhook deliveries
           EyeInTheSky.Github.WebhookDispatcher,
+          # Nudge idle sessions that still own open tasks to update ticket state.
+          EyeInTheSky.Scheduler.IdleTicketNudger,
           # Periodic scheduler: zombie sweep + dead-idle archive (every 5 min).
           # Holds a sandbox connection mid-query; must be skipped in test env
           # (start_pollers: false) or it crashes on SQL Sandbox OwnershipError.

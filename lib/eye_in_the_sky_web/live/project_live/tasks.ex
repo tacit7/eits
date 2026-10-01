@@ -20,49 +20,57 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   @impl true
   def mount(%{"id" => id} = params, _session, socket) do
     project_id = ControllerHelpers.parse_int(id)
-    if connected?(socket), do: subscribe_project_tasks(project_id)
 
-    socket =
-      socket
-      |> mount_project(params,
-        sidebar_tab: :tasks,
-        page_title_prefix: "Tasks",
-        preload: [:agents]
-      )
-      |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
-      |> assign(:show_all, false)
-      |> assign(:search_query, "")
-      |> assign(:filter_state_id, nil)
-      |> assign(:sort_by, "created_desc")
-      |> assign(:workflow_states, [])
-      |> assign(:show_new_task_drawer, false)
-      |> assign(:show_filter_sheet, false)
-      |> assign(:show_task_detail_drawer, false)
-      |> assign(:selected_task, nil)
-      |> assign(:task_notes, [])
-      |> assign(:task_count, 0)
-      |> assign(:page, 1)
-      |> assign(:has_more, false)
-      |> assign(:total_tasks, 0)
-      |> assign(:selected_task_ids, MapSet.new())
-      |> assign(:tasks_select_mode, false)
-      |> assign(:show_archive_confirm, false)
-      |> assign(:loaded_task_ids, [])
-      |> assign(:loaded_tasks, [])
-      |> assign(:state_counts, %{})
-      |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
-      |> assign(:installed_editors, Editors.detect_installed())
-      |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
+    if load_project_for_socket(socket, project_id, []) do
+      if connected?(socket), do: subscribe_project_tasks(project_id)
 
-    socket =
-      if connected?(socket) do
-        assign(socket, :workflow_states, Tasks.list_workflow_states())
-      else
+      socket =
         socket
-      end
+        |> mount_project(params,
+          sidebar_tab: :tasks,
+          page_title_prefix: "Tasks",
+          preload: [:agents]
+        )
+        |> assign(:top_bar_cta, %{label: "New Task", event: "toggle_new_task_drawer"})
+        |> assign(:show_all, false)
+        |> assign(:search_query, "")
+        |> assign(:filter_state_id, nil)
+        |> assign(:sort_by, "created_desc")
+        |> assign(:workflow_states, [])
+        |> assign(:show_new_task_drawer, false)
+        |> assign(:show_filter_sheet, false)
+        |> assign(:show_task_detail_drawer, false)
+        |> assign(:selected_task, nil)
+        |> assign(:task_notes, [])
+        |> assign(:task_count, 0)
+        |> assign(:page, 1)
+        |> assign(:has_more, false)
+        |> assign(:total_tasks, 0)
+        |> assign(:selected_task_ids, MapSet.new())
+        |> assign(:tasks_select_mode, false)
+        |> assign(:show_archive_confirm, false)
+        |> assign(:loaded_task_ids, [])
+        |> assign(:loaded_tasks, [])
+        |> assign(:state_counts, %{})
+        |> stream(:tasks, [], dom_id: fn t -> "pt-#{t.id}" end)
+        |> assign(:installed_editors, Editors.detect_installed())
+        |> assign(:preferred_editor, Settings.get("preferred_editor") || "code")
 
-    if connected?(socket), do: Events.broadcast_rail_context(socket)
-    {:ok, socket}
+      socket =
+        if connected?(socket) do
+          assign(socket, :workflow_states, Tasks.list_workflow_states())
+        else
+          socket
+        end
+
+      if connected?(socket), do: Events.broadcast_rail_context(socket)
+      {:ok, socket}
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, "Project not found")
+       |> redirect(to: ~p"/workspace/tasks")}
+    end
   end
 
   @impl true
@@ -279,7 +287,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
   end
 
   def handle_info({:editor_sync_failed, :task, _id, _reason}, socket) do
-    {:noreply, put_flash(socket, :error, "Editor sync failed — check your editor")}
+    {:noreply, put_flash(socket, :error, "Editor sync failed | check your editor")}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -331,7 +339,6 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
     ~H"""
     <div
       class="flex flex-col overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-w-[860px]"
-      phx-hook="GlobalKeydown"
       id="project-tasks-page"
     >
       <div class="w-full max-w-3xl mx-auto">
@@ -340,7 +347,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           <button
             :if={!@tasks_select_mode && @task_count > 0}
             phx-click="enter_select_mode_tasks"
-            class="btn btn-ghost btn-sm gap-1 h-11 text-xs text-base-content/50"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1 rounded-box px-3 text-mini font-medium text-base-content/45 transition-colors hover:bg-base-content/5 hover:text-base-content/75"
           >
             <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
           </button>
@@ -348,7 +355,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             phx-click="open_filter_sheet"
             aria-label="Open filters"
             aria-haspopup="dialog"
-            class="relative btn btn-ghost btn-sm btn-square h-11 w-11"
+            class="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-box text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
           >
             <.icon name="hero-funnel-mini" class="size-4" />
             <%= if not is_nil(@filter_state_id) || @sort_by != "created_desc" do %>
@@ -361,7 +368,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
           </button>
           <button
             phx-click="toggle_new_task_drawer"
-            class="btn btn-sm btn-primary gap-1.5 min-h-0 h-11 text-xs"
+            class="focus-ring inline-flex h-11 items-center justify-center gap-1.5 rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
           >
             <.icon name="hero-plus-mini" class="size-3.5" /> New Task
           </button>
@@ -420,7 +427,7 @@ defmodule EyeInTheSkyWeb.ProjectLive.Tasks do
             class="py-4 flex justify-center"
           >
             <%= if @has_more do %>
-              <span class="loading loading-spinner loading-sm text-base-content/30"></span>
+              <span class=" spinner spinner--sm text-base-content/30"></span>
             <% end %>
           </div>
         <% else %>

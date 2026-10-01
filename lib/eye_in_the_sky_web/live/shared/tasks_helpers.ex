@@ -92,16 +92,22 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
     description = params["description"]
     state_id = parse_form_int(params["state_id"], 0)
     priority = parse_form_int(params["priority"], 0)
+
     due_at =
       case params["due_at"] do
-        "" -> nil
-        nil -> nil
+        "" ->
+          nil
+
+        nil ->
+          nil
+
         date_str ->
           case DateTime.from_iso8601(date_str <> "T00:00:00Z") do
             {:ok, dt, _} -> dt
             _ -> nil
           end
       end
+
     tags_string = params["tags"] || ""
 
     tag_names = parse_tag_names(tags_string)
@@ -133,7 +139,13 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
 
     case Tasks.get_task_by_uuid_or_id(task_id) do
       {:ok, task} ->
-        do_task_mutation(task, &Tasks.delete_task_with_associations/1, socket, reload_fn, "Failed to delete task")
+        do_task_mutation(
+          task,
+          &Tasks.delete_task_with_associations/1,
+          socket,
+          reload_fn,
+          "Failed to delete task"
+        )
 
       {:error, :not_found} ->
         {:noreply, put_flash(socket, :error, "Task not found")}
@@ -385,7 +397,9 @@ defmodule EyeInTheSkyWeb.Live.Shared.TasksHelpers do
             reinsert_all_tasks(socket)
           else
             # Only re-insert the rows in the range
-            range_tasks = Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
+            range_tasks =
+              Enum.filter(socket.assigns.loaded_tasks, &MapSet.member?(range_ids, task_id(&1)))
+
             Enum.reduce(range_tasks, socket, fn task, acc -> stream_insert(acc, :tasks, task) end)
           end
 

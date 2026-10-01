@@ -72,17 +72,17 @@ defmodule EyeInTheSkyWeb.Components.TerminalWindowComponent do
       data-terminal-id={@id}
       phx-hook="TerminalWindowHook"
       style={"position: absolute; left: #{@ct.pos_x}px; top: #{@ct.pos_y}px; width: #{@ct.width}px; height: #{@ct.height}px; resize: both; overflow: auto;"}
-      class="bg-zinc-950 rounded-xl shadow-2xl border border-zinc-800 flex flex-col"
+      class="bg-base-300 rounded-box shadow-2xl border border-base-content/10 flex flex-col"
     >
       <%!-- Title bar — matches ChatWindowComponent chrome --%>
       <div
         data-drag-handle
-        class="flex items-center justify-between px-3 py-2 bg-zinc-900 border-b border-zinc-800 rounded-t-xl cursor-move select-none shrink-0"
+        class="flex items-center justify-between px-3 py-2 bg-base-200 border-b border-base-content/10 rounded-t-box cursor-move select-none shrink-0"
       >
         <div class="flex items-center gap-2">
-          <.icon name="hero-command-line" class="size-3.5 text-zinc-400" />
-          <span class="text-xs font-medium text-zinc-300">Terminal</span>
-          <span class="text-xs text-zinc-600">bash</span>
+          <.icon name="hero-command-line" class="size-3.5 text-base-content/50" />
+          <span class="text-mini font-medium text-base-content/80">Terminal</span>
+          <span class="text-mini text-base-content/35">bash</span>
         </div>
         <div class="flex items-center gap-1.5">
           <button

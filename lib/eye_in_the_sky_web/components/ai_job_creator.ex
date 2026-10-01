@@ -120,7 +120,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
           <div class="flex items-center justify-between mb-6">
             <h2 class="text-lg font-semibold">Create Job with Claude</h2>
             <button
-              class="btn btn-ghost btn-sm btn-square min-h-[44px] min-w-[44px]"
+              class="eits-action eits-action--ghost eits-action--icon"
               phx-click="toggle_claude_drawer"
               phx-target={@myself}
             >
@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
                 phx-target={@myself}
               >
                 <option value="opus" selected={@claude_model == "opus"}>
-                  Opus 4.8 &bull; Most capable for complex work
+                  Opus 5.5 &bull; Most capable for ambitious work
                 </option>
                 <option value="sonnet" selected={@claude_model == "sonnet"}>
                   Sonnet 5 &bull; Best for everyday tasks
@@ -167,7 +167,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
               <label class="label"><span class="label-text font-medium">Description</span></label>
               <textarea
                 name="description"
-                class="textarea textarea-bordered w-full text-base"
+                class="textarea textarea-bordered w-full text-message"
                 rows="3"
                 placeholder="What kind of job do you want to create?"
               ></textarea>

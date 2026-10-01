@@ -9,11 +9,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   them in any way you want, based on your application growth and needs.
 
   The foundation for styling is Tailwind CSS, a utility-first CSS framework,
-  augmented with daisyUI, a Tailwind CSS plugin that provides UI components
-  and themes. Here are useful references:
-
-    * [daisyUI](https://daisyui.com/docs/intro/) - a good place to get
-      started and see the available components.
+  extended with local EITS design tokens and component primitives. Here are
+  useful references:
 
     * [Tailwind CSS](https://tailwindcss.com) - the foundational framework
       we build on. You will use it for layout, sizing, flexbox, grid, and
@@ -63,8 +60,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     >
       <div class={[
         "alert w-80 sm:w-96 max-w-80 sm:max-w-96 text-wrap",
-        @kind == :info && "alert-info",
-        @kind == :error && "alert-error"
+        @kind == :info && "alert--info",
+        @kind == :error && "alert--error"
       ]}>
         <.icon :if={@kind == :info} name="hero-information-circle" class="size-5 shrink-0" />
         <.icon :if={@kind == :error} name="hero-exclamation-circle" class="size-5 shrink-0" />
@@ -88,7 +85,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   the native `.indeterminate` DOM property in sync with `data-indeterminate`.
   When `id` is nil, renders a plain checkbox without a hook.
 
-  The `checkbox_area` attr adds `data-checkbox-area="true"` to the outer label —
+  The `checkbox_area` attr adds `data-checkbox-area="true"` to the outer label -
   used by the `ShiftSelect` hook to detect checkbox clicks for range selection.
   """
   attr :id, :string, default: nil
@@ -159,11 +156,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   slot :inner_block, required: true
 
   def button(%{rest: rest} = assigns) do
-    variants = %{"primary" => "btn-primary", nil => "btn-primary btn-soft"}
+    variants = %{"primary" => "eits-action--primary", nil => "eits-action--secondary"}
 
     assigns =
       assign_new(assigns, :class, fn ->
-        ["btn", Map.fetch!(variants, assigns[:variant])]
+        ["eits-action", Map.fetch!(variants, assigns[:variant])]
       end)
 
     if rest[:href] || rest[:navigate] || rest[:patch] do
@@ -199,8 +196,8 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   attr :subtitle, :string, default: nil
   attr :class, :string, default: "py-12 text-center"
   attr :icon_class, :string, default: "mx-auto h-12 w-12 text-base-content/40"
-  attr :title_class, :string, default: "mt-2 text-sm font-medium text-base-content"
-  attr :subtitle_class, :string, default: "mt-1 text-sm text-base-content/60"
+  attr :title_class, :string, default: "mt-2 text-message font-medium text-base-content"
+  attr :subtitle_class, :string, default: "mt-1 text-message text-base-content/60"
 
   slot :icon_slot
   slot :subtitle_slot
@@ -299,14 +296,14 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class="fieldset mb-2">
       <label>
         <input type="hidden" name={@name} value="false" disabled={@rest[:disabled]} />
-        <span class="label">
+        <span class="eits-label">
           <input
             type="checkbox"
             id={@id}
             name={@name}
             value="true"
             checked={@checked}
-            class={@class || "checkbox checkbox-sm"}
+            class={@class || "eits-checkbox eits-checkbox--sm"}
             {@rest}
           />{@label}
         </span>
@@ -320,11 +317,14 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <select
           id={@id}
           name={@name}
-          class={[@class || "w-full select", @errors != [] && (@error_class || "select-error")]}
+          class={[
+            @class || "w-full eits-select",
+            @errors != [] && (@error_class || "eits-select--error")
+          ]}
           multiple={@multiple}
           {@rest}
         >
@@ -341,13 +341,13 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <textarea
           id={@id}
           name={@name}
           class={[
-            @class || "w-full textarea text-base",
-            @errors != [] && (@error_class || "textarea-error")
+            @class || "w-full eits-textarea text-message",
+            @errors != [] && (@error_class || "eits-textarea--error")
           ]}
           {@rest}
         >{Phoenix.HTML.Form.normalize_value("textarea", @value)}</textarea>
@@ -362,15 +362,15 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     ~H"""
     <div class="fieldset mb-2">
       <label>
-        <span :if={@label} class="label mb-1">{@label}</span>
+        <span :if={@label} class="eits-label mb-1">{@label}</span>
         <input
           type={@type}
           name={@name}
           id={@id}
           value={Phoenix.HTML.Form.normalize_value(@type, @value)}
           class={[
-            @class || "w-full input text-base",
-            @errors != [] && (@error_class || "input-error")
+            @class || "w-full eits-field text-message",
+            @errors != [] && (@error_class || "eits-field--error")
           ]}
           {@rest}
         />
@@ -383,7 +383,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   # Helper used by inputs to generate form errors
   defp error(assigns) do
     ~H"""
-    <p class="mt-1.5 flex gap-2 items-center text-sm text-error">
+    <p class="mt-1.5 flex gap-2 items-center text-message text-error">
       <.icon name="hero-exclamation-circle" class="size-5" />
       {render_slot(@inner_block)}
     </p>
@@ -404,7 +404,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         <h1 class="text-lg font-semibold leading-8">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="text-sm text-base-content/70">
+        <p :if={@subtitle != []} class="text-message text-base-content/70">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -445,7 +445,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       end
 
     ~H"""
-    <table class="table table-zebra">
+    <table class="eits-table">
       <thead>
         <tr>
           <th :for={col <- @col}>{col[:label]}</th>
@@ -531,7 +531,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   # Lucide icons, rendered as inline SVG. Use these only where Heroicons has no
-  # icon matching the concept — otherwise prefer `<.icon name="hero-..." />`.
+  # icon matching the concept; otherwise prefer `<.icon name="hero-..." />`.
   attr :name, :string, required: true
   attr :class, :string, default: "size-4"
 
@@ -663,13 +663,16 @@ defmodule EyeInTheSkyWeb.CoreComponents do
     <div class={["flex gap-2", @class]}>
       <button
         type="submit"
-        class={["btn btn-primary flex-1", @size && "btn-#{@size}"]}
+        class={["eits-action eits-action--primary flex-1", action_size_class(@size)]}
         disabled={@submit_disabled}
       >
         {@submit_text}
       </button>
       <%= if @cancel_navigate do %>
-        <.link navigate={@cancel_navigate} class={["btn btn-ghost", @size && "btn-#{@size}"]}>
+        <.link
+          navigate={@cancel_navigate}
+          class={["eits-action eits-action--ghost", action_size_class(@size)]}
+        >
           {@cancel_text}
         </.link>
       <% else %>
@@ -677,7 +680,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           type="button"
           phx-click={@cancel_event}
           phx-target={@cancel_target}
-          class={["btn btn-ghost", @size && "btn-#{@size}"]}
+          class={["eits-action eits-action--ghost", action_size_class(@size)]}
         >
           {@cancel_text}
         </button>
@@ -716,7 +719,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         phx-click={@on_click}
         aria-label={@aria_label}
         class={[
-          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+          "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box transition-all focus-visible:outline-none focus-visible:ring-2",
           @show_on_hover && hover_reveal_class(@hover_group),
           color_classes(@color),
           @class
@@ -732,7 +735,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       phx-click={@on_click}
       aria-label={@aria_label}
       class={[
-        "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md transition-all focus-visible:outline-none focus-visible:ring-2",
+        "flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-box transition-all focus-visible:outline-none focus-visible:ring-2",
         @show_on_hover && hover_reveal_class(@hover_group),
         color_classes(@color),
         @class
@@ -775,11 +778,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   ## Examples
 
       <.form_field label="Title">
-        <input type="text" name="title" class="input input-bordered text-base" />
+        <input type="text" name="title" class="eits-field eits-field--bordered text-message" />
       </.form_field>
 
       <.form_field label="Budget" hint="Optional">
-        <input type="number" name="budget" class="input input-bordered" />
+        <input type="number" name="budget" class="eits-field eits-field--bordered" />
       </.form_field>
   """
   attr :label, :string, required: true
@@ -811,7 +814,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def detail_label(assigns) do
     ~H"""
-    <label class="text-mini font-medium text-base-content/40 uppercase tracking-wider mb-1.5 block">
+    <label class="text-mini font-medium text-base-content/40 uppercase tracking-normal mb-1.5 block">
       {@text}
     </label>
     """
@@ -837,7 +840,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       <button
         phx-click={@toggle_event}
         phx-target={@phx_target}
-        class="btn btn-ghost btn-sm btn-circle"
+        class="eits-action eits-action--ghost eits-action--icon"
       >
         <.icon name="hero-x-mark" class="size-4" />
       </button>
@@ -927,18 +930,18 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   Renders a search form with a magnifying glass icon on the left.
 
   Supports two sizes:
-  - `"sm"` (default) — page-level search bars (`input-sm min-h-[44px]`)
-  - `"xs"` — compact top-bar search bars (`input-xs h-7 text-xs`)
+  - `"sm"` (default) - page-level search bars (`eits-field--sm min-h-[44px]`)
+  - `"xs"` - compact top-bar search bars (`eits-field--xs h-7 text-mini`)
 
   ## Examples
 
-      <.search_bar id="agent-search" placeholder="Search agents…" value={@query} />
-      <.search_bar id="top-bar-search" size="xs" label="Search sessions" placeholder="Search…" value={@search_query || ""} class="flex-1 max-w-xs" />
+      <.search_bar id="agent-search" placeholder="Search agents..." value={@query} />
+      <.search_bar id="top-bar-search" size="xs" label="Search sessions" placeholder="Search..." value={@search_query || ""} class="flex-1 max-w-xs" />
   """
   attr :id, :string, required: true
   attr :size, :string, default: "sm"
   attr :label, :string, default: nil
-  attr :placeholder, :string, default: "Search…"
+  attr :placeholder, :string, default: "Search..."
   attr :value, :string, default: ""
   attr :on_change, :string, default: "search"
   attr :on_submit, :string, default: nil
@@ -973,11 +976,11 @@ defmodule EyeInTheSkyWeb.CoreComponents do
         phx-debounce={@debounce}
         autocomplete={@autocomplete}
         data-vim-search={if @vim_search, do: "", else: nil}
-        class={"input w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
+        class={"eits-field w-full bg-base-200/50 border-base-content/8 placeholder:text-base-content/25 " <>
           "focus:border-primary/30 focus:bg-base-100 transition-colors " <>
           if(@size == "xs",
-            do: "input-xs pl-8 h-7 text-xs",
-            else: "input-sm pl-9 min-h-[44px] text-base"
+            do: "eits-field--xs pl-8 h-7 text-mini",
+            else: "eits-field--sm pl-9 min-h-[44px] text-message"
           )}
       />
     </form>
@@ -985,7 +988,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a loading spinner using the DaisyUI loading class.
+  Renders a spinner using the local EITS spinner primitive.
 
   ## Examples
 
@@ -998,7 +1001,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def spinner(assigns) do
     ~H"""
     <span
-      class={"loading loading-spinner loading-#{@size} #{@class}"}
+      class={"eits-spinner eits-spinner--#{@size} #{@class}"}
       aria-label="Loading"
       role="status"
     />
@@ -1006,7 +1009,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a single skeleton placeholder row for list loading states.
+  Renders a single skeleton placeholder row for list  states.
 
   ## Examples
 
@@ -1017,10 +1020,10 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   def skeleton_row(assigns) do
     ~H"""
     <div class={"flex items-center gap-3 px-3 py-2.5 #{@class}"}>
-      <div class="skeleton size-4 rounded-full shrink-0" />
+      <div class="eits-skeleton size-4 rounded-full shrink-0" />
       <div class="flex flex-col gap-1.5 flex-1">
-        <div class="skeleton h-3 w-2/3" />
-        <div class="skeleton h-2.5 w-1/3" />
+        <div class="eits-skeleton h-3 w-2/3" />
+        <div class="eits-skeleton h-2.5 w-1/3" />
       </div>
     </div>
     """
@@ -1052,7 +1055,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a DaisyUI badge with semantic status coloring and an optional dot.
+  Renders an EITS status chip with semantic coloring and an optional dot.
 
   ## Examples
 
@@ -1074,7 +1077,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       )
 
     ~H"""
-    <span class={"badge badge-#{@size} #{status_badge_color(@status)} #{@class}"}>
+    <span class={["eits-chip", status_chip_class(@status), status_chip_size(@size), @class]}>
       <%= if @show_dot do %>
         <.status_dot status={@status} size="xs" />
       <% end %>
@@ -1084,7 +1087,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a keyboard key using the DaisyUI kbd component.
+  Renders a keyboard key using the local EITS keyboard primitive.
 
   ## Examples
 
@@ -1103,7 +1106,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   @doc """
   Renders a pill tab container. Each tab is declared with the `:item` slot.
 
-  `value_key` controls which `phx-value-*` attribute is emitted — default is `"tab"`.
+  `value_key` controls which `phx-value-*` attribute is emitted; default is `"tab"`.
   Supported values: `"tab"`, `"filter"`, `"type"`, `"by"`.
 
   Per-item `active_class` overrides the default active styling (useful for coloured status tabs).
@@ -1136,7 +1139,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def tab_pills(assigns) do
     ~H"""
-    <div class={["flex items-center gap-0.5 bg-base-200/40 rounded-lg p-0.5 shrink-0", @class]}>
+    <div class={["flex items-center gap-0.5 bg-base-200/40 rounded-box p-0.5 shrink-0", @class]}>
       <%= for item <- @item do %>
         <button
           type="button"
@@ -1146,7 +1149,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
           phx-value-type={if @value_key == "type", do: item[:value]}
           phx-value-by={if @value_key == "by", do: item[:value]}
           class={[
-            "px-2.5 py-1 rounded-md text-mini font-medium transition-all duration-150",
+            "px-2.5 py-1 rounded-box text-mini font-medium transition-all duration-150",
             if(item[:active],
               do: item[:active_class] || "bg-base-100 text-base-content/90 shadow-sm",
               else: "text-base-content/45 hover:text-base-content/65"
@@ -1161,7 +1164,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   end
 
   @doc """
-  Renders a DaisyUI skeleton placeholder for loading states.
+  Renders a local skeleton placeholder for loading states.
   Caller controls width/height via the class attribute.
 
   ## Examples
@@ -1174,7 +1177,7 @@ defmodule EyeInTheSkyWeb.CoreComponents do
 
   def skeleton(assigns) do
     ~H"""
-    <div class={["skeleton", @class]} {@rest}></div>
+    <div class={["eits-skeleton", @class]} {@rest}></div>
     """
   end
 
@@ -1244,9 +1247,15 @@ defmodule EyeInTheSkyWeb.CoreComponents do
   defp status_dot_color(:waiting), do: "bg-warning"
   defp status_dot_color(:pending), do: "bg-warning"
   defp status_dot_color(:completed), do: "bg-base-content/15"
-  defp status_dot_color(:failed), do: "bg-base-content/15"
+  defp status_dot_color(:failed), do: "bg-error"
+  defp status_dot_color(:failed_billing), do: "bg-error"
+  defp status_dot_color(:failed_auth), do: "bg-error"
+  defp status_dot_color(:failed_rate_limit), do: "bg-error"
+  defp status_dot_color(:failed_timeout), do: "bg-error"
+  defp status_dot_color(:failed_retry_exhausted), do: "bg-error"
+  defp status_dot_color(:failed_model), do: "bg-error"
   defp status_dot_color(:stopped), do: "bg-base-content/15"
-  defp status_dot_color(:compacting), do: "bg-orange-500"
+  defp status_dot_color(:compacting), do: "bg-warning"
 
   defp status_dot_color(s) when is_binary(s) do
     case s do
@@ -1256,38 +1265,53 @@ defmodule EyeInTheSkyWeb.CoreComponents do
       "waiting" -> "bg-warning"
       "pending" -> "bg-warning"
       "completed" -> "bg-base-content/15"
-      "failed" -> "bg-base-content/15"
+      "failed" -> "bg-error"
+      "failed_billing" -> "bg-error"
+      "failed_auth" -> "bg-error"
+      "failed_rate_limit" -> "bg-error"
+      "failed_timeout" -> "bg-error"
+      "failed_retry_exhausted" -> "bg-error"
+      "failed_model" -> "bg-error"
       "stopped" -> "bg-base-content/15"
-      "compacting" -> "bg-orange-500"
+      "compacting" -> "bg-warning"
       _ -> "bg-base-content/25"
     end
   end
 
   defp status_dot_color(_), do: "bg-base-content/25"
 
-  defp status_badge_color(:working), do: "badge-success"
-  defp status_badge_color(:running), do: "badge-success"
-  defp status_badge_color(:idle), do: "badge-ghost"
-  defp status_badge_color(:waiting), do: "badge-warning"
-  defp status_badge_color(:pending), do: "badge-warning"
-  defp status_badge_color(:completed), do: "badge-success"
-  defp status_badge_color(:failed), do: "badge-error"
-  defp status_badge_color(:stopped), do: "badge-ghost"
-  defp status_badge_color(:archived), do: "badge-ghost"
+  defp action_size_class("xs"), do: "h-7 min-h-0 px-2"
+  defp action_size_class("sm"), do: "h-8 min-h-0 px-2.5"
+  defp action_size_class(_), do: nil
 
-  defp status_badge_color(s) when is_binary(s) do
+  defp status_chip_size("xs"), do: "px-1.5 py-0.5"
+  defp status_chip_size("sm"), do: nil
+  defp status_chip_size("md"), do: "px-2 py-1 text-message"
+  defp status_chip_size(_), do: nil
+
+  defp status_chip_class(:working), do: "eits-chip--success"
+  defp status_chip_class(:running), do: "eits-chip--success"
+  defp status_chip_class(:idle), do: "eits-chip--muted"
+  defp status_chip_class(:waiting), do: "eits-chip--warning"
+  defp status_chip_class(:pending), do: "eits-chip--warning"
+  defp status_chip_class(:completed), do: "eits-chip--success"
+  defp status_chip_class(:failed), do: "eits-chip--error"
+  defp status_chip_class(:stopped), do: "eits-chip--muted"
+  defp status_chip_class(:archived), do: "eits-chip--muted"
+
+  defp status_chip_class(s) when is_binary(s) do
     case s do
-      "working" -> "badge-success"
-      "running" -> "badge-success"
-      "idle" -> "badge-ghost"
-      "waiting" -> "badge-warning"
-      "pending" -> "badge-warning"
-      "completed" -> "badge-success"
-      "failed" -> "badge-error"
-      "stopped" -> "badge-ghost"
-      _ -> "badge-ghost"
+      "working" -> "eits-chip--success"
+      "running" -> "eits-chip--success"
+      "idle" -> "eits-chip--muted"
+      "waiting" -> "eits-chip--warning"
+      "pending" -> "eits-chip--warning"
+      "completed" -> "eits-chip--success"
+      "failed" -> "eits-chip--error"
+      "stopped" -> "eits-chip--muted"
+      _ -> "eits-chip--muted"
     end
   end
 
-  defp status_badge_color(_), do: "badge-ghost"
+  defp status_chip_class(_), do: "eits-chip--muted"
 end

@@ -138,7 +138,10 @@ defmodule EyeInTheSky.Pi.SDK do
             {:ok, sdk_ref, handler_pid}
 
           {:error, reason} ->
-            Logger.error("[telemetry] pi.sdk.error session_id=#{opts[:session_id]} reason=#{inspect(reason)}")
+            Logger.error(
+              "[telemetry] pi.sdk.error session_id=#{opts[:session_id]} reason=#{inspect(reason)}"
+            )
+
             Process.exit(handler_pid, :kill)
             {:error, reason}
         end
@@ -159,7 +162,10 @@ defmodule EyeInTheSky.Pi.SDK do
             state =
               initial_state(sdk_ref, caller_pid, Keyword.put(opts, :prompt, prompt))
               |> Map.put(:port, port)
-              |> send_request("initialize", %{type: "initialize", protocolVersion: @protocol_version})
+              |> send_request("initialize", %{
+                type: "initialize",
+                protocolVersion: @protocol_version
+              })
 
             MessageHandler.run_loop(__MODULE__, state, @loop_opts)
 

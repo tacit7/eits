@@ -1007,7 +1007,14 @@ Agent DMs now use a structured format with a sender chip that shows agent name a
 
 **Message format:**
 
-New format (bracketed header):
+Current format (compact, commit f6d3609f):
+```
+DM from:<agent_name> (session:<uuid_or_id>) <message body>
+```
+
+Where the session reference is `from_session.uuid` with `from_session.id` as fallback. `DmHandler` delegates to `DMDelivery.deliver_or_persist/4` for live delivery into active workers.
+
+Legacy format (bracketed header, no longer generated):
 ```
 [DM from agent: <agent_name>]
 <message body>
@@ -1015,14 +1022,9 @@ New format (bracketed header):
 Reply: eits dm --to <session_id> --message ""
 ```
 
-Legacy format (still supported):
-```
-DM from:<agent_name> (session:<uuid>) <message body>
-```
-
 **DM parsing and stripping:**
 - `strip_dm_prefix/1`: Removes the DM header and reply footer, returning just the body content
-  - Handles both new bracketed format and legacy "DM from:" format
+  - Handles both current compact format and legacy bracketed format
   - Regex updated (commit 6edecd7e) to use `(.*)` capture to handle header-only DMs where the message body is empty
   - Regex tolerates no space after session UUID in legacy format
 
@@ -1541,6 +1543,7 @@ eits dm inbox                    # List DMs in table format
 eits dm inbox --json            # Raw JSON output
 eits dm inbox --from <uuid>     # Filter by sender
 eits dm inbox --since <iso8601> # Only messages after timestamp (commit dcfd4508)
+eits dm inbox --all-time        # Full history, no session-start cutoff (commit f69b8f7d)
 eits dm inbox --team-only       # Filter to team members only
 eits dm inbox --help            # Show command help
 ```
@@ -1551,6 +1554,13 @@ eits dm inbox --help            # Show command help
 - Enables incremental polling: orchestrators can fetch new replies without diffing the full inbox client-side
 - Wired through both REST API (`GET /api/v1/dm?since=...`) and CLI
 - API returns `filter_since` in response metadata
+
+**Default cutoff (commit f69b8f7d):**
+- With no `--since`, `--since-session`, or `--all-time`, `dm inbox`/`dm list` resolve the session's `started_at` (via `GET /api/v1/sessions/<id>`, using `--session`, else the env session) and pass it as `since`
+- `--all-time` skips the lookup and fetches full history; it conflicts with `--since`, `--since-session`, and `--strict` (usage error, exit 2)
+- An explicit `--since` also skips the lookup
+- If `started_at` can't be resolved (missing field or 404), the inbox is fetched without a cutoff and the response includes a `session_start_unresolved` warning (`reason`: `missing_started_at` or `not_found`); `--strict` fails instead
+- `dm wait` is unchanged (no default `since`)
 
 **Table Output (_tbl_dm renderer):**
 | Column | Description |
@@ -1749,7 +1759,7 @@ Event-driven endpoint that blocks until a new DM arrives for a session, eliminat
 - After `timeout` with no DM, returns `{"items":[],"count":0}`
 - Client HTTP timeout is set to server timeout + 15s headroom to avoid cutting the long-poll short locally
 
-**CLI equivalent:** `eitsr dm wait [--session] [--since] [--timeout]` — prints the result and exits when a DM lands.
+**CLI equivalent:** `eits dm wait [--session] [--since] [--timeout] [--team-only]` — prints the result and exits when a DM lands. With `--team-only`, each long-poll iteration filters results to messages from sessions that share a team with the current agent (requires `EITS_AGENT_UUID`). If all polled messages are filtered out and time remains, the loop re-polls with an updated `since` cursor (taken from the last message's `inserted_at`) until a team message arrives or the overall timeout elapses; on timeout it returns `{"items":[],"count":0}` as usual.
 
 **Use case:** Orchestrators and background scripts can block on this endpoint instead of interval-polling `GET /api/v1/dm`, reducing latency and server load.
 
@@ -2248,6 +2258,129 @@ Settings handlers were extracted into a dedicated `SettingsHandlers` module (com
 - `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — initialization with effective settings computation
 - `priv/repo/migrations/20260504112139_add_settings_to_sessions_and_agents.exs` — migration adding settings JSONB columns
 
+### DmSettings: Settings-to-CLI-Opts Bridge (commits `7dea1b91`, `a9da2669`, `620532f0`)
+
+Three bug-fix commits wired effective settings all the way through to provider CLI opts, fixed scope display, and hardened the UI.
+
+**`DmSettings` module (commit `7dea1b91`):**
+
+`EyeInTheSky.Settings.DmSettings` is a new pure (no DB calls) module that converts an effective settings map into a keyword list of provider CLI opts:
+
+```elixir
+DmSettings.to_provider_opts(effective, "claude")
+# → [permission_mode: "plan", max_turns: 10, bare: true, ...]
+
+DmSettings.to_provider_opts(effective, "codex")
+# → [full_auto: false, bypass_sandbox: false, ...]
+
+DmSettings.to_provider_opts(effective, "pi")  # or any unknown provider
+# → []
+```
+
+- Claude provider: maps all `anthropic.*` keys to CLI opts (permission_mode, max_turns, fallback_model, system_prompt, bare, verbose, sandbox, skip_permissions, chrome, etc.)
+- Codex provider: maps `openai.*` keys (full_auto, bypass_sandbox, sandbox, ask_for_approval)
+- Pi and unknown providers: return `[]` (no-op)
+- `nil` settings values are filtered out; boolean `false` is preserved (important for `bypass_sandbox: false`)
+- `chrome` string `"on"/"off"` converted to `true/false`
+
+**`session_cli_opts` derived from settings (commit `7dea1b91`):**
+
+Previously `session_cli_opts` was always initialized to `[]` on mount. Now:
+- `MountState` calls `DmSettings.to_provider_opts(effective, provider)` on mount, so settings are applied immediately on page load
+- `SettingsHandlers.build_settings_assigns/4` also calls `DmSettings.to_provider_opts` after any settings change, so updated settings take effect on the next message without a remount
+
+**`bypass_sandbox` resolution bug fix (commit `7dea1b91`):**
+
+`RuntimeContext.build/3` had `bypass_sandbox: opts[:bypass_sandbox] || provider == "codex"`. Because `false || true == true`, explicitly disabling bypass for a Codex session was silently ignored. Fixed with `Keyword.fetch/2` to distinguish nil (not set) from false (explicitly disabled):
+
+```elixir
+defp resolve_bypass_sandbox(opts, provider) do
+  case Keyword.fetch(opts, :bypass_sandbox) do
+    {:ok, val} -> val       # user explicitly set it — respect false
+    :error -> provider == "codex"  # not set — default by provider
+  end
+end
+```
+
+**Scope-aware display (commit `a9da2669`):**
+
+The Settings tab now renders inputs from the correct effective map for the active scope:
+- **Session scope:** Uses the full merged effective map (defaults ⊕ agent ⊕ session)
+- **Agent scope:** Uses agent-only effective map (defaults ⊕ agent, no session overrides)
+
+Previously both scopes read from the merged effective map, so agent-scope inputs showed session-overridden values. The `dm_page.ex` component computes `dm_settings_agent_effective` (agent.settings only) and passes it alongside the merged `dm_settings_effective`. The `settings_tab` component picks `scoped_effective` based on the active scope.
+
+General section inputs (`show_live_stream`, `thinking_enabled`, `max_budget_usd`, `notify_on_stop`) were also updated to read from `scoped_effective` instead of `session_state` assigns.
+
+**Provider tab visibility fix (commit `a9da2669`):**
+
+Tab visibility conditions changed from `!= provider` to `== provider`:
+- "Claude flags" tab only shown when `provider == "claude"` (was hidden only for codex, showed for pi)
+- "Codex flags" tab only shown when `provider == "codex"` (was hidden only for claude, showed for pi)
+- Pi sessions now show only the General tab
+
+**Subtab fallback guard (commit `a9da2669`):**
+
+`active_subtab/2` now guards against nil and unknown subtabs, and provider mismatches for all three providers. A `catch-all` clause prevents `CaseClauseError`. Unknown or nil subtabs fall back to "general".
+
+**Agent scope toggle uses agent-only map (commit `620532f0`):**
+
+`SettingsHandlers.handle_setting_toggle/3` previously read the current value from `dm_settings_effective` (the merged map) regardless of scope. When scope is "agent", it now reads from `JsonSettings.effective_settings(dm_settings_agent_overrides, %{})` so the toggle flips the agent's own value, not the session-merged value.
+
+**Stable DOM IDs (commit `a9da2669`):**
+
+All interactive controls now have predictable IDs for testing and browser automation:
+- Scope buttons: `dm-scope-session`, `dm-scope-agent`
+- Subtab buttons: `dm-subtab-general`, `dm-subtab-anthropic`, `dm-subtab-openai`
+- Reset button: `dm-settings-reset`
+- All inputs/toggles/selects: `dm-setting-<dotted.key>` (e.g., `dm-setting-anthropic.permission_mode`)
+
+**Agent scope button disabled when no agent (commit `a9da2669`):**
+
+The "Agent default" scope button is `disabled` when no agent record is associated with the session.
+
+**`from_pr` row session-scoped (commit `a9da2669`):**
+
+The "From PR" row in the Claude flags subtab is only rendered when `scope == "session"`. It is hidden in agent scope because the schema restricts it to session-level writes only.
+
+**`max_turns` integer constraint (commit `a9da2669`):**
+
+The `max_turns` number input now uses `step="1" min="1"` (positive integer) instead of `step="0.01" min="0"` (float).
+
+**Codex CLI: `--full-auto` removal (commit `620532f0`):**
+
+Newer Codex versions removed `--full-auto`. The `Codex.CLI` module now expands the legacy `full_auto` setting to its current equivalent:
+- `full_auto: true` → `--sandbox workspace-write -c approval_policy="on-request"`
+- `full_auto: false` with explicit sandbox/approval → uses the provided values
+- `on-failure` approval policy (legacy) is mapped to `on-request`
+
+`DmSettings.to_provider_opts` for Codex was also extended to map `openai.sandbox` → `:sandbox` and `openai.ask_for_approval` → `:ask_for_approval`.
+
+**`extra_cli_opts` merge fix (commit `620532f0`):**
+
+Provider strategy `build_opts` functions previously concatenated `base_opts ++ optional_opts ++ extra`, so `extra_cli_opts` entries appended as duplicates instead of overriding. Changed to `Keyword.merge(base_opts ++ optional_opts, extra, ...)` with a custom resolver:
+- `:append_system_prompt`: concatenates EITS prompt and custom prompt with `\n\n`
+- All other keys: `extra_cli_opts` value wins
+
+**Test coverage:**
+- `test/eye_in_the_sky/settings/dm_settings_test.exs` — 27 unit tests for `DmSettings.to_provider_opts/2` covering Claude, Codex, and unknown providers
+- `test/eye_in_the_sky/agents/runtime_context_test.exs` — 4 tests for `bypass_sandbox` resolution including the `false || true` edge case
+- `test/eye_in_the_sky_web/live/dm_live/settings_handlers_test.exs` — 2 integration tests for `session_cli_opts` propagation after setting changes; 1 test for agent-scope toggle using agent-only map
+- `test/eye_in_the_sky_web/components/dm_page/settings_tab_test.exs` — 38 focused component tests for scope display, tab visibility, fallback subtab, stable DOM IDs
+- `test/eye_in_the_sky/claude/provider_strategy_settings_test.exs` — 2 tests verifying `extra_cli_opts` override strategy defaults for both Claude and Codex
+- `test/eye_in_the_sky/codex/cli_test.exs` — updated tests: `--full-auto` replaced with sandbox/approval-policy equivalents
+
+**Files:**
+- `lib/eye_in_the_sky/settings/dm_settings.ex` — new `DmSettings` module
+- `lib/eye_in_the_sky/agents/runtime_context.ex` — `resolve_bypass_sandbox/2` fix
+- `lib/eye_in_the_sky_web/live/dm_live/mount_state.ex` — session_cli_opts from effective settings on mount
+- `lib/eye_in_the_sky_web/live/dm_live/settings_handlers.ex` — session_cli_opts updated on setting change; agent-scope toggle reads agent map
+- `lib/eye_in_the_sky_web/components/dm_page.ex` — computes `dm_settings_agent_effective` and `dm_settings_overrides`
+- `lib/eye_in_the_sky_web/components/dm_page/settings_tab.ex` — scope-aware effective map, Pi tab fix, subtab fallback, stable IDs, from_pr guard, max_turns constraint
+- `lib/eye_in_the_sky/claude/provider_strategy/claude.ex` — `build_opts` uses `Keyword.merge` with custom resolver
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` — `build_opts` uses `Keyword.merge`
+- `lib/eye_in_the_sky/codex/cli.ex` — `--full-auto` replaced with `--sandbox`/approval-policy expansion
+
 ---
 
 ## DM Component Refactoring
@@ -2530,6 +2663,14 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 3. **Schedule task** — (if applicable)
 4. **Reload check modal** — Explicitly trigger reload confirmation dialog
 
+**Closed by default (commit b21f58f4):** The menu wrapper (and the top-bar `...` overflow wrapper in `TopBar.DM`) uses the `eits-dropdown` class instead of `relative`, so the menu stays hidden until its trigger is activated. `eits-dropdown` (defined in `assets/css/app.css`) only reveals its nested `.eits-menu` on `:hover`/`:focus-within`, whereas plain `relative` had no such gating — the menu could render open before interaction.
+
+**Regression tests (commit b21f58f4):**
+- `test/eye_in_the_sky_web/components/dm_page/action_menu_test.exs` — asserts the `#dm-actions-menu` wrapper carries the `eits-dropdown` class
+- `test/eye_in_the_sky_web/components/top_bar/dm_test.exs` — asserts the top-bar `#dm-topbar-relative-menu` wrapper's parent carries the `eits-dropdown` class
+
+**Viewport fix (commit `6cf8f7b9`):** Both the action-menu overflow list and the top-bar `...` overflow menu render off-screen to the right when the trigger sits near the right edge. Fixed by adding `right-0` to the `<ul>` panel class so it anchors to the right edge of its trigger instead of the left, keeping the panel inside the viewport. Regression tests added in `action_menu_test.exs` and `top_bar/dm_test.exs`.
+
 **Attributes:**
 - `session_uuid` — optional; if present, adds the "Copy UUID" menu item
 - `wrapper_id` — menu wrapper identifier (used in button ID generation)
@@ -2550,23 +2691,21 @@ The DM page overlay (timer controls, task detail) now includes an action menu bu
 
 ## DM Receivable Statuses
 
-**Commits:** `eb55f37c` (idle added), `870f3e3a` (waiting added)
+**Commits:** `eb55f37c` (idle added), `870f3e3a` (waiting added), `ee5b42e0` (terminated sessions now accepted)
 
-The `/api/v1/dm` endpoint accepts messages destined for sessions in any non-terminal status.
+The `/api/v1/dm` endpoint accepts messages destined for sessions in **any status**, including terminal ones.
 
-**Allowed statuses (`@receivable_statuses`):**
-- `working` — agent actively processing
-- `idle` — agent waiting for input
-- `waiting` — sdk-cli session ended and queued for resume; DM is persisted and delivered on next wakeup. Blocking this status caused false 422s when agents tried to reach headless sessions between turns.
+**All statuses accept DMs:**
+- `working` — message delivered live to the session worker
+- `idle` — message delivered live to the session worker
+- `waiting` — sdk-cli session queued for resume; DM is persisted and delivered on next wakeup
+- `completed` / `failed` — message persisted directly via `DMDelivery.persist/4` (no live worker required); available for later polling or inspection
 
-**Rejected statuses (terminal):**
-- `completed` — session finished; cannot receive DMs
-- `failed` — session errored; cannot receive DMs
-
-**Error message on rejection:** `"Target session is terminated (completed or failed) and cannot receive DMs"`
+**Removed behavior (commit `ee5b42e0`):** The `@receivable_statuses` allowlist and `check_receiver_reachable/1` guard have been removed from `MessagingController`. Previously, DMs to `completed` or `failed` sessions returned `422 "Target session is terminated and cannot receive DMs"`. Now `DMDelivery.deliver_or_persist/4` is called instead, which routes to live delivery or direct persistence based on session status.
 
 **File:**
-- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `@receivable_statuses` module attribute and `do_dm/4`
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4` routes based on status; `persist/4` for terminal sessions
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `do_dm/4` now calls `deliver_or_persist` with no status pre-check
 
 ---
 
@@ -2652,6 +2791,58 @@ Two dead-code wrappers were removed from `MessagingController`:
 
 ---
 
+## DMDelivery: deliver_or_persist and persist
+
+**Commits:** `ee5b42e0`, `e51b7d53`
+
+Two public functions in `EyeInTheSky.Messaging.DMDelivery` handle DMs to sessions that may or may not have a live worker.
+
+### deliver_or_persist/4
+
+```elixir
+def deliver_or_persist(to_session_id, from_session_id, body, metadata \\ %{})
+```
+
+Routes a DM based on the target session's current status and whether a live in-process worker exists (commit `e51b7d53`):
+
+```elixir
+cond do
+  session.status in Sessions.terminated_statuses() ->
+    persist(...)
+
+  Sessions.app_managed?(session) or live_worker?(session_id) ->
+    deliver_and_persist(...)
+
+  true ->
+    persist(...)
+end
+```
+
+- **Terminated session (`completed` or `failed`):** Persists directly — no live worker possible.
+- **App-managed session OR live worker present:** Delivers to the in-process worker and persists. The `live_worker?/1` check allows non-app-managed sessions (e.g. Codex sdk-cli agents) that still have a registered `AgentRegistry` pid to receive live delivery.
+- **Otherwise:** Persists directly to the durable inbox for later polling.
+
+**`live_worker?/1` (private):** Looks up `Registry.lookup(EyeInTheSky.Claude.AgentRegistry, {:session, session_id})` and checks `Process.alive?(pid)`. Rescues `ArgumentError` (uninitialized registry in test) → `false`.
+
+This replaces the previous two-branch `if` that denied live delivery to any non-app-managed session, which caused Codex sdk-cli agents to miss DMs while their worker was still running.
+
+### persist/4
+
+```elixir
+def persist(to_session_id, from_session_id, body, metadata \\ %{})
+```
+
+Persists a DM directly to the messages table and broadcasts a `session_new_dm` PubSub event, without requiring a live session worker. This is the write path for CLI/headless sessions that poll their durable inbox, and for any session where live delivery is not possible.
+
+Previously this logic was inlined inside `deliver_and_persist/4`; it is now a named public function so `deliver_or_persist/4` can call it independently.
+
+**Files:**
+- `lib/eye_in_the_sky/messaging/dm_delivery.ex` — `deliver_or_persist/4`, `persist/4`, `live_worker?/1`
+- `lib/eye_in_the_sky/claude/provider_strategy/codex.ex` — now passes `entrypoint: "sdk-cli"` in spawn context so hooks correctly classify Codex sessions
+- `lib/eye_in_the_sky/agents/cmd_dispatcher/dm_handler.ex` — delegates to `DMDelivery.deliver_or_persist/4` instead of hand-building a message row
+
+---
+
 ## DM Response Fields: reachable and metadata
 
 **Commit:** `15d2eb16` (reachable), `94215a51` (metadata)
@@ -2668,7 +2859,7 @@ The `/api/v1/dm` endpoint now includes two new fields in success responses:
 - `true` — session is in `working`, `idle`, or `waiting` status; message delivered to reachable session
 - `false` — (future) session is offline or in a non-receivable state; message queued or buffered
 
-**Current behavior:** All successful DM responses have `reachable: true` while only `completed` and `failed` statuses are rejected. Future iterations may support queue-to-unreachable sessions.
+**Current behavior:** All successful DM responses have `reachable: true`. Terminated sessions (`completed` and `failed`) are accepted — `reachable: true` is returned after the message is persisted via `deliver_or_persist/4`. The field was originally intended to distinguish live vs. queued delivery; this distinction is now handled internally by `DMDelivery`.
 
 ### metadata
 
@@ -3067,12 +3258,12 @@ When user presses Cmd+S or clicks the Save button, the hook:
 
 No busy-polling: the connection is held open until a PubSub event fires or the timeout fires. The client HTTP timeout should be set to at least `timeout + 15` seconds to avoid cutting the long-poll short locally.
 
-**`eitsr dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`.
+**`eits dm wait` subcommand** wraps this endpoint. It blocks until a DM lands and prints the result, letting a background process exit immediately instead of interval-polling `dm inbox`. Pass `--team-only` to restrict delivery to messages from sessions sharing a team with the current agent: the subcommand loops internally — each long-poll iteration filters by team membership, and if all polled messages are filtered out with time remaining, it advances the `since` cursor to the last message's `inserted_at` and re-polls until a team message arrives or the timeout elapses.
 
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `wait_for_dm/2` action
 - `lib/eye_in_the_sky_web/router.ex` — `GET /api/v1/dm/wait`
-- `crates/eits-cli/src/commands/dm.rs` — `eitsr dm wait` subcommand
+- `crates/eits-cli/src/commands/dm.rs` — `eits dm wait` subcommand
 
 ---
 
@@ -3099,6 +3290,42 @@ HTTP 403 Forbidden
 
 **Files:**
 - `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `authorize_session_recipient/2` replaces `authorize_dm_recipient/2`; `show_dm/2` no longer accepts `session` query param
+
+**Proposed follow-on (not yet implemented):** The `x-eits-session` header used above is caller-supplied and only asserts identity — it does not authenticate it. A design for per-session opaque API credentials (`session_api_credentials` table, `SessionApiAuth` plug, `EITS_SESSION_TOKEN`) that would replace header-based recipient checks with a verified principal is written up in [docs/SESSION_API_AUTHORIZATION_DESIGN.md](SESSION_API_AUTHORIZATION_DESIGN.md). It covers `GET /api/v1/dm`, `GET /api/v1/dm/:id`, and `GET /api/v1/dm/wait` and includes a phased rollout plan; see that doc for the full design before implementing.
+
+---
+
+## CLI: eits dm watch — Reconnecting Ordered DM Watch
+
+**Commit:** `43907846`
+
+`eits dm watch` keeps a single long-poll connection open against `GET /api/v1/dm/wait` and streams new inbound messages as they arrive, reconnecting automatically and preserving strict delivery order across reconnects. It's the CLI's answer to running a background listener instead of interval-polling `dm inbox`.
+
+**Usage:**
+```bash
+eits dm watch --since-session --team-only --format jsonl
+```
+
+**Key behavior:**
+- Set `EITS_SESSION_UUID`/`EITS_SESSION_ID` to the *watching* session (not the parent); `--session` overrides the recipient
+- `--team-only` requires `EITS_AGENT_UUID`; team membership is resolved once at startup — restart the watcher after team changes
+- Without `--since`, resolves the session's actual `started_at` as the cutoff (`--since-session` requests this explicitly); failure to resolve stops the command rather than replaying unbounded history
+- `--format jsonl` (default) emits one compact DM object per line; `--format json` emits one `{"items":[...],"count":N}` object per delivered batch — the stream itself is not one JSON array
+- `--timeout` (1–55s, default 25) bounds each individual long poll, not the watcher's lifetime
+
+**Ordering and reconnects:**
+- Uses an opt-in ordered cursor (`watch_cursor: true`) on `/dm/wait`; older servers without support fail immediately with an upgrade error
+- Requests carry `since` + `after_id`; the server returns the oldest messages strictly after `(since, after_id)`, ordered by timestamp then numeric ID, so same-timestamp messages and backlog drains stay in order
+- Reconnects preserve the last handled timestamp and message ID — no duplicate emission or backward cursor movement
+- Connection failures and HTTP 429/500/502/503/504 retry with backoff (1, 2, 4, 8, 16, then 30s, up to 8 consecutive retries); a successful response resets the budget. Other HTTP errors and malformed responses stop the command.
+
+**Delivery limits:** dedup is in-memory for the process lifetime only — no durable consumer ack or exactly-once guarantee. Consumers doing real work should dedupe on message ID themselves.
+
+**Files:**
+- `crates/eits-cli/src/commands/dm.rs` — `dm watch` subcommand
+- `lib/eye_in_the_sky/messages/listings.ex` — ordered cursor query support
+- `lib/eye_in_the_sky_web/controllers/api/v1/messaging_controller.ex` — `watch_cursor`/`after_id` handling on `wait/2`
+- Full reference: [docs/CLI_DM_WATCH.md](CLI_DM_WATCH.md)
 
 ---
 

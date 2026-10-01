@@ -92,6 +92,123 @@ defmodule EyeInTheSky.Codex.SDKTest do
     end
   end
 
+  describe "app-server backend" do
+    test "is opt-in and preserves the public SDK tuple/event contract" do
+      owner_key = System.unique_integer([:positive])
+      test_pid = self()
+      fake = start_supervised!({SDKTestFakeCodexAppServer, test_pid})
+
+      task =
+        Task.async(fn ->
+          SDK.start("hello",
+            to: test_pid,
+            project_path: "/tmp",
+            codex_app_server: true,
+            eits_session_id: owner_key,
+            transport_pid: fake
+          )
+        end)
+
+      assert_receive {:sdk_fake_request, "initialize", init_id}
+      send_response(owner_key, init_id, %{})
+      assert_receive {:sdk_fake_notification, "initialized"}
+
+      assert_receive {:sdk_fake_request, "thread/start", thread_id}
+      send_response(owner_key, thread_id, %{"thread" => %{"id" => "thread-sdk"}})
+
+      assert_receive {:sdk_fake_request, "turn/start", turn_id}
+      send_response(owner_key, turn_id, %{"turn" => %{"id" => "turn-sdk"}})
+
+      assert {:ok, ref, app_server_pid} = Task.await(task)
+      assert is_reference(ref)
+      assert Registry.lookup(ref) == app_server_pid
+      assert_receive {:codex_session_id, ^ref, "thread-sdk"}
+
+      send_notification(owner_key, "item/agentMessage/delta", %{
+        "threadId" => "thread-sdk",
+        "turnId" => "turn-sdk",
+        "itemId" => "msg-1",
+        "delta" => "hi"
+      })
+
+      send_notification(owner_key, "turn/completed", %{
+        "threadId" => "thread-sdk",
+        "turn" => %{"id" => "turn-sdk", "status" => "completed"}
+      })
+
+      assert_receive {:claude_message, ^ref, %Message{type: :result, content: "hi"}}
+      assert_receive {:claude_complete, ^ref, "thread-sdk"}
+      assert Registry.lookup(ref) == nil
+    end
+
+    test "default backend still uses codex exec registry shape" do
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
+      assert is_pid(Registry.lookup(ref))
+      assert :ok = SDK.cancel(ref)
+    end
+
+    test "falls back to codex exec when app-server capability gate fails before startup" do
+      telemetry_ref = attach_app_server_gate_telemetry()
+      executable = "/tmp/eits-codex-old-#{System.unique_integer([:positive])}"
+
+      runner = fn ^executable, ["--version"], [stderr_to_stdout: true] ->
+        {"codex-cli 0.148.0", 0}
+      end
+
+      {:ok, ref, _handler} =
+        SDK.start("test",
+          to: self(),
+          project_path: "/tmp",
+          codex_app_server: true,
+          codex_executable: executable,
+          app_server_command_runner: runner
+        )
+
+      assert is_pid(Registry.lookup(ref))
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:gate_failed], _measurements,
+                      %{reason: {:codex_version_too_old, "0.148.0"}}}
+
+      assert :ok = SDK.cancel(ref)
+    end
+
+    test "caches app-server capability probe and falls back on startup lookup failure" do
+      telemetry_ref = attach_app_server_gate_telemetry()
+      executable = "/tmp/eits-codex-new-#{System.unique_integer([:positive])}"
+      missing_project = "/tmp/eits-codex-missing-#{System.unique_integer([:positive])}"
+      {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+      runner = fn ^executable, ["--version"], [stderr_to_stdout: true] ->
+        Agent.update(counter, &(&1 + 1))
+        {"codex-cli 0.149.1", 0}
+      end
+
+      start_opts = [
+        to: self(),
+        project_path: missing_project,
+        codex_app_server: true,
+        codex_executable: executable,
+        app_server_command_runner: runner
+      ]
+
+      {:ok, first_ref, _handler} = SDK.start("first", start_opts)
+      {:ok, second_ref, _handler} = SDK.start("second", start_opts)
+
+      assert Agent.get(counter, & &1) == 1
+      assert is_pid(Registry.lookup(first_ref))
+      assert is_pid(Registry.lookup(second_ref))
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:gate_passed], _measurements,
+                      %{version: "0.149.1"}}
+
+      assert_receive {:app_server_gate_telemetry, ^telemetry_ref, [:fallback], _measurements,
+                      %{phase: :lookup, reason: {:invalid_project_path, ^missing_project}}}
+
+      assert :ok = SDK.cancel(first_ref)
+      assert :ok = SDK.cancel(second_ref)
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Message flow: agent_message -> turn.completed -> result + complete
   # ---------------------------------------------------------------------------
@@ -371,22 +488,61 @@ defmodule EyeInTheSky.Codex.SDKTest do
       assert_receive {:claude_error, ^ref, {:codex_error, "Authentication failed"}}, 5_000
     end
 
-    test "non-zero exit sends claude_error" do
+    test "non-zero exit includes retained provider diagnostics" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
+      send(
+        mock_port,
+        {:send_output,
+         "ERROR codex_core::rollout: stream disconnected while using key sk-test-secret123456"}
+      )
+
       send(mock_port, {:exit, 1})
 
-      assert_receive {:claude_error, ^ref, {:exit_code, 1}}, 5_000
+      assert_receive {:claude_error, ^ref,
+                      {:codex_error,
+                       %{
+                         "type" => "cli_exit_error",
+                         "status" => 1,
+                         "message" => message
+                       }}},
+                     5_000
+
+      assert message =~ "Codex process exited with status 1"
+      assert message =~ "stream disconnected"
+      refute message =~ "sk-test-secret123456"
     end
 
-    test "clean exit without turn.completed sends complete" do
+    test "clean exit without turn.completed reports an incomplete turn" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)
 
       send(mock_port, {:exit, 0})
 
-      assert_receive {:claude_complete, ^ref, _session_id}, 5_000
+      assert_receive {:claude_error, ^ref, {:codex_incomplete_turn, message}}, 5_000
+      assert message =~ "turn.completed"
+      refute_receive {:claude_complete, ^ref, _session_id}
+    end
+
+    test "resumed turn with partial text still requires turn.completed" do
+      {:ok, ref, _handler} = SDK.resume("thread-partial", "continue", to: self())
+      mock_port = Registry.lookup(ref)
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "item.completed",
+           "item" => %{"type" => "agent_message", "text" => "Starting the task"}
+         })}
+      )
+
+      assert_receive {:claude_message, ^ref, %Message{type: :text}}, 5_000
+      send(mock_port, {:exit, 0})
+
+      assert_receive {:claude_error, ^ref, {:codex_incomplete_turn, _message}}, 5_000
+      refute_receive {:claude_complete, ^ref, _session_id}
     end
   end
 
@@ -445,5 +601,77 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
       SDK.cancel(ref)
     end
+  end
+
+  defp send_response(owner_key, id, result) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "id" => id, "result" => result})}
+    )
+  end
+
+  defp send_notification(owner_key, method, params) do
+    [{pid, _}] = Elixir.Registry.lookup(EyeInTheSky.Codex.AppServerRegistry, owner_key)
+
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
+    )
+  end
+
+  defp attach_app_server_gate_telemetry do
+    test_pid = self()
+    ref = make_ref()
+    handler_id = {__MODULE__, ref}
+
+    events =
+      for event <- [:gate_passed, :gate_failed, :fallback] do
+        [:eits, :codex, :app_server, event]
+      end
+
+    :ok =
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        fn event, measurements, metadata, _config ->
+          suffix = Enum.drop(event, 3)
+          send(test_pid, {:app_server_gate_telemetry, ref, suffix, measurements, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+    ref
+  end
+end
+
+defmodule SDKTestFakeCodexAppServer do
+  use GenServer
+
+  def start_link(test_pid), do: GenServer.start_link(__MODULE__, test_pid)
+
+  @impl true
+  def init(test_pid), do: {:ok, test_pid}
+
+  @impl true
+  def handle_info({:codex_app_server_write, _from, json}, test_pid) do
+    message = Jason.decode!(json)
+
+    cond do
+      Map.has_key?(message, "result") ->
+        send(test_pid, {:sdk_fake_response, message["id"], message["result"]})
+
+      Map.has_key?(message, "id") ->
+        send(test_pid, {:sdk_fake_request, message["method"], message["id"]})
+
+      true ->
+        send(test_pid, {:sdk_fake_notification, message["method"]})
+    end
+
+    {:noreply, test_pid}
   end
 end

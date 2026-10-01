@@ -10,7 +10,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Notes do
   def mount(_params, _session, socket) do
     workspace = socket.assigns.workspace
 
-    socket = assign(socket, :page_title, "#{workspace.name} — Notes")
+    socket = assign(socket, :page_title, "#{workspace.name} | Notes")
 
     {:ok, socket}
   end
@@ -27,7 +27,7 @@ defmodule EyeInTheSkyWeb.WorkspaceLive.Notes do
         <h1 class="text-xl font-semibold">{@page_title}</h1>
         <.scope_badge scope={@scope} />
       </div>
-      <p class="mt-4 text-base-content/60">Workspace notes view — coming soon.</p>
+      <p class="mt-4 text-base-content/60">Workspace notes view | coming soon.</p>
     </div>
     """
   end

@@ -123,6 +123,7 @@ export function navigationCommands(hook) {
           shortcut: null,
           type: "navigate",
           href: "/projects/" + p.id,
+          railProjectId: p.id,
           when: null
         }))
       },

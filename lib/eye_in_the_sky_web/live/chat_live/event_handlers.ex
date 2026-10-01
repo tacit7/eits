@@ -24,17 +24,17 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
   def handle_event("change_channel", %{"channel_id" => channel_id}, socket) do
     session_id = get_session_id(socket)
 
-    if channel_member?(channel_id, session_id) do
+    if channel_accessible?(channel_id, session_id) do
       {:noreply, push_patch(socket, to: ~p"/chat?channel_id=#{channel_id}")}
     else
-      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
+      {:noreply, put_flash(socket, :error, "Channel not found")}
     end
   end
 
   def handle_event("send_channel_message", %{"channel_id" => channel_id, "body" => body}, socket) do
     session_id = get_session_id(socket)
 
-    if channel_member?(channel_id, session_id) do
+    if channel_accessible?(channel_id, session_id) do
       {image_infos, content_blocks} = consume_and_persist_agent_images(socket)
 
       # Wrap message + attachments in a single transaction so the Postgres NOTIFY
@@ -94,7 +94,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
           {:noreply, put_flash(socket, :error, "Failed to send message")}
       end
     else
-      {:noreply, put_flash(socket, :error, "You are not a member of that channel")}
+      {:noreply, put_flash(socket, :error, "Channel not found")}
     end
   end
 
@@ -217,7 +217,7 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
     session_id = get_session_id(socket)
 
     search_results =
-      if channel_member?(channel_id, session_id) && String.trim(query) != "" do
+      if channel_accessible?(channel_id, session_id) && String.trim(query) != "" do
         channel_id
         |> Messages.search_messages_for_channel(query)
         |> ChatPresenter.serialize_messages()
@@ -335,8 +335,17 @@ defmodule EyeInTheSkyWeb.ChatLive.EventHandlers do
 
   defp get_session_id(socket), do: socket.assigns[:session_id]
 
-  defp channel_member?(_channel_id, nil), do: false
-  defp channel_member?(channel_id, session_id), do: Channels.member?(channel_id, session_id)
+  # The web UI acts as a single operator session (Sessions.ensure_web_ui_session/0)
+  # that is never added to channel_members, so a membership check always fails for
+  # it. Access here means: the web session exists and the channel exists.
+  defp channel_accessible?(_channel_id, nil), do: false
+
+  defp channel_accessible?(channel_id, _session_id) do
+    case parse_int(channel_id) do
+      nil -> false
+      id -> Channels.get_channel(id) != nil
+    end
+  end
 
   defp refresh_members_and_picker(socket) do
     channel_id = socket.assigns.active_channel_id

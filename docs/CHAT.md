@@ -193,6 +193,8 @@ Main chat interface. Manages channels, members, message sending, and routing.
 
 **Mount**: Creates a deterministic "Web UI" agent+session for the user.
 
+**Access**: The Web UI session is never added to `channel_members`, so `change_channel`, `send_channel_message`, and `search_channel_messages` only require that the channel exists (error: "Channel not found"). They do not check membership.
+
 **Key events**:
 - `send_channel_message` -- Save message, parse mentions, fan out to agents
 - `send_direct_message` -- Route to specific agent by session ID

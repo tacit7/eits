@@ -92,7 +92,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
   defp handle_fab_event("fab_send_message", %{"session_id" => session_id, "body" => body}, socket) do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
-        case AgentManager.continue_session(session.id, body, model: Settings.default_model()) do
+        case AgentManager.continue_session(session.id, body, session_model_opts(session)) do
           {:ok, _} ->
             {:halt, switch_active_session(socket, session.id)}
 
@@ -143,7 +143,7 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
        ) do
     case Messages.send_to_session(session_id, body) do
       {:ok, session} ->
-        case AgentManager.continue_session(session.id, body, model: Settings.default_model()) do
+        case AgentManager.continue_session(session.id, body, session_model_opts(session)) do
           {:ok, _} ->
             {:halt, socket}
 
@@ -326,4 +326,10 @@ defmodule EyeInTheSkyWeb.FloatingChatLive do
       statuses: socket.assigns.fab_statuses
     )
   end
+
+  # Use the session's own model; the global default may belong to another provider.
+  defp session_model_opts(%{model: model}) when is_binary(model) and model != "",
+    do: [model: model]
+
+  defp session_model_opts(_session), do: []
 end

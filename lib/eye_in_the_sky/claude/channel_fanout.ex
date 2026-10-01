@@ -19,7 +19,6 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
   alias EyeInTheSky.Agents.AgentManager
   alias EyeInTheSky.{Channels, Messages, Sessions}
   alias EyeInTheSky.Claude.ChannelProtocol
-  alias EyeInTheSky.Settings
 
   @doc """
   Fan out `body` to all current members of `channel_id`, skipping `sender_session_id`.
@@ -208,17 +207,28 @@ defmodule EyeInTheSky.Claude.ChannelFanout do
 
         Logger.info("ChannelFanout: routing to session=#{session_id} mode=#{mode}")
 
-        AgentManager.send_message(session_id, prompt,
-          model: Settings.default_model(),
-          channel_id: channel_id,
-          content_blocks: content_blocks,
-          context: context
+        AgentManager.send_message(
+          session_id,
+          prompt,
+          model_opts(session_id) ++
+            [channel_id: channel_id, content_blocks: content_blocks, context: context]
         )
 
       {:error, changeset} ->
         Logger.error(
           "ChannelFanout: failed to route to session=#{session_id} errors=#{inspect(changeset.errors)}"
         )
+    end
+  end
+
+  # Use the target session's own model. The global default model setting can be
+  # for a different provider (e.g. a Codex slug), and passing it to a Claude
+  # session makes the CLI fail with "issue with the selected model".
+  @doc false
+  def model_opts(session_id) do
+    case Sessions.get_session(session_id) do
+      {:ok, %{model: model}} when is_binary(model) and model != "" -> [model: model]
+      _ -> []
     end
   end
 

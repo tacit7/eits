@@ -33,3 +33,30 @@ defmodule EyeInTheSky.Claude.ChannelFanoutTest do
     end
   end
 end
+
+defmodule EyeInTheSky.Claude.ChannelFanoutModelTest do
+  use EyeInTheSky.DataCase, async: true
+
+  alias EyeInTheSky.Claude.ChannelFanout
+  alias EyeInTheSky.Factory
+
+  describe "model_opts/1" do
+    test "uses the target session's own model, not the global default" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent, %{model: "claude-opus-5-5"})
+
+      assert ChannelFanout.model_opts(session.id) == [model: "claude-opus-5-5"]
+    end
+
+    test "passes no model when the session has none" do
+      agent = Factory.create_agent()
+      session = Factory.create_session(agent)
+
+      assert ChannelFanout.model_opts(session.id) == []
+    end
+
+    test "passes no model for an unknown session" do
+      assert ChannelFanout.model_opts(-1) == []
+    end
+  end
+end

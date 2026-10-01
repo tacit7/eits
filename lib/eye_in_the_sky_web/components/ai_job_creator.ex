@@ -138,7 +138,7 @@ defmodule EyeInTheSkyWeb.Components.AIJobCreator do
                 phx-target={@myself}
               >
                 <option value="opus" selected={@claude_model == "opus"}>
-                  Opus 5 &bull; Most capable for complex work
+                  Opus 5.5 &bull; Most capable for ambitious work
                 </option>
                 <option value="sonnet" selected={@claude_model == "sonnet"}>
                   Sonnet 5 &bull; Best for everyday tasks

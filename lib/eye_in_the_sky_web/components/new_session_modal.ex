@@ -1,11 +1,11 @@
 defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   @moduledoc """
-  Centered modal dialog for creating new sessions/agents.
+  Right-side drawer for creating new sessions/agents.
   Context-aware: pre-fills project when launched from a project page.
   """
 
   use Phoenix.LiveComponent
-  import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, modal_header: 1]
+  import EyeInTheSkyWeb.CoreComponents, only: [icon: 1, side_drawer: 1]
 
   import EyeInTheSkyWeb.Helpers.ModelHelpers,
     only: [normalize_model_alias: 1, all_model_entries: 0]
@@ -160,25 +160,41 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
   def render(assigns) do
     ~H"""
     <div>
-      <div
+      <.side_drawer
         :if={@show}
-        class="eits-modal eits-modal-open  "
+        id="new-session-drawer"
+        show={true}
+        on_close={@toggle_event}
+        target={assigns[:target]}
+        max_width="md"
+        class="border-l border-base-content/10"
         phx-window-keydown={@toggle_event}
         phx-key="Escape"
-        phx-target={assigns[:target]}
       >
-        <div class="eits-dialog w-full sm:max-w-md pb-[env(safe-area-inset-bottom)]">
-          <.modal_header
-            title={assigns[:title] || "New Agent"}
-            toggle_event={@toggle_event}
-            phx_target={assigns[:target]}
-          />
+        <div class="flex min-h-0 flex-1 flex-col">
+          <div class="border-b border-base-content/10 px-5 pt-5 pb-3">
+            <div class="mb-1 flex items-center justify-between">
+              <h2 class="text-xl font-semibold text-white">{assigns[:title] || "New Agent"}</h2>
+              <button
+                type="button"
+                phx-click={@toggle_event}
+                phx-target={assigns[:target]}
+                class="eits-action eits-action--ghost eits-action--icon"
+                aria-label="Close new agent drawer"
+              >
+                <.icon name="hero-x-mark" class="size-4" />
+              </button>
+            </div>
+            <p class="text-mini text-base-content/45">
+              Configure the agent, project context, and launch path.
+            </p>
+          </div>
 
           <form
             id="new-session-form"
             phx-submit={@submit_event}
             phx-target={assigns[:target]}
-            class="flex flex-col gap-4"
+            class="flex min-h-0 flex-1 flex-col"
           >
             <input
               type="hidden"
@@ -187,55 +203,88 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
               id="new-session-submit-action"
               phx-update="ignore"
             />
-            <div>
-              <label class="text-message font-medium text-base-content/70 mb-1.5 block">Model</label>
-              <.model_selector
-                id="new-session-model-selector"
-                entries={all_model_entries()}
-                selected_provider={@selected_provider}
-                selected_model={@selected_model}
-                allow_provider_switch?={true}
-                event="model_and_provider_selected"
-                myself={@myself}
-              />
-              <input type="hidden" name="agent_type" value={@selected_provider} />
-              <input type="hidden" name="model" value={@selected_model} />
+
+            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <div class="flex flex-col gap-4">
+                <div>
+                  <label class="text-message font-medium text-base-content/70 mb-1.5 block">
+                    Model
+                  </label>
+                  <.model_selector
+                    id="new-session-model-selector"
+                    entries={all_model_entries()}
+                    selected_provider={@selected_provider}
+                    selected_model={@selected_model}
+                    allow_provider_switch?={true}
+                    event="model_and_provider_selected"
+                    myself={@myself}
+                  />
+                  <input type="hidden" name="agent_type" value={@selected_provider} />
+                  <input type="hidden" name="model" value={@selected_model} />
+                </div>
+                <.effort_selector
+                  selected_provider={@selected_provider}
+                  selected_model={@selected_model}
+                />
+                <.agent_combobox
+                  available_agents={@available_agents}
+                  prefill_agent_slug={assigns[:prefill_agent_slug]}
+                  prefill_agent_name={assigns[:prefill_agent_name]}
+                />
+                <.prompt_selector
+                  prompts={assigns[:prompts]}
+                  selected_prompt_id={@selected_prompt_id}
+                  myself={@myself}
+                />
+                <.name_field focus_on_open={not is_nil(assigns[:prefill_agent_slug])} />
+                <.description_field
+                  selected_prompt_id={@selected_prompt_id}
+                  prefill_text={@prefill_text}
+                  focus_on_open={not is_nil(assigns[:prefill_agent_slug])}
+                />
+                <.image_attachments file_uploads={@file_uploads} />
+                <.project_selector
+                  current_project={assigns[:current_project]}
+                  projects={assigns[:projects]}
+                  myself={@myself}
+                />
+                <.worktree_field />
+                <.eits_workflow_field />
+                <.cli_flags_section selected_provider={@selected_provider} />
+              </div>
             </div>
-            <.effort_selector selected_provider={@selected_provider} selected_model={@selected_model} />
-            <.agent_combobox
-              available_agents={@available_agents}
-              prefill_agent_slug={assigns[:prefill_agent_slug]}
-              prefill_agent_name={assigns[:prefill_agent_name]}
-            />
-            <.prompt_selector
-              prompts={assigns[:prompts]}
-              selected_prompt_id={@selected_prompt_id}
-              myself={@myself}
-            />
-            <.name_field focus_on_open={not is_nil(assigns[:prefill_agent_slug])} />
-            <.description_field
-              selected_prompt_id={@selected_prompt_id}
-              prefill_text={@prefill_text}
-              focus_on_open={not is_nil(assigns[:prefill_agent_slug])}
-            />
-            <.image_attachments file_uploads={@file_uploads} />
-            <.project_selector
-              current_project={assigns[:current_project]}
-              projects={assigns[:projects]}
-              myself={@myself}
-            />
-            <.worktree_field />
-            <.eits_workflow_field />
-            <.cli_flags_section selected_provider={@selected_provider} />
-            <.modal_submit button_text={assigns[:button_text]} />
+
+            <.drawer_submit button_text={assigns[:button_text]} />
           </form>
         </div>
-        <div
-          class="eits-modal-backdrop bg-black/50 cursor-pointer"
-          phx-click={@toggle_event}
-          phx-target={assigns[:target]}
+      </.side_drawer>
+    </div>
+    """
+  end
+
+  attr :button_text, :string, default: nil
+
+  defp drawer_submit(assigns) do
+    ~H"""
+    <div class="shrink-0 border-t border-base-content/10 bg-base-100/95 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur">
+      <div class="mb-3 flex items-center gap-2 text-mini text-base-content/45">
+        <.icon name="hero-bolt-mini" class="size-3.5 text-primary" />
+        <span>Launch creates a tracked EITS session for this project.</span>
+      </div>
+      <div class="flex gap-2">
+        <button
+          type="submit"
+          class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
         >
-        </div>
+          {@button_text || "Launch Agent"}
+        </button>
+        <button
+          type="button"
+          class="focus-ring inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-box border border-base-content/10 bg-base-200 px-3 text-mini font-medium text-base-content/75 transition-colors hover:bg-base-content/10 hover:text-base-content"
+          onclick="document.getElementById('new-session-submit-action').value='chat'; document.getElementById('new-session-form').requestSubmit();"
+        >
+          <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" /> Chat
+        </button>
       </div>
     </div>
     """
@@ -601,28 +650,6 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModal do
         <option value="on-failure">on-failure</option>
         <option value="never">never</option>
       </select>
-    </div>
-    """
-  end
-
-  attr :button_text, :string, default: nil
-
-  defp modal_submit(assigns) do
-    ~H"""
-    <div class="flex gap-2 mt-2">
-      <button
-        type="submit"
-        class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center rounded-box bg-primary px-3 text-mini font-medium text-primary-content transition-colors hover:bg-primary/85"
-      >
-        {@button_text || "Launch Agent"}
-      </button>
-      <button
-        type="button"
-        class="focus-ring inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-box bg-secondary px-3 text-mini font-medium text-secondary-content transition-colors hover:bg-secondary/85"
-        onclick="document.getElementById('new-session-submit-action').value='chat'; document.getElementById('new-session-form').requestSubmit();"
-      >
-        <.icon name="hero-chat-bubble-left-right-mini" class="w-4 h-4" /> Chat
-      </button>
     </div>
     """
   end

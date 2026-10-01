@@ -8,7 +8,7 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     Map.merge(
       %{
         uploads: %{files: %Phoenix.LiveView.UploadConfig{ref: "test-upload-ref", entries: []}},
-        selected_model: "claude-opus-4-8",
+        selected_model: "claude-opus-5-5",
         selected_effort: "medium",
         active_overlay: nil,
         processing: false,
@@ -32,7 +32,7 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     html = render_component(&MessageComposer.message_composer/1, base_assigns())
     assert html =~ ~s(data-event="select_model")
     assert html =~ ~s(data-allow-provider-switch="false")
-    assert html =~ "Opus 5"
+    assert html =~ "Opus 5.5"
   end
 
   test "pi provider sessions get Pi entries, not the Claude fallback (bug being fixed)" do
@@ -51,10 +51,10 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     html =
       render_component(
         &MessageComposer.message_composer/1,
-        base_assigns(%{provider: "codex", selected_model: "gpt-5.6-sol"})
+        base_assigns(%{provider: "codex", selected_model: "gpt-6-astra"})
       )
 
-    assert html =~ "GPT-5.6 Sol"
+    assert html =~ "GPT-6-Astra"
     refute html =~ "gpt-5.2"
     refute html =~ "GPT-5.2"
   end
@@ -66,7 +66,7 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
         base_assigns(%{provider: "codex", selected_model: "gpt-5.2"})
       )
 
-    assert html =~ ~s(data-selected-model="gpt-5.6-sol")
+    assert html =~ ~s(data-selected-model="gpt-6-astra")
     assert html =~ ~s(id="composer-model-adjustment-notice")
     assert html =~ "gpt-5.2 unavailable"
     refute html =~ "GPT-5.2"

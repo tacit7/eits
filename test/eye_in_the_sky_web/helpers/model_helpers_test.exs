@@ -9,7 +9,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "claude_models/0" do
     test "returns a non-empty list" do
-      assert ModelHelpers.claude_models() != []
+      refute Enum.empty?(ModelHelpers.claude_models())
     end
 
     test "every entry is a {binary, binary} tuple" do
@@ -36,7 +36,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "claude_models_with_meta/0" do
     test "returns a non-empty list" do
-      assert ModelHelpers.claude_models_with_meta() != []
+      refute Enum.empty?(ModelHelpers.claude_models_with_meta())
     end
 
     test "every entry is a 4-element tuple with binary fields" do
@@ -68,7 +68,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "codex_models/0" do
     test "returns a non-empty list" do
-      assert ModelHelpers.codex_models() != []
+      refute Enum.empty?(ModelHelpers.codex_models())
     end
 
     test "does not offer the unavailable gpt-5.5 model" do
@@ -91,10 +91,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "returns the curated GPT selector options in display order" do
       assert ModelHelpers.codex_models() == [
+               {"gpt-6-astra", "GPT-6-Astra"},
+               {"gpt-6-sol", "GPT-6-Sol"},
+               {"gpt-6-luna", "GPT-6-Luna"},
                {"gpt-5.6-sol", "GPT-5.6 Sol"},
                {"gpt-5.6-terra", "GPT-5.6 Terra"},
-               {"gpt-5.6-luna", "GPT-5.6 Luna"},
-               {"gpt-5.2", "GPT-5.2"}
+               {"gpt-5.6-luna", "GPT-5.6 Luna"}
              ]
     end
   end
@@ -105,7 +107,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
   describe "codex_models_with_meta/0" do
     test "returns a non-empty list" do
-      assert ModelHelpers.codex_models_with_meta() != []
+      refute Enum.empty?(ModelHelpers.codex_models_with_meta())
     end
 
     test "every entry is a 4-element tuple with binary fields" do
@@ -131,14 +133,16 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "returns the curated GPT selector descriptions in display order" do
       assert ModelHelpers.codex_models_with_meta() == [
-               {"gpt-5.6-sol", "GPT-5.6 Sol", "Latest frontier agentic coding model (default)",
+               {"gpt-6-astra", "GPT-6-Astra", "Frontier intelligence for the most demanding work",
                 "text-warning"},
-               {"gpt-5.6-terra", "GPT-5.6 Terra",
-                "Balanced agentic coding model for everyday work", "text-warning"},
-               {"gpt-5.6-luna", "GPT-5.6 Luna", "Fast and affordable agentic coding model",
+               {"gpt-6-sol", "GPT-6-Sol", "Workhorse model for coding and everyday work",
+                "text-warning"},
+               {"gpt-6-luna", "GPT-6-Luna", "Fast and affordable model for easier tasks",
                 "text-info"},
-               {"gpt-5.2", "GPT-5.2", "Optimized for professional work and long-running agents",
-                "text-info"}
+               {"gpt-5.6-sol", "GPT-5.6 Sol", "Older coding model for complex work", "text-info"},
+               {"gpt-5.6-terra", "GPT-5.6 Terra", "Older balanced model for straightforward work",
+                "text-info"},
+               {"gpt-5.6-luna", "GPT-5.6 Luna", "Older fast and efficient model", "text-info"}
              ]
     end
   end
@@ -210,17 +214,17 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "\"opus\" normalizes to opus slug" do
-      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("opus") == "claude-opus-5-5"
     end
 
     test "uppercase aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("OPUS") == "claude-opus-5-5"
       assert ModelHelpers.normalize_model_alias("SONNET") == "claude-sonnet-5"
       assert ModelHelpers.normalize_model_alias("HAIKU") == "claude-haiku-4-5-20251001"
     end
 
     test "mixed-case aliases are case-insensitive" do
-      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-4-8"
+      assert ModelHelpers.normalize_model_alias("Opus") == "claude-opus-5-5"
       assert ModelHelpers.normalize_model_alias("Sonnet") == "claude-sonnet-5"
     end
 
@@ -231,7 +235,7 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "nil returns default sonnet slug" do
-      assert ModelHelpers.normalize_model_alias(nil) == "claude-sonnet-5"
+      assert ModelHelpers.normalize_model_alias(nil) == "claude-opus-5-5"
     end
 
     test "unknown string passes through unchanged" do
@@ -244,21 +248,21 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   # ---------------------------------------------------------------------------
 
   describe "default_model_for/1" do
-    test "\"codex\" returns gpt-5.6-sol" do
-      assert ModelHelpers.default_model_for("codex") == "gpt-5.6-sol"
+    test "\"codex\" returns gpt-6-astra" do
+      assert ModelHelpers.default_model_for("codex") == "gpt-6-astra"
     end
 
-    test "\"claude\" returns claude-sonnet-5" do
-      assert ModelHelpers.default_model_for("claude") == "claude-sonnet-5"
+    test "\"claude\" returns claude-opus-5-5" do
+      assert ModelHelpers.default_model_for("claude") == "claude-opus-5-5"
     end
 
     test "nil falls back to claude default" do
-      assert ModelHelpers.default_model_for(nil) == "claude-sonnet-5"
+      assert ModelHelpers.default_model_for(nil) == "claude-opus-5-5"
     end
 
     test "unknown provider falls back to claude default" do
-      assert ModelHelpers.default_model_for("openai") == "claude-sonnet-5"
-      assert ModelHelpers.default_model_for("") == "claude-sonnet-5"
+      assert ModelHelpers.default_model_for("openai") == "claude-opus-5-5"
+      assert ModelHelpers.default_model_for("") == "claude-opus-5-5"
     end
 
     test "default for codex is in valid_model_slugs" do
@@ -281,16 +285,17 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       assert ModelHelpers.model_display_name("claude-sonnet-4-6") == "Sonnet 4.6"
       assert ModelHelpers.model_display_name("claude-haiku-4-5-20251001") == "Haiku 4.5"
       assert ModelHelpers.model_display_name("claude-opus-4-8") == "Opus 5"
+      assert ModelHelpers.model_display_name("claude-opus-5-5") == "Opus 5.5"
     end
 
     test "known codex slug returns its label" do
       assert ModelHelpers.model_display_name("gpt-5.5") == "GPT-5.5"
       assert ModelHelpers.model_display_name("gpt-5.6-terra") == "GPT-5.6 Terra"
-      assert ModelHelpers.model_display_name("gpt-5.2") == "GPT-5.2"
+      assert ModelHelpers.model_display_name("gpt-6-astra") == "GPT-6-Astra"
     end
 
-    test "short alias \"opus\" returns \"Opus 5\"" do
-      assert ModelHelpers.model_display_name("opus") == "Opus 5"
+    test "short alias \"opus\" returns \"Opus 5.5\"" do
+      assert ModelHelpers.model_display_name("opus") == "Opus 5.5"
     end
 
     test "short alias \"sonnet\" returns \"Sonnet 5\"" do
@@ -341,8 +346,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
 
     test "primary current-gen models are not legacy", %{entries: entries} do
       by_slug = Map.new(entries, &{&1.slug, &1})
-      assert by_slug["claude-opus-4-8"].legacy? == false
-      assert by_slug["claude-fable-5"].legacy? == false
+      assert by_slug["claude-opus-5-5"].legacy? == false
+      assert by_slug["claude-fable-5-1"].legacy? == false
       assert by_slug["claude-sonnet-5"].legacy? == false
       assert by_slug["claude-haiku-4-5-20251001"].legacy? == false
     end
@@ -360,12 +365,12 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     end
 
     test "non-1m entries are not premium", %{entries: entries} do
-      refute Enum.any?(entries, &(&1.slug == "claude-opus-4-8" and &1.premium?))
+      refute Enum.any?(entries, &(&1.slug == "claude-opus-5-5" and &1.premium?))
     end
 
-    test "exactly one default entry, on claude-sonnet-5", %{entries: entries} do
+    test "exactly one default entry, on claude-opus-5-5", %{entries: entries} do
       defaults = Enum.filter(entries, & &1.default?)
-      assert [%{slug: "claude-sonnet-5"}] = defaults
+      assert [%{slug: "claude-opus-5-5"}] = defaults
     end
   end
 
@@ -383,19 +388,19 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
       refute Enum.any?(entries, & &1.premium?)
     end
 
-    test "gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna are primary; rest are legacy", %{
+    test "gpt-6-astra, gpt-6-sol, gpt-6-luna are primary; rest are legacy", %{
       entries: entries
     } do
       by_slug = Map.new(entries, &{&1.slug, &1})
-      assert by_slug["gpt-5.6-sol"].legacy? == false
-      assert by_slug["gpt-5.6-terra"].legacy? == false
-      assert by_slug["gpt-5.6-luna"].legacy? == false
+      assert by_slug["gpt-6-astra"].legacy? == false
+      assert by_slug["gpt-6-sol"].legacy? == false
+      assert by_slug["gpt-6-luna"].legacy? == false
+      assert by_slug["gpt-5.6-sol"].legacy? == true
       refute Map.has_key?(by_slug, "gpt-5.5")
-      assert by_slug["gpt-5.2"].legacy? == true
     end
 
-    test "default is gpt-5.6-sol", %{entries: entries} do
-      assert [%{slug: "gpt-5.6-sol"}] = Enum.filter(entries, & &1.default?)
+    test "default is gpt-6-astra", %{entries: entries} do
+      assert [%{slug: "gpt-6-astra"}] = Enum.filter(entries, & &1.default?)
     end
   end
 
@@ -403,7 +408,11 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
     test "preserves sub_provider from discovery and marks non-ollama as premium" do
       previous_control = Application.fetch_env!(:eye_in_the_sky, :pi_control_module)
       Application.put_env(:eye_in_the_sky, :pi_control_module, __MODULE__.FakeControl)
-      on_exit(fn -> Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control) end)
+
+      on_exit(fn ->
+        Application.put_env(:eye_in_the_sky, :pi_control_module, previous_control)
+      end)
+
       {:ok, _} = EyeInTheSky.Pi.ModelDiscoveryCache.refresh()
 
       entries = ModelHelpers.entries_for_provider("pi")
@@ -439,8 +448,8 @@ defmodule EyeInTheSkyWeb.Helpers.ModelHelpersTest do
   describe "claude_models/0 — refreshed catalog" do
     test "includes the refreshed Claude 5 family slugs" do
       values = ModelHelpers.claude_models() |> Enum.map(&elem(&1, 0))
-      assert "claude-opus-4-8" in values
-      assert "claude-fable-5" in values
+      assert "claude-opus-5-5" in values
+      assert "claude-fable-5-1" in values
       assert "claude-sonnet-5" in values
       assert "claude-haiku-4-5-20251001" in values
     end

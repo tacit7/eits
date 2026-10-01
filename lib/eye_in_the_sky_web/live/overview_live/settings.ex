@@ -38,6 +38,17 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @valid_tabs ~w(general editor auth workflow pricing system desktop providers)
 
+  @settings_nav [
+    {"General", "general", "hero-adjustments-horizontal"},
+    {"Providers", "providers", "hero-server-stack"},
+    {"Editor", "editor", "hero-code-bracket-square"},
+    {"Auth & Keys", "auth", "hero-key"},
+    {"Workflow", "workflow", "hero-arrow-path-rounded-square"},
+    {"Pricing", "pricing", "hero-banknotes"},
+    {"System", "system", "hero-circle-stack"},
+    {"Desktop", "desktop", "hero-computer-desktop"}
+  ]
+
   # Function, not attribute: compile-time ~ expansion bakes the build-machine home dir.
   defp allowed_editor_roots, do: [Path.expand("~/.claude")]
 
@@ -67,13 +78,15 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:page_title, "Settings")
       |> assign(:sidebar_tab, :settings)
       |> assign(:sidebar_project, nil)
+      |> assign(:hide_app_rail, true)
       |> assign(:settings, settings)
       |> assign(:db_info, db_info)
-      |> assign(:models, ModelHelpers.claude_models())
+      |> assign(:models, ModelHelpers.claude_models() ++ ModelHelpers.codex_models())
       |> assign(:voices, @voices)
       |> assign(:themes, @themes)
       |> assign(:flash_key, nil)
       |> assign(:active_tab, :general)
+      |> assign(:return_to, "/sessions")
       |> assign(:generated_api_key, nil)
       |> assign(:desktop_mode?, Desktop.desktop_mode?())
       |> assign(:desktop_port, DesktopConfig.configured_port())
@@ -81,6 +94,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
       |> assign(:pi_providers, :loading)
       |> assign(:pi_model_status, current_model_status())
       |> assign(:pi_key_op_in_flight, false)
+      |> assign(:settings_nav, @settings_nav)
 
     if connected?(socket), do: Events.broadcast_rail_context(socket)
 
@@ -88,14 +102,16 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
   end
 
   @impl true
-  def handle_params(%{"tab" => tab}, _uri, socket) do
+  def handle_params(params, _uri, socket) do
+    tab = params["tab"]
     active = if tab in @valid_tabs, do: String.to_existing_atom(tab), else: :general
-    {:noreply, socket |> assign(:active_tab, active) |> maybe_load_providers(active)}
-  end
+    return_to = safe_return_to(params["return_to"])
 
-  @impl true
-  def handle_params(_params, _uri, socket) do
-    {:noreply, assign(socket, :active_tab, :general)}
+    {:noreply,
+     socket
+     |> assign(:active_tab, active)
+     |> assign(:return_to, return_to)
+     |> maybe_load_providers(active)}
   end
 
   defp maybe_load_providers(socket, :providers) do
@@ -128,7 +144,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   @impl true
   def handle_event("set_tab", %{"tab" => tab}, socket) do
-    {:noreply, push_patch(socket, to: ~p"/settings?tab=#{tab}")}
+    {:noreply,
+     push_patch(socket, to: ~p"/settings?tab=#{tab}&return_to=#{socket.assigns.return_to}")}
   end
 
   @impl true
@@ -445,33 +462,85 @@ defmodule EyeInTheSkyWeb.OverviewLive.Settings do
 
   defp reload_settings(socket), do: assign(socket, :settings, Settings.all())
 
+  defp safe_return_to(path) when is_binary(path) do
+    cond do
+      path == "/sessions" -> path
+      Regex.match?(~r|^/projects/\d+/sessions$|, path) -> path
+      true -> "/sessions"
+    end
+  end
+
+  defp safe_return_to(_path), do: "/sessions"
+
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="px-4 sm:px-6 lg:px-8 py-8">
-      <div class="max-w-4xl mx-auto space-y-6">
-        <div class="eits-tabs overflow-x-auto flex-nowrap whitespace-nowrap">
-          <%= for {label, key} <- [
-            {"General", "general"}, {"Editor", "editor"}, {"Auth & Keys", "auth"},
-            {"Providers", "providers"},
-            {"Workflow", "workflow"}, {"Pricing", "pricing"}, {"System", "system"},
-            {"Desktop", "desktop"}
-          ] do %>
-            <button
-              class={
-                "eits-tab #{if @active_tab == String.to_existing_atom(key), do: "eits-tab--active", else: ""}"
-              }
-              phx-click="set_tab"
-              phx-value-tab={key}
-            >
-              {label}
-            </button>
-          <% end %>
+    <div class="flex min-h-full flex-col bg-base-100 lg:flex-row">
+      <aside class="border-b border-base-content/10 bg-base-200/35 px-4 py-4 lg:min-h-[calc(var(--app-viewport-height)-5.5rem)] lg:w-72 lg:shrink-0 lg:border-b-0 lg:border-r lg:px-3 lg:py-6">
+        <.link
+          id="settings-back-link"
+          navigate={@return_to}
+          class="mb-4 hidden items-center gap-2 px-2 text-message font-medium text-base-content/45 transition-colors hover:text-base-content/75 lg:flex"
+        >
+          <.icon name="hero-arrow-left" class="size-4" />
+          <span>Back to app</span>
+        </.link>
+
+        <div class="mb-4 flex items-center justify-between gap-3 px-2 lg:block">
+          <h1 class="text-xl font-semibold tracking-normal text-base-content lg:text-message">
+            Settings
+          </h1>
+          <span class="text-mini text-base-content/40 lg:hidden">
+            {active_tab_label(@active_tab)}
+          </span>
         </div>
-        {render_tab(assigns)}
-      </div>
+
+        <nav
+          id="settings-section-nav"
+          aria-label="Settings sections"
+          class="flex gap-1 overflow-x-auto border-t border-base-content/8 pt-3 lg:flex-col lg:overflow-visible"
+        >
+          <button
+            :for={{label, key, icon} <- @settings_nav}
+            id={"settings-nav-#{key}"}
+            type="button"
+            phx-click="set_tab"
+            phx-value-tab={key}
+            class={[
+              "group flex h-11 shrink-0 items-center gap-2 rounded-box px-3 text-left text-message font-medium transition-colors lg:w-full",
+              if(@active_tab == String.to_existing_atom(key),
+                do: "bg-primary/10 text-base-content ring-1 ring-primary/15",
+                else: "text-base-content/50 hover:bg-base-content/5 hover:text-base-content/80"
+              )
+            ]}
+          >
+            <.icon name={icon} class="size-4 shrink-0" />
+            <span>{label}</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="min-w-0 flex-1 px-4 py-7 sm:px-6 lg:px-10 lg:py-10 xl:px-16">
+        <div class="mx-auto max-w-6xl">
+          <h2 class="mb-8 text-2xl font-semibold tracking-normal text-base-content lg:mb-10">
+            {active_tab_label(@active_tab)}
+          </h2>
+
+          {render_tab(assigns)}
+        </div>
+      </main>
     </div>
     """
+  end
+
+  defp active_tab_label(tab) do
+    tab_key = to_string(tab)
+
+    @settings_nav
+    |> Enum.find_value(fn
+      {label, ^tab_key, _icon} -> label
+      _ -> nil
+    end) || "General"
   end
 
   defp render_tab(%{active_tab: :general} = assigns), do: GeneralTab.render(assigns)

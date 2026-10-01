@@ -9,6 +9,9 @@ defmodule EyeInTheSky.Codex.Models do
   # When adding a curated model here, also update ModelHelpers display metadata
   # and scripts/eits help examples. Validation accepts future gpt-* slugs.
   @context_windows %{
+    "gpt-6-astra" => 1_050_000,
+    "gpt-6-sol" => 1_050_000,
+    "gpt-6-luna" => 1_050_000,
     "gpt-5.6-sol" => 1_050_000,
     "gpt-5.6-tenna" => 1_050_000,
     "gpt-5.6-luna" => 1_050_000,
@@ -20,6 +23,9 @@ defmodule EyeInTheSky.Codex.Models do
 
   # Max output tokens per model (where known)
   @max_output_tokens %{
+    "gpt-6-astra" => 128_000,
+    "gpt-6-sol" => 128_000,
+    "gpt-6-luna" => 128_000,
     "gpt-5.6-sol" => 128_000,
     "gpt-5.6-tenna" => 128_000,
     "gpt-5.6-luna" => 128_000,

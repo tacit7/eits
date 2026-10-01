@@ -178,6 +178,33 @@ defmodule EyeInTheSkyWeb.ChatLive.ChannelActionsTest do
 
       assert result.assigns.flash["error"] == "Session not found"
     end
+
+    test "removes stale channel member even when backing session is missing" do
+      %{channel: channel, agent: agent, project: project} = setup_channel_context()
+      stale_session_id = 9_999_999 + uniq()
+
+      {:ok, _member} = Channels.add_member(channel.id, agent.id, stale_session_id)
+
+      socket =
+        build_socket(%{
+          active_channel_id: channel.id,
+          session_search: "",
+          all_projects: [project]
+        })
+
+      {:noreply, result} =
+        ChannelActions.handle_remove_agent(socket, %{"session_id" => to_string(stale_session_id)})
+
+      refute Enum.any?(Channels.list_members(channel.id), fn m ->
+               m.session_id == stale_session_id
+             end)
+
+      refute Enum.any?(result.assigns.channel_members, fn m ->
+               m.session_id == stale_session_id
+             end)
+
+      refute Map.has_key?(result.assigns.flash, "error")
+    end
   end
 
   # ──────────────────────────────────────────────────────────────

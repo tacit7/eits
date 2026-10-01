@@ -289,43 +289,4 @@ defmodule EyeInTheSkyWeb.Components.AgentList do
     </li>
     """
   end
-
-  attr :show_archive_confirm, :boolean, required: true
-  attr :selected_ids, :any, required: true
-
-  def archive_confirm_modal(assigns) do
-    ~H"""
-    <dialog
-      id="archive-confirm-modal"
-      class={"eits-modal   " <> if(@show_archive_confirm, do: "eits-modal-open", else: "")}
-    >
-      <div class="eits-dialog w-full sm:max-w-sm pb-[env(safe-area-inset-bottom)]">
-        <h3 class="text-lg font-bold">Archive sessions</h3>
-        <p class="py-4 text-message text-base-content/70">
-          <% count = MapSet.size(@selected_ids) %> Archive {count} selected session{if count == 1,
-            do: "",
-            else: "s"}?
-          Archived sessions can be unarchived later.
-        </p>
-        <div class="eits-panel__actions">
-          <button
-            phx-click="cancel_archive_selected"
-            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box px-3 text-mini font-medium text-base-content/55 transition-colors hover:bg-base-content/5 hover:text-base-content/80"
-          >
-            Cancel
-          </button>
-          <button
-            phx-click="archive_selected"
-            class="focus-ring inline-flex min-h-[44px] items-center justify-center rounded-box bg-warning px-3 text-mini font-medium text-warning-content transition-colors hover:bg-warning/85"
-          >
-            Archive
-          </button>
-        </div>
-      </div>
-      <form method="dialog" class="eits-modal-backdrop">
-        <button phx-click="cancel_archive_selected">close</button>
-      </form>
-    </dialog>
-    """
-  end
 end

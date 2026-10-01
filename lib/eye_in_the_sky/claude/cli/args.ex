@@ -271,7 +271,7 @@ defmodule EyeInTheSky.Claude.CLI.Args do
     case String.downcase(model) do
       "haiku" -> "claude-haiku-4-5-20251001"
       "sonnet" -> "claude-sonnet-5"
-      "opus" -> "claude-opus-4-8"
+      "opus" -> "claude-opus-5-5"
       _ -> model
     end
   end

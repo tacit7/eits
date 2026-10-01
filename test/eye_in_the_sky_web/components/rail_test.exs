@@ -29,6 +29,29 @@ defmodule EyeInTheSkyWeb.Components.RailTest do
   defp get_rail(view), do: find_live_child(view, "app-rail")
 
   describe "flyout chevron toggle" do
+    test "tasks rail item navigates to workspace tasks without selected project", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/sessions")
+      rail = get_rail(view)
+
+      assert {:error, {:live_redirect, %{to: "/tasks"}}} =
+               rail
+               |> element(~s(button[aria-label="Tasks"]))
+               |> render_click()
+    end
+
+    test "settings link preserves the current project sessions destination", %{
+      conn: conn,
+      user: user
+    } do
+      project = build_project(user)
+      {:ok, view, _html} = live(conn, ~p"/projects/#{project.id}/sessions")
+
+      assert has_element?(
+               get_rail(view),
+               ~s(a[aria-label="Settings"][href="/settings?return_to=%2Fprojects%2F#{project.id}%2Fsessions"])
+             )
+    end
+
     test "renders a persistent desktop chevron for hiding or showing the flyout", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/sessions")
 

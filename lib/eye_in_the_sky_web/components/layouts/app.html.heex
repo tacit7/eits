@@ -5,6 +5,8 @@
   data-palette-shortcut={@palette_shortcut}
   data-allow-split={if assigns[:allow_split], do: "true", else: "false"}
 >
+  <% hide_app_rail = assigns[:hide_app_rail] || false %>
+
   <div id="aria-live-polite" class="sr-only" role="status" aria-live="polite" aria-atomic="true">
   </div>
   <div
@@ -92,6 +94,7 @@
         <.icon name="hero-bell" class="size-4" />
       </button>
       <button
+        :if={!hide_app_rail}
         phx-click="toggle_collapsed"
         phx-target="#app-rail"
         class="eits-action eits-action--ghost eits-action--icon h-7 min-h-0 min-w-7"
@@ -114,21 +117,24 @@
   </div>
 
   <div id="app-body" class="flex flex-1 min-h-0">
-    {live_render(@socket, EyeInTheSkyWeb.Components.Rail,
-      id: "app-rail",
-      sticky: true,
-      session: %{
-        "rail_context_topic" => assigns[:rail_context_topic],
-        "sidebar_tab" => assigns[:sidebar_tab] && Atom.to_string(assigns[:sidebar_tab]),
-        "sidebar_project_id" => assigns[:sidebar_project] && assigns[:sidebar_project].id,
-        "workspace_id" => assigns[:workspace_id]
-      }
-    )}
+    <%= unless hide_app_rail do %>
+      {live_render(@socket, EyeInTheSkyWeb.Components.Rail,
+        id: "app-rail",
+        sticky: true,
+        session: %{
+          "rail_context_topic" => assigns[:rail_context_topic],
+          "sidebar_tab" => assigns[:sidebar_tab] && Atom.to_string(assigns[:sidebar_tab]),
+          "sidebar_project_id" => assigns[:sidebar_project] && assigns[:sidebar_project].id,
+          "workspace_id" => assigns[:workspace_id]
+        }
+      )}
+    <% end %>
     <%!-- Grab handle for swipe-to-open sidebar on mobile.
        touch-action:none prevents Safari from stealing the gesture for back navigation. --%>
     <%!-- Grab handle starts below the mobile header so it never covers the hamburger button.
        z-[45] sits below the sidebar (z-50) but above main content. --%>
     <div
+      :if={!hide_app_rail}
       id="rail-grab-handle"
       class="md:hidden fixed left-[52px] bottom-0 w-10 z-[45]"
       style="touch-action: none; top: calc(3rem + env(safe-area-inset-top));"
@@ -142,6 +148,7 @@
         assigns[:hide_mobile_header] && "hidden"
       ]}>
         <button
+          :if={!hide_app_rail}
           phx-click={Phoenix.LiveView.JS.dispatch("rail:open", to: "#rail-root")}
           class="eits-action eits-action--ghost eits-action--icon h-11 min-h-0 min-w-11"
           title="Open menu"
@@ -280,7 +287,10 @@
 
       <main
         id="main-content"
-        class="flex-1 overflow-auto flex flex-col min-w-0 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0"
+        class={[
+          "flex-1 overflow-auto flex flex-col min-w-0 md:pb-0",
+          if(hide_app_rail, do: "pb-0", else: "pb-[calc(4.25rem+env(safe-area-inset-bottom))]")
+        ]}
       >
         <.flash_group flash={@flash} />
         {@inner_content}
@@ -293,6 +303,7 @@
       <% project_href =
         if sidebar_project, do: ~p"/projects/#{sidebar_project.id}", else: ~p"/" %>
       <nav
+        :if={!hide_app_rail}
         class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-base-content/10 bg-base-100/95 backdrop-blur supports-[backdrop-filter]:bg-base-100/80 px-2 pt-1 pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
         aria-label="Main navigation"
       >

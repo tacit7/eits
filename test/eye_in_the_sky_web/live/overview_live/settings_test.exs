@@ -19,6 +19,27 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
       {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
       assert html =~ "Settings"
     end
+
+    test "hides the app rail chrome", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
+
+      refute has_element?(lv, "#app-rail")
+      refute has_element?(lv, "#rail-grab-handle")
+      refute has_element?(lv, ~s(nav[aria-label="Main navigation"]))
+      assert has_element?(lv, "#settings-section-nav")
+    end
+
+    test "back link returns to project sessions when return_to is provided", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?return_to=/projects/123/sessions")
+
+      assert has_element?(lv, ~s(#settings-back-link[href="/projects/123/sessions"]))
+    end
+
+    test "back link rejects unsafe return_to paths", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings?return_to=https://example.com")
+
+      assert has_element?(lv, ~s(#settings-back-link[href="/sessions"]))
+    end
   end
 
   describe "tab routing" do
@@ -35,6 +56,11 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
     test "defaults to general tab showing Default Model", %{conn: conn} do
       {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
       assert html =~ "Default Model"
+    end
+
+    test "default model selector includes GPT models", %{conn: conn} do
+      {:ok, lv, _html} = live(auth_conn(conn), ~p"/settings")
+      assert has_element?(lv, ~s(select[name="value"] option[value^="gpt-"]))
     end
 
     test "?tab=auth loads auth tab", %{conn: conn} do
@@ -79,8 +105,8 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
   describe "theme settings" do
     test "renders theme buttons on general tab", %{conn: conn} do
       {:ok, _lv, html} = live(auth_conn(conn), ~p"/settings")
-      assert html =~ "Appearance"
       assert html =~ "Theme"
+      assert html =~ "App-wide color theme"
 
       for label <- ~w(Dark Light Dracula) do
         assert html =~ label
@@ -107,7 +133,7 @@ defmodule EyeInTheSkyWeb.OverviewLive.SettingsTest do
       # render/1 flushes pending handle_info(:set_default_theme) before asserting persistence
       html = render(lv)
       assert EyeInTheSky.Settings.get("theme") == "dark"
-      assert html =~ "Appearance"
+      assert html =~ "Theme"
     end
   end
 

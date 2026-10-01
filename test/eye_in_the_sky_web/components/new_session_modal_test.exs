@@ -34,10 +34,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
   defmodule HostLive do
     use Phoenix.LiveView
 
-    def mount(_params, _session, socket) do
+    def mount(_params, session, socket) do
       {:ok,
        assign(socket,
-         show: true,
+         show: Map.get(session, "show", true),
          toggle_event: "toggle_new_session",
          submit_event: "create_session",
          prompts: [],
@@ -65,6 +65,10 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       """
     end
 
+    def handle_event("toggle_new_session", _, socket) do
+      {:noreply, assign(socket, show: not socket.assigns.show)}
+    end
+
     def handle_event(_, _, socket), do: {:noreply, socket}
   end
 
@@ -74,6 +78,21 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
 
   defp render_new_session_modal(overrides) do
     render_component(NewSessionModal, base_assigns(overrides))
+  end
+
+  test "fixes static root rendering when the modal is closed and toggled", %{conn: conn} do
+    {:ok, view, _html} = live_isolated(conn, HostLive, session: %{"show" => false})
+
+    refute has_element?(view, "#new-session-drawer")
+
+    render_click(view, "toggle_new_session")
+    assert has_element?(view, "#new-session-drawer #new-session-form")
+
+    render_click(view, "toggle_new_session")
+    refute has_element?(view, "#new-session-drawer")
+
+    render_click(view, "toggle_new_session")
+    assert has_element?(view, "#new-session-drawer #new-session-form")
   end
 
   # -------------------------------------------------------------------------
@@ -185,13 +204,13 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       |> element("#new-session-model-selector")
       |> render_hook("model_and_provider_selected", %{
         "provider" => "codex",
-        "model" => "gpt-5.6-sol"
+        "model" => "gpt-6-astra"
       })
 
       html = render(view)
-      assert html =~ "GPT-5.6 Sol"
+      assert html =~ "GPT-6-Astra"
       assert html =~ ~s(name="agent_type" value="codex")
-      assert html =~ ~s(name="model" value="gpt-5.6-sol")
+      assert html =~ ~s(name="model" value="gpt-6-astra")
     end
 
     test "an invalid payload is rejected, previous selection is kept", %{conn: conn} do
@@ -226,7 +245,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
       |> element("#new-session-model-selector")
       |> render_hook("model_and_provider_selected", %{
         "provider" => "codex",
-        "model" => "gpt-5.6-sol"
+        "model" => "gpt-6-astra"
       })
 
       html = render(view)
@@ -250,7 +269,7 @@ defmodule EyeInTheSkyWeb.Components.NewSessionModalTest do
         AgentCreationHelpers.build_opts(
           %{
             "agent_type" => "codex",
-            "model" => "gpt-5.6-sol",
+            "model" => "gpt-6-astra",
             "permission_mode" => "bypassPermissions",
             "max_turns" => "10",
             "skip_permissions" => "true",

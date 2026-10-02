@@ -94,9 +94,12 @@ _resume() {
   grep -q "EITS_SESSION_UUID=$TEST_SESSION_UUID" "$TMPENV"
 }
 
-@test "startup: writes EITS_URL to CLAUDE_ENV_FILE" {
-  _startup "$TEST_SESSION_UUID" >/dev/null 2>&1
-  grep -q "EITS_URL=" "$TMPENV"
+@test "startup: preserves inherited EITS_URL in CLAUDE_ENV_FILE" {
+  local desktop_url="http://127.0.0.1:34877/api/v1"
+
+  EITS_URL="$desktop_url" _startup "$TEST_SESSION_UUID" >/dev/null 2>&1
+
+  grep -q "EITS_URL=$desktop_url" "$TMPENV"
 }
 
 @test "startup: writes EITS_PROJECT_ID to CLAUDE_ENV_FILE" {

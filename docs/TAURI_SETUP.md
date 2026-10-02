@@ -239,6 +239,24 @@ release, waits for Phoenix to broadcast `"ready"` over ElixirKit PubSub, then
 creates the WKWebView window pointing at `http://127.0.0.1:<resolved port>`
 (default `34877`).
 
+At startup, the Rust layer gives the embedded release both `PORT` and a matching
+`EITS_URL` (`http://127.0.0.1:<resolved port>/api/v1`). Phoenix therefore has
+one canonical local API endpoint even when port collision handling selects a
+fallback port.
+
+Agent launchers propagate that endpoint using each provider's supported
+mechanism:
+
+- Claude receives `EITS_URL` in its subprocess environment. The SessionStart
+  hook preserves the value in `CLAUDE_ENV_FILE` for later tool calls.
+- Codex receives `EITS_URL` in its subprocess environment and through
+  `shell_environment_policy.set`, which makes it available to commands run by
+  both `codex exec` and app-server threads.
+
+Existing agent processes keep the environment they started with. Restart an
+agent after upgrading or restarting the desktop app so it receives the current
+endpoint. No shell-profile export is required for app-launched agents.
+
 **Do not use `open -n "Eye in the Sky.app"`** to launch programmatically.
 Launch Services does not pass shell env vars. Always invoke the Tauri binary
 directly if you need custom env overrides:

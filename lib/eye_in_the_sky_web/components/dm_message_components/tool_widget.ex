@@ -50,7 +50,7 @@ defmodule EyeInTheSkyWeb.Components.DmMessageComponents.ToolWidget do
         if @compact,
           do: "group my-px",
           else:
-            "group rounded-box border border-[var(--border-subtle)] bg-[var(--surface-panel)] overflow-hidden"
+            "group rounded-box border border-[var(--border-subtle)] bg-[var(--surface-card)] overflow-hidden"
       }>
         <summary class={
           if @compact,

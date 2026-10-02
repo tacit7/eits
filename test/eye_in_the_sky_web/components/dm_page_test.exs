@@ -113,6 +113,31 @@ defmodule EyeInTheSkyWeb.Components.DmPageTest do
            "dm_page root must set a theme-aware foreground so dark theme text is readable"
   end
 
+  test "message cards use the defined theme-aware surface token" do
+    project_root = Path.expand("../../..", __DIR__)
+
+    messages_source =
+      File.read!(
+        Path.join(
+          project_root,
+          "lib/eye_in_the_sky_web/components/dm_page/messages_tab.ex"
+        )
+      )
+
+    tool_widget_source =
+      File.read!(
+        Path.join(
+          project_root,
+          "lib/eye_in_the_sky_web/components/dm_message_components/tool_widget.ex"
+        )
+      )
+
+    assert messages_source =~ "bg-[var(--surface-card)]"
+    assert tool_widget_source =~ "bg-[var(--surface-card)]"
+    refute messages_source =~ "--surface-panel"
+    refute tool_widget_source =~ "--surface-panel"
+  end
+
   test "dm_page passes session_state to messages tab content" do
     source =
       File.read!(

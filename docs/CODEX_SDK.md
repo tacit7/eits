@@ -41,7 +41,7 @@ The following Codex models are available for agent spawning:
 | Model | Display Name | Context Window | Max Output | Description |
 |-------|--------------|-----------------|------------|-------------|
 | `gpt-5.6-sol` | GPT-5.6 Sol (Default) | 1,050,000 tokens | 128k tokens | Latest frontier agentic coding model |
-| `gpt-5.6-tenna` | GPT-5.6 Tenna | 1,050,000 tokens | 128k tokens | Balanced agentic coding model for everyday work |
+| `gpt-5.6-terra` | GPT-5.6 Terra | 1,050,000 tokens | 128k tokens | Balanced agentic coding model for everyday work |
 | `gpt-5.6-luna` | GPT-5.6 Luna | 1,050,000 tokens | 128k tokens | Fast and affordable agentic coding model |
 | `gpt-5.5` | GPT-5.5 | 1,050,000 tokens | 128k tokens | Frontier model for complex coding, research, and real-world work |
 | `gpt-5.4` | GPT-5.4 | 1,050,000 tokens | 128k tokens | Strong model for everyday coding |

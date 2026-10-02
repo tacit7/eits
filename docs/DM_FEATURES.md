@@ -1706,6 +1706,23 @@ def send_to_session(session_id, body, _opts \\ [])
 
 ---
 
+## Channel Fanout & Floating Chat: Use the Target Session's Own Model
+
+**Commit:** `913749ac`
+
+Channel fanout and floating chat sends previously passed `Settings.default_model()` as the `model:` opt to `AgentManager`. The global default model can belong to a different provider (e.g. a Codex slug) than the target session's own provider, which made Claude sessions fail with `"issue with the selected model"`.
+
+**Fix:** Both call sites now resolve the model from the target session itself instead of the global default.
+
+- `ChannelFanout.model_opts/1` (`lib/eye_in_the_sky/claude/channel_fanout.ex`) — looks up the session via `Sessions.get_session/1`; returns `[model: session.model]` when the session has a non-empty model, `[]` otherwise. Used by the `ChannelFanout` routing path that calls `AgentManager.send_message/3`.
+- `FloatingChatLive.session_model_opts/1` (`lib/eye_in_the_sky_web/live/floating_chat_live.ex`) — same pattern, inlined as a private helper taking the already-loaded `session` struct. Used by both `fab_send_message` and the floating chat's reply handler before calling `AgentManager.continue_session/3`.
+
+Passing `[]` (no `model:` opt) falls back to whatever default `AgentManager`/the CLI wrapper applies, which is provider-correct for that session.
+
+**Files:** `lib/eye_in_the_sky/claude/channel_fanout.ex`, `lib/eye_in_the_sky_web/live/floating_chat_live.ex`
+
+---
+
 ## DM Sidebar Tab Default
 
 **Commit:** `81f211e4`

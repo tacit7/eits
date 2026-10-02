@@ -157,10 +157,25 @@ When an agent is spawned to handle a channel-routed prompt, its result is saved 
 
 **How it works:**
 1. `ChannelFanout` routes a channel prompt to AgentManager with `context[:reply_mode] = "cli_required"`
-2. AgentWorker threads `job_context` (the full context map) through to `WorkerEvents.on_result_received/2`
+2. AgentWorker threads `job_context` through to `WorkerEvents.on_result_received/2` — **not** the raw `current_job.context` map, but `Job.reply_context(current_job)`
 3. `on_result_received` checks `get_in(job_context, ["reply_mode"]) == "cli_required"`
 4. If true: calls `save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)`
 5. If false or nil: normal flow — calls `save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)` and `maybe_fanout_mentions/3`
+
+**`Job.reply_context/1` — required unwrap, not optional:**
+`Job.normalize_context/1` nests the caller-supplied, string-keyed context map under the `:context` key of `job.context` (e.g. `job.context == %{channel_id: 1, context: %{"reply_mode" => "cli_required", ...}}`). The string-keyed map is **not** at the top level of `job.context`.
+
+Passing `state.current_job.context` (the whole job context) straight to `on_result_received` was a bug: `get_in(ctx, ["reply_mode"])` always returned `nil` because `"reply_mode"` lives one level deeper, under `:context`. The guard never matched, so every channel-routed agent turn's final text was incorrectly saved as a channel message (and re-scanned for mentions) instead of staying session-only.
+
+`Job.reply_context(job)` returns the nested string-keyed map (or `nil` if none was supplied) and must be used wherever `job_context` is threaded to `WorkerEvents`/`AgentWorkerEvents`:
+```elixir
+def reply_context(%__MODULE__{context: %{context: ctx}}) when is_map(ctx), do: ctx
+def reply_context(%__MODULE__{}), do: nil
+```
+
+**Code locations:** `lib/eye_in_the_sky/claude/job.ex` — `reply_context/1`; `lib/eye_in_the_sky/claude/agent_worker.ex` — call site that builds `job_context` before `WorkerEvents.on_result_received/2`.
+
+**Commit:** d32de8a0 (fix cli_required guard never matching — pass `Job.reply_context/1` instead of the raw job context)
 
 **Unified save_result/5:**
 `save_result/5` (private) handles both paths via an options map:

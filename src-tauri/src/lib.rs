@@ -721,6 +721,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             pick_folder,
             open_window,
+            open_local_media,
+            reveal_local_file,
             get_always_on_top,
             set_always_on_top
         ])
@@ -1241,6 +1243,87 @@ fn copy_dir_recursive(src: &std::path::Path, dest: &std::path::Path) -> std::io:
 // Tauri commands (invoked from the frontend via invoke('command_name', ...))
 // ---------------------------------------------------------------------------
 
+const SUPPORTED_MEDIA_EXTENSIONS: &[&str] = &[
+    "avi", "avif", "bmp", "gif", "heic", "heif", "jpeg", "jpg", "m4v", "mkv", "mov", "mp4",
+    "mpeg", "mpg", "png", "tif", "tiff", "webm", "webp",
+];
+
+/// Canonicalize and validate a user-selected Markdown target before passing it
+/// to the OS. Symlinks are resolved first, so validation applies to the actual
+/// target rather than a harmless-looking link name.
+fn validate_local_media_path(path: &str) -> Result<std::path::PathBuf, String> {
+    if path.trim().is_empty() {
+        return Err("Path is empty".to_string());
+    }
+
+    let requested = std::path::Path::new(path);
+    if !requested.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+
+    let canonical = requested
+        .canonicalize()
+        .map_err(|_| "File or folder does not exist".to_string())?;
+    let metadata = canonical
+        .metadata()
+        .map_err(|_| "File or folder is not accessible".to_string())?;
+
+    if metadata.is_dir() {
+        let extension = canonical
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if matches!(extension.as_str(), "app" | "bundle") {
+            return Err("Application bundles cannot be opened from chat".to_string());
+        }
+        return Ok(canonical);
+    }
+
+    if !metadata.is_file() {
+        return Err("Path must point to a media file or folder".to_string());
+    }
+
+    let extension = canonical
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if !SUPPORTED_MEDIA_EXTENSIONS.contains(&extension.as_str()) {
+        return Err("Only supported image and video files can be opened".to_string());
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if metadata.permissions().mode() & 0o111 != 0 {
+            return Err("Executable files cannot be opened from chat".to_string());
+        }
+    }
+
+    Ok(canonical)
+}
+
+/// Open a validated image, video, or directory with its default application.
+/// This custom command intentionally keeps arbitrary path opening out of the
+/// frontend-facing opener permission scope.
+#[tauri::command]
+fn open_local_media(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let canonical = validate_local_media_path(&path)?;
+    app.opener()
+        .open_path(canonical.to_string_lossy(), None::<&str>)
+        .map_err(|error| format!("The default application could not open this item: {error}"))
+}
+
+/// Reveal a validated local media target in the platform file manager.
+#[tauri::command]
+fn reveal_local_file(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let canonical = validate_local_media_path(&path)?;
+    app.opener()
+        .reveal_item_in_dir(canonical)
+        .map_err(|error| format!("The file manager could not reveal this item: {error}"))
+}
+
 /// Opens a native folder picker dialog and returns the selected path, or null
 /// if the user cancelled.  Uses a oneshot channel so the tokio thread never
 /// blocks — the dialog callback fires on the main thread, sends the result,
@@ -1289,6 +1372,20 @@ fn set_always_on_top(app: tauri::AppHandle, on: bool) -> bool {
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::fs;
+
+    fn temp_test_dir(name: &str) -> std::path::PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "eits-local-media-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
 
     #[test]
     fn embedded_server_env_uses_resolved_port_for_eits_url() {
@@ -1311,5 +1408,65 @@ mod tests {
             env.get("EITS_URL"),
             Some(&Some("http://127.0.0.1:34878/api/v1".to_string()))
         );
+    }
+
+    #[test]
+    fn local_media_validation_accepts_supported_media_and_directories() {
+        let dir = temp_test_dir("accepted");
+        let image = dir.join("café preview.PNG");
+        fs::write(&image, b"not-real-image-data").unwrap();
+
+        assert_eq!(
+            validate_local_media_path(image.to_str().unwrap()).unwrap(),
+            image.canonicalize().unwrap()
+        );
+        assert_eq!(
+            validate_local_media_path(dir.to_str().unwrap()).unwrap(),
+            dir.canonicalize().unwrap()
+        );
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn local_media_validation_rejects_relative_missing_and_unsupported_paths() {
+        assert_eq!(
+            validate_local_media_path("relative/video.mp4").unwrap_err(),
+            "Path must be absolute"
+        );
+
+        let dir = temp_test_dir("rejected");
+        let unsupported = dir.join("notes.txt");
+        fs::write(&unsupported, b"notes").unwrap();
+        assert_eq!(
+            validate_local_media_path(unsupported.to_str().unwrap()).unwrap_err(),
+            "Only supported image and video files can be opened"
+        );
+        assert_eq!(
+            validate_local_media_path(dir.join("missing.mp4").to_str().unwrap()).unwrap_err(),
+            "File or folder does not exist"
+        );
+
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_media_validation_resolves_symlinks_and_rejects_executables() {
+        use std::os::unix::fs::{symlink, PermissionsExt};
+
+        let dir = temp_test_dir("symlink");
+        let executable = dir.join("payload.mp4");
+        fs::write(&executable, b"payload").unwrap();
+        fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+        let link = dir.join("preview.mp4");
+        symlink(&executable, &link).unwrap();
+
+        assert_eq!(
+            validate_local_media_path(link.to_str().unwrap()).unwrap_err(),
+            "Executable files cannot be opened from chat"
+        );
+
+        fs::remove_dir_all(dir).unwrap();
     }
 }

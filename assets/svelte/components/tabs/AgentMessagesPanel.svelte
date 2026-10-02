@@ -5,6 +5,7 @@
   import { marked } from 'marked'
   import DOMPurify from 'dompurify'
   import ThreadPanel from '../ThreadPanel.svelte'
+  import { installLocalMediaLinks } from '../../../js/local_media_links.js'
 
   // Configure marked once at module level
   marked.setOptions({ gfm: true, breaks: true })
@@ -36,6 +37,22 @@
   let inspectCloseButton
   let inspectReturnFocusId = null
   let openReactionPickerId = null
+
+  // Svelte owns the message DOM, so decorate native links after each HTML
+  // update while keeping a single delegated click listener on the panel.
+  function localMediaLinks(node) {
+    const controller = installLocalMediaLinks(node)
+    const observer = new MutationObserver(() => controller.decorate())
+    observer.observe(node, { childList: true, subtree: true })
+    controller.decorate()
+
+    return {
+      destroy() {
+        observer.disconnect()
+        controller.destroy()
+      },
+    }
+  }
 
   async function openInspect(msg) {
     inspectReturnFocusId = `agent-message-${msg.id}-actions`
@@ -659,19 +676,19 @@
     margin: 0.15em 0 0.15em;
   }
   :global(.message-body code:not(pre code)) {
-    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.8em;
     padding: 0.1em 0.35em;
     border-radius: var(--radius-box);
-    background-color: rgb(127 127 127 / 0.1);
+    background-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
   }
   :global(.message-body pre) {
-    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.8em;
     line-height: 1.5;
     padding: 0.65em 0.9em;
     border-radius: var(--radius-box);
-    background-color: rgb(127 127 127 / 0.07);
+    background-color: color-mix(in oklch, var(--color-base-content) 7%, transparent);
     overflow-x: auto;
     margin: 0.4em 0;
   }
@@ -695,7 +712,7 @@
   :global(.message-body h3) { font-size: 1em; font-weight: 600; margin: 0.4em 0 0.2em; }
   :global(.message-body h4, .message-body h5, .message-body h6) { font-weight: 600; margin: 0.3em 0 0.15em; }
   :global(.message-body blockquote) {
-    border-left: 2px solid rgb(127 127 127 / 0.25);
+    border-left: 1px solid color-mix(in oklch, var(--color-base-content) 25%, transparent);
     padding-left: 0.75em;
     margin: 0.4em 0;
     opacity: 0.75;
@@ -707,14 +724,14 @@
   }
   :global(.message-body hr) {
     border: none;
-    border-top: 1px solid rgb(127 127 127 / 0.15);
+    border-top: 1px solid color-mix(in oklch, var(--color-base-content) 15%, transparent);
     margin: 0.75em 0;
   }
 </style>
 
 <svelte:document on:keydown={handleDocKeydown} on:click={() => { openOverflowId = null; openReactionPickerId = null }} />
 
-<div id="agent-messages-panel" class="flex h-full min-w-0">
+<div id="agent-messages-panel" class="flex h-full min-w-0" use:localMediaLinks>
   <!-- Main chat column -->
   <div class="relative flex flex-col flex-1 min-w-0">
   <!-- Search bar -->

@@ -119,6 +119,19 @@ values; they are parsed, not executed.
 
 Supply the full base URL including `/api/v1`; the CLI removes trailing slashes
 but does not append the API path. Connection failure does not switch servers.
+
+### Desktop-launched agents
+
+The Tauri app resolves its embedded Phoenix port at startup and sets
+`EITS_URL=http://127.0.0.1:<resolved port>/api/v1` on the release process.
+Provider launchers then inject that value into new Claude and Codex instances.
+Claude persists it through `CLAUDE_ENV_FILE`; Codex uses both its process
+environment and `shell_environment_policy.set` so agent shell commands receive
+the same URL. Existing instances must be restarted to pick up a changed port.
+
+Do not add a fixed desktop URL to shell profiles. The resolved port may differ
+from `34877` when the preferred port is occupied.
+
 To explicitly retry against a remote server, set `EITS_URL` for the command:
 
 ```bash

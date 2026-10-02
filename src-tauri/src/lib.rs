@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -109,6 +108,15 @@ fn resolved_port() -> &'static str {
         );
         base.to_string()
     })
+}
+
+/// Point the embedded Phoenix server and every agent it spawns at the same
+/// resolved local endpoint. `EITS_URL` must include the API prefix because the
+/// Rust CLI and agent launchers treat it as the complete REST base URL.
+#[cfg(any(not(debug_assertions), test))]
+fn configure_embedded_server_env(command: &mut std::process::Command, port: &str) {
+    command.env("PORT", port);
+    command.env("EITS_URL", format!("http://127.0.0.1:{port}/api/v1"));
 }
 
 /// Read the `port` field from the desktop config file, if present and valid.
@@ -967,7 +975,7 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
     if cfg!(debug_assertions) {
         let mut command = elixirkit::mix("phx.server", &[]);
         command.current_dir("..");
-        command.env("PORT", resolved_port());
+        configure_embedded_server_env(&mut command, resolved_port());
         command.env("DISABLE_AUTH", "true");
         command.env("SKIP_WATCHERS", "1");
         command
@@ -975,7 +983,7 @@ fn elixir_command(rel_dir: &std::path::Path) -> std::process::Command {
         let mut command = elixirkit::release(rel_dir, "eye_in_the_sky");
         command.env("PHX_SERVER", "true");
         command.env("PHX_HOST", "127.0.0.1");
-        command.env("PORT", resolved_port());
+        configure_embedded_server_env(&mut command, resolved_port());
         command.env("DISABLE_AUTH", "true");
         command.env("BYPASS_AUTH", "true");
         command.env("DATABASE_SSL_VERIFY", "false");
@@ -1275,4 +1283,33 @@ fn set_always_on_top(app: tauri::AppHandle, on: bool) -> bool {
     }
     sync_always_on_top_checkmarks(&app, on);
     on
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn embedded_server_env_uses_resolved_port_for_eits_url() {
+        let mut command = std::process::Command::new("true");
+
+        configure_embedded_server_env(&mut command, "34878");
+
+        let env = command
+            .get_envs()
+            .map(|(key, value)| {
+                (
+                    key.to_string_lossy().into_owned(),
+                    value.map(|value| value.to_string_lossy().into_owned()),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+
+        assert_eq!(env.get("PORT"), Some(&Some("34878".to_string())));
+        assert_eq!(
+            env.get("EITS_URL"),
+            Some(&Some("http://127.0.0.1:34878/api/v1".to_string()))
+        );
+    }
 }

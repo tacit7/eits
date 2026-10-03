@@ -157,10 +157,12 @@ When an agent is spawned to handle a channel-routed prompt, its result is saved 
 
 **How it works:**
 1. `ChannelFanout` routes a channel prompt to AgentManager with `context[:reply_mode] = "cli_required"`
-2. AgentWorker threads `job_context` (the full context map) through to `WorkerEvents.on_result_received/2`
+2. AgentWorker threads `job_context` through to `WorkerEvents.on_result_received/2` via `Job.reply_context/1` — **not** the raw `current_job.context`. `Job.normalize_context/1` nests the caller's string-keyed context map under the `:context` key, so the `reply_mode` flag lives at `job.context[:context]["reply_mode"]`, not at the top level. `Job.reply_context/1` extracts that nested map (or returns `nil`).
 3. `on_result_received` checks `get_in(job_context, ["reply_mode"]) == "cli_required"`
 4. If true: calls `save_result(session_id, provider, text, metadata, visibility: :session_only, context: job_context)`
 5. If false or nil: normal flow — calls `save_result(session_id, provider, text, metadata, channel_id: channel_id, source_uuid: source_uuid)` and `maybe_fanout_mentions/3`
+
+**Bug (fixed):** `agent_worker.ex` originally passed `current_job.context` (the whole, un-nested job context) instead of the nested map, so `get_in(ctx, ["reply_mode"])` was always `nil`. Every channel-routed turn fell through to the normal path — its final text was saved as a channel message and re-scanned for mentions instead of being kept session-only. Fixed by passing `Job.reply_context(state.current_job)` instead. (Commit d32de8a0)
 
 **Unified save_result/5:**
 `save_result/5` (private) handles both paths via an options map:

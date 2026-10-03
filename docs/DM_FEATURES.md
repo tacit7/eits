@@ -3573,3 +3573,51 @@ This setting controls whether users land on a ready-to-talk session (PTY mode) o
 | `lib/eye_in_the_sky/sessions/naming.ex` | Haiku auto-naming via Anthropic API |
 | `lib/eye_in_the_sky_web/components/rail/project_actions.ex` | `handle_new_session_navigate/2` routing |
 | `test/eye_in_the_sky_web/live/dm_live_new_test.exs` | LiveView + PendingSessionMessages + Naming tests |
+
+---
+
+## Channel Fanout & Floating Chat: Use Target Session's Own Model
+
+**Commit:** `913749ac`
+
+Fixed Claude sessions failing with `"issue with the selected model"` when messaged via channel fanout or the floating chat FAB.
+
+**Problem:** `ChannelFanout.fanout_all/2` and `FloatingChatLive`'s send handlers both passed `Settings.default_model()` — the global default model — as the `model` opt when routing a message to a session. If the global default is set to a different provider's slug (e.g. a Codex/GPT model), a Claude session receiving the message fails because the CLI is invoked with a model it doesn't recognize.
+
+**Fix:** Both call sites now resolve the model from the *target session's own* `model` field instead of the global default:
+- `ChannelFanout.model_opts/1` — looks up the session via `Sessions.get_session/1`; returns `[model: session.model]` if set, otherwise `[]` (no model opt, letting the CLI use its own default)
+- `FloatingChatLive.session_model_opts/1` — same logic, applied to `fab_send_message` and the other FAB send handler before calling `AgentManager.continue_session/3`
+
+**Implementation:**
+- `lib/eye_in_the_sky/claude/channel_fanout.ex` — `model_opts/1`
+- `lib/eye_in_the_sky_web/live/floating_chat_live.ex` — `session_model_opts/1`
+- `test/eye_in_the_sky/claude/channel_fanout_test.exs` — `ChannelFanoutModelTest`
+
+---
+
+## Web UI Chat: Channel Access Check Replaces Membership Check
+
+**Commit:** `2d680d3e`
+
+Fixed `"You are not a member of that channel"` errors when sending messages from the web UI chat interface.
+
+**Problem:** The web UI chat (`/chat`) sends on behalf of a single, deterministic "Web UI" operator session (see `Sessions.ensure_web_ui_session/0`), which is never added to `channel_members`. A membership check (`Channels.member?/2`) added for channel operations therefore rejected every send, change-channel, and search from the web UI.
+
+**Fix:** `change_channel`, `send_channel_message`, and `search_channel_messages` in `ChatLive.EventHandlers` now call `channel_accessible?/2` instead of `channel_member?/2`. Access only requires that the channel exists (parses the ID and checks `Channels.get_channel/1`); it no longer checks `ChannelMember` rows. On failure the flash now reads `"Channel not found"` instead of `"You are not a member of that channel"`.
+
+**Implementation:**
+- `lib/eye_in_the_sky_web/live/chat_live/event_handlers.ex` — `channel_accessible?/2` replaces `channel_member?/2`
+- `test/eye_in_the_sky_web/live/chat_live_e2e_test.exs` — covers a non-member web session sending successfully, and a nonexistent channel being rejected
+- See `docs/CHAT.md` ("Access" note under `ChatLive`) for the companion description of this behavior
+
+---
+
+## Channel Member Removal: Handle Stale Sessions
+
+**Commit:** `a6a2b825`
+
+`handle_remove_agent/2` in `ChatLive.ChannelActions` previously returned `"Session not found"` and left the channel membership record in place when the session backing a channel member had already been deleted.
+
+**Fix:** On `{:error, :not_found}` from `Sessions.get_session/1`, the handler now still calls `Channels.remove_member/2`. If a membership row was actually removed, it broadcasts a `"left the channel"` system event (`"Agent @#{session_id} (missing session) left the channel"`) and refreshes the member list/picker, same as a normal removal. Only falls back to the `"Session not found"` flash error if no membership row existed to remove.
+
+**Implementation:** `lib/eye_in_the_sky_web/live/chat_live/channel_actions.ex` — `handle_remove_agent/2`

@@ -42,11 +42,12 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnParams do
 
   def build(params, team) do
     name = resolve_session_name(params, team)
+    provider = params["provider"] || "claude"
 
     [
       instructions: params["instructions"],
       model: params["model"],
-      agent_type: params["provider"] || "claude",
+      agent_type: provider,
       project_id: params["project_id"],
       project_name: params["project_name"],
       project_path: params["project_path"],
@@ -58,7 +59,7 @@ defmodule EyeInTheSky.Agents.AgentManager.SpawnParams do
       parent_agent_id: params["parent_agent_id"],
       parent_session_id: params["parent_session_id"],
       agent: params["agent"],
-      bypass_sandbox: params["bypass_sandbox"] == true
+      bypass_sandbox: Map.get(params, "bypass_sandbox", provider == "codex") == true
     ]
   end
 end

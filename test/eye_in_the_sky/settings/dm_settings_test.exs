@@ -183,13 +183,23 @@ defmodule EyeInTheSky.Settings.DmSettingsTest do
       assert DmSettings.to_provider_opts(%{}, "codex") == []
     end
 
-    test "schema defaults put codex out of sandbox" do
+    test "schema defaults run Codex with no approvals or sandbox" do
       opts =
         %{}
         |> JsonSettings.effective_settings(%{})
         |> DmSettings.to_provider_opts("codex")
 
       assert opts[:bypass_sandbox] == true
+      assert opts[:ask_for_approval] == "never"
+      assert opts[:sandbox] == "danger-full-access"
+
+      assert "--dangerously-bypass-approvals-and-sandbox" in EyeInTheSky.Codex.CLI.build_args(
+               opts
+             )
+
+      request = EyeInTheSky.Codex.AppServer.Protocol.thread_start_request(1, opts)
+      assert request["params"]["approvalPolicy"] == "never"
+      assert request["params"]["sandbox"] == "danger-full-access"
     end
 
     test "maps full_auto" do

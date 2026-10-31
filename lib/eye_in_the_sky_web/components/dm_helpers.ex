@@ -33,6 +33,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
 
   # New format: [DM from agent: <name>]\n<body>\n\nReply: eits dm --to <id> --message ""
   # Legacy format: DM from:<name> (session:<uuid>) <body>
+  @legacy_dm_pattern ~r/^DM from:([^\r\n]+?)\(session:[^\)\r\n]+\)\s*(.*)$/s
 
   def strip_dm_prefix(body) when is_binary(body) do
     cond do
@@ -46,8 +47,8 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
         String.trim(content)
 
       # Legacy format
-      match = Regex.run(~r/^DM from:[^\(]+\(session:[^\)]+\)\s*(.*)$/s, body) ->
-        [_, content] = match
+      match = Regex.run(@legacy_dm_pattern, body) ->
+        [_, _sender, content] = match
         String.trim(content)
 
       true ->
@@ -92,7 +93,7 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
         end
 
       # Legacy format: DM from:<name> (session:<uuid>) <body>
-      match = Regex.run(~r/^DM from:([^\(]+)\(session:[^\)]+\)\s*(.*)/s, body) ->
+      match = Regex.run(@legacy_dm_pattern, body) ->
         [_, sender, rest] = match
         rest = String.trim(rest)
         {status, url} = extract_dm_status_and_url(rest)

@@ -91,6 +91,101 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpersTest do
     end
   end
 
+  describe "Codex context usage" do
+    test "uses the latest provider context snapshot and refreshes it after compaction" do
+      agent = Factory.create_agent() |> Repo.preload(:project)
+      session = Factory.create_session(agent, %{provider: "codex"})
+      fixture_home = Path.join(System.tmp_dir!(), "dm-usage-#{session.uuid}")
+      dir = Path.join([fixture_home, ".codex", "sessions", "2026", "11", "01"])
+      File.mkdir_p!(dir)
+      file = Path.join(dir, "rollout-#{session.uuid}.jsonl")
+      original_home = System.get_env("HOME")
+      System.put_env("HOME", fixture_home)
+
+      on_exit(fn ->
+        System.put_env("HOME", original_home)
+        File.rm_rf!(fixture_home)
+      end)
+
+      write_usage = fn total, last ->
+        File.write!(
+          file,
+          Jason.encode!(%{
+            "type" => "event_msg",
+            "payload" => %{
+              "type" => "token_count",
+              "info" => %{
+                "total_token_usage" => %{"total_tokens" => total},
+                "last_token_usage" => %{"total_tokens" => last},
+                "model_context_window" => 258_400
+              }
+            }
+          })
+        )
+      end
+
+      # The stored result contains cumulative tokens; it is not the context size.
+      {:ok, _} =
+        Messages.create_message(%{
+          session_id: session.id,
+          sender_role: "agent",
+          recipient_role: "user",
+          provider: "codex",
+          direction: "inbound",
+          body: "done",
+          metadata: %{"usage" => %{"input_tokens" => 28_090_268, "output_tokens" => 32_865}}
+        })
+
+      socket =
+        build_socket(%{
+          session_id: session.id,
+          session_uuid: session.uuid,
+          session: session,
+          agent: agent,
+          total_tokens: 0,
+          total_cost: 0.0
+        })
+
+      write_usage.(28_123_133, 143_644)
+      result = TabHelpers.force_reload_messages(socket, session.id)
+      assert result.assigns.context_used == 143_644
+      assert result.assigns.context_window == 258_400
+      assert result.assigns.total_tokens == 28_123_133
+
+      write_usage.(28_200_000, 30_000)
+      refreshed = TabHelpers.force_reload_messages(result, session.id)
+      assert refreshed.assigns.context_used == 30_000
+      assert refreshed.assigns.context_window == 258_400
+      assert refreshed.assigns.total_tokens == 28_200_000
+    end
+
+    test "does not invent a Codex context window from cumulative message usage" do
+      agent = Factory.create_agent() |> Repo.preload(:project)
+      session = Factory.create_session(agent, %{provider: "codex"})
+
+      socket =
+        build_socket(%{
+          session_id: session.id,
+          session_uuid: session.uuid,
+          session: session,
+          agent: agent,
+          messages: [
+            %{
+              id: :fake,
+              body: "done",
+              metadata: %{
+                "usage" => %{"input_tokens" => 28_090_268, "output_tokens" => 32_865}
+              }
+            }
+          ]
+        })
+
+      result = TabHelpers.load_tab_data(socket, "messages", session.id)
+      assert result.assigns.context_used == 0
+      assert result.assigns.context_window == 0
+    end
+  end
+
   describe "load_tab_data/3 — tab-switch cache preserved" do
     test "returns cached :messages on tab switch without hitting DB for new entries" do
       agent = Factory.create_agent() |> Repo.preload(:project)

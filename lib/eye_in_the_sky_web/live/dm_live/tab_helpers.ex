@@ -39,16 +39,8 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     Logger.info("Loading DM tab data tab=#{tab} session_id=#{session_id}")
     {messages, has_more} = load_message_data(socket, tab, session_id)
 
-    # Sentinel {0, 0.0} means "not yet loaded". A session with genuinely zero
-    # usage also returns {0, 0.0}, which will correctly cache and skip re-reads.
-    {total_tokens, total_cost} =
-      maybe_load_once(
-        tab,
-        "messages",
-        {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
-        {0, 0.0},
-        fn -> read_session_usage_stats(socket, session_id) end
-      )
+    {total_tokens, total_cost, context_used, context_window} =
+      load_usage_data(socket, tab, session_id, messages)
 
     current_task =
       maybe_load_once(
@@ -57,14 +49,6 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
         socket.assigns[:current_task],
         :not_loaded,
         fn -> Tasks.get_current_task_for_session(session_id) end
-      )
-
-    {context_used, context_window} =
-      maybe_load_value(
-        tab,
-        "messages",
-        {socket.assigns[:context_used], socket.assigns[:context_window]},
-        fn -> extract_context_window(messages) end
       )
 
     socket
@@ -213,6 +197,45 @@ defmodule EyeInTheSkyWeb.DmLive.TabHelpers do
     else
       existing_value
     end
+  end
+
+  defp load_usage_data(
+         %{assigns: %{session: %{provider: "codex"}}} = socket,
+         "messages",
+         session_id,
+         _messages
+       ) do
+    case EyeInTheSky.Codex.SessionReader.read_usage_snapshot(socket.assigns.session_uuid) do
+      {:ok, snapshot} ->
+        {snapshot.total_tokens, 0.0, snapshot.context_used, snapshot.context_window}
+
+      _ ->
+        {tokens, cost} = Messages.total_usage_for_session(session_id)
+        # Stored Codex result usage may be cumulative. Without a provider
+        # snapshot there is no reliable context size or window to display.
+        {tokens, cost, 0, 0}
+    end
+  end
+
+  defp load_usage_data(socket, tab, session_id, messages) do
+    {tokens, cost} =
+      maybe_load_once(
+        tab,
+        "messages",
+        {socket.assigns[:total_tokens], socket.assigns[:total_cost]},
+        {0, 0.0},
+        fn -> read_session_usage_stats(socket, session_id) end
+      )
+
+    {used, window} =
+      maybe_load_value(
+        tab,
+        "messages",
+        {socket.assigns[:context_used], socket.assigns[:context_window]},
+        fn -> extract_context_window(messages) end
+      )
+
+    {tokens, cost, used, window}
   end
 
   defp extract_context_window(messages) do

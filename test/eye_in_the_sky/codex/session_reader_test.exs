@@ -434,6 +434,35 @@ defmodule EyeInTheSky.Codex.SessionReaderTest do
       assert {:ok, 500, 0.0} = SessionReader.read_usage(thread_id)
     end
 
+    test "separates current context from cumulative usage and preserves it through rate-limit events",
+         %{
+           session_file: session_file,
+           thread_id: thread_id
+         } do
+      write_jsonl(session_file, [
+        %{
+          "type" => "event_msg",
+          "payload" => %{
+            "type" => "token_count",
+            "info" => %{
+              "total_token_usage" => %{"total_tokens" => 28_123_133},
+              "last_token_usage" => %{
+                "input_tokens" => 143_354,
+                "cached_input_tokens" => 143_104,
+                "output_tokens" => 290,
+                "total_tokens" => 143_644
+              },
+              "model_context_window" => 258_400
+            }
+          }
+        },
+        %{"type" => "event_msg", "payload" => %{"type" => "token_count", "info" => nil}}
+      ])
+
+      assert {:ok, %{total_tokens: 28_123_133, context_used: 143_644, context_window: 258_400}} =
+               SessionReader.read_usage_snapshot(thread_id)
+    end
+
     test "returns 0 tokens when no token_count events present", %{
       session_file: session_file,
       thread_id: thread_id

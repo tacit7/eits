@@ -65,21 +65,47 @@ defmodule EyeInTheSky.Codex.SessionReader do
   """
   @spec read_usage(String.t()) :: {:ok, non_neg_integer(), float()} | {:error, term()}
   def read_usage(thread_id) do
-    with {:ok, file_path} <- find_session_file(thread_id),
-         {:ok, content} <- File.read(file_path) do
-      total_tokens =
-        content
-        |> String.split("\n", trim: true)
-        |> Enum.reduce(0, &count_tokens_in_line/2)
-
-      {:ok, total_tokens, 0.0}
+    with {:ok, snapshot} <- read_usage_snapshot(thread_id) do
+      {:ok, snapshot.total_tokens, 0.0}
     end
   end
 
-  defp count_tokens_in_line(line, acc) do
+  @doc """
+  Reads cumulative usage and the latest context size separately. Codex includes
+  cached tokens in input tokens; `last_token_usage.total_tokens` is the current
+  context, while `total_token_usage` accumulates across requests and compactions.
+  Rate-limit-only token_count events have no info and do not erase the snapshot.
+  """
+  @spec read_usage_snapshot(String.t() | nil) :: {:ok, map()} | {:error, term()}
+  def read_usage_snapshot(thread_id) do
+    with {:ok, file_path} <- find_session_file(thread_id),
+         {:ok, content} <- File.read(file_path) do
+      snapshot =
+        content
+        |> String.split("\n", trim: true)
+        |> Enum.reduce(%{total_tokens: 0, context_used: 0, context_window: 0}, &usage_in_line/2)
+
+      {:ok, snapshot}
+    end
+  end
+
+  defp usage_in_line(line, acc) do
     case Jason.decode(line) do
-      {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count"} = payload}} ->
-        get_in(payload, ["info", "total_token_usage", "total_tokens"]) || acc
+      {:ok, %{"type" => "event_msg", "payload" => %{"type" => "token_count", "info" => info}}}
+      when is_map(info) ->
+        acc = %{
+          acc
+          | total_tokens: get_in(info, ["total_token_usage", "total_tokens"]) || acc.total_tokens
+        }
+
+        case {get_in(info, ["last_token_usage", "total_tokens"]), info["model_context_window"]} do
+          {used, window}
+          when is_integer(used) and used >= 0 and is_integer(window) and window > 0 ->
+            %{acc | context_used: used, context_window: window}
+
+          _ ->
+            acc
+        end
 
       _ ->
         acc

@@ -500,13 +500,9 @@ This enables live debugging and inspection of the raw Codex JSONL stream without
 
 By default, all Codex sessions bypass sandbox approval checks and tooling restrictions with the `--dangerously-bypass-approvals-and-sandbox` flag. This is configured in two places:
 
-1. **RuntimeContext**: Defaults to bypass only when the caller did not explicitly
-   set `bypass_sandbox`; an explicit `false` is preserved:
+1. **RuntimeContext**: Sets `bypass_sandbox: true` by default for Codex provider:
    ```elixir
-   case Keyword.fetch(opts, :bypass_sandbox) do
-     {:ok, val} -> val
-     :error -> provider == "codex"
-   end
+   bypass_sandbox: opts[:bypass_sandbox] || provider == "codex"
    ```
 
 2. **Codex.CLI.build_args/1**: Defaults `bypass_sandbox` option to `true`:

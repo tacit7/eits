@@ -12,10 +12,10 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.NoteDialog do
       id="quick-create-note"
       phx-hook="QuickCreateNote"
       data-project-id={@project_id}
-      class="eits-modal   p-0 bg-transparent"
+      class="eits-modal eits-modal--panel p-0 bg-transparent"
     >
-      <div class="eits-dialog max-w-lg p-0 overflow-hidden">
-        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between">
+      <div class="eits-dialog eits-dialog--panel p-0 overflow-hidden">
+        <div class="border-b border-base-content/10 px-4 py-3 flex items-center justify-between shrink-0">
           <h2 class="text-message font-semibold text-base-content">New Note</h2>
           <button
             data-qcn-cancel
@@ -26,30 +26,32 @@ defmodule EyeInTheSkyWeb.Components.QuickCreateDialogs.NoteDialog do
             <.icon name="hero-x-mark-mini" class="size-4" />
           </button>
         </div>
-        <form data-qcn-form class="p-4 flex flex-col gap-3">
-          <div>
-            <label class="sr-only" for="qcn-title">Title</label>
-            <input
-              id="qcn-title"
-              type="text"
-              data-qcn-title
-              required
-              placeholder="Note title..."
-              class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message min-h-[44px]"
-              autocomplete="off"
-            />
+        <form data-qcn-form class="flex-1 flex flex-col overflow-hidden">
+          <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+            <div>
+              <label class="sr-only" for="qcn-title">Title</label>
+              <input
+                id="qcn-title"
+                type="text"
+                data-qcn-title
+                required
+                placeholder="Note title..."
+                class="input input-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message min-h-[44px]"
+                autocomplete="off"
+              />
+            </div>
+            <div>
+              <label class="sr-only" for="qcn-body">Body</label>
+              <textarea
+                id="qcn-body"
+                data-qcn-body
+                placeholder="Note content..."
+                rows="4"
+                class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message resize-none"
+              ></textarea>
+            </div>
           </div>
-          <div>
-            <label class="sr-only" for="qcn-body">Body</label>
-            <textarea
-              id="qcn-body"
-              data-qcn-body
-              placeholder="Note content..."
-              rows="4"
-              class="textarea textarea-sm w-full border-base-content/10 bg-base-100 focus:border-primary/40 text-message resize-none"
-            ></textarea>
-          </div>
-          <div class="flex justify-end gap-2 pt-1">
+          <div class="flex justify-end gap-2 px-4 py-3 border-t border-base-content/10 shrink-0">
             <button
               data-qcn-cancel
               type="button"

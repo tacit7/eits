@@ -338,6 +338,32 @@
     overflow: hidden;
   }
 
+  .eits-modal--panel {
+    position: fixed;
+    inset: 0 0 0 auto;
+    margin: 0;
+    width: min(100%, 26rem);
+    max-width: none;
+    height: 100vh;
+    max-height: none;
+  }
+
+  .eits-modal--panel::backdrop {
+    backdrop-filter: none;
+  }
+
+  .eits-dialog--panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border-radius: 0;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
   .eits-menu {
     z-index: 50;
     min-width: 10rem;

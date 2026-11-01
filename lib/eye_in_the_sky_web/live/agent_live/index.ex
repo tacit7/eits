@@ -229,17 +229,6 @@ defmodule EyeInTheSkyWeb.AgentLive.Index do
             >
               <.icon name="hero-check-circle-mini" class="size-3.5" /> Select
             </button>
-            <button
-              phx-click="toggle_new_session_drawer"
-              class="eits-action eits-action--primary h-11 min-h-0 gap-1.5 sm:h-7"
-            >
-              <.icon name="hero-plus-mini" class="size-3.5" /> New Agent
-            </button>
-            <label class="swap swap-rotate eits-action eits-action--ghost eits-action--icon">
-              <input type="checkbox" class="theme-controller" value="dark" />
-              <.icon name="hero-sun" class="swap-on size-4" />
-              <.icon name="hero-moon" class="swap-off size-4" />
-            </label>
           </div>
         </div>
 

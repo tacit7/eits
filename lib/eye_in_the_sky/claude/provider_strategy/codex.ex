@@ -66,6 +66,7 @@ defmodule EyeInTheSky.Claude.ProviderStrategy.Codex do
     base = [
       to: self(),
       model: context[:model],
+      reasoning_effort: context[:effort_level],
       session_id: state.provider_conversation_id,
       project_path: state.project_path,
       full_auto: true,

@@ -14,6 +14,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
   alias EyeInTheSky.Settings.JsonSettings
   alias EyeInTheSkyWeb.Helpers.PubSubHelpers
   alias EyeInTheSkyWeb.Helpers.SlashItems
+  alias EyeInTheSkyWeb.Helpers.ModelHelpers
 
   @default_message_limit 50
 
@@ -99,7 +100,7 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:active_tab, "messages")
     |> assign(:session_ref, nil)
     |> assign(:processing, false)
-    |> assign(:selected_model, session.model || Settings.default_model())
+    |> assign(:selected_model, initial_model(session))
     |> assign(:selected_effort, "medium")
     |> assign(:active_overlay, nil)
     |> assign(:show_live_stream, get_in(effective, ["general", "show_live_stream"]))
@@ -128,6 +129,11 @@ defmodule EyeInTheSkyWeb.DmLive.MountState do
     |> assign(:dm_settings_agent_overrides, agent_overrides)
     |> assign(:syncing, true)
   end
+
+  defp initial_model(%{provider: "codex", model: model}) when model in [nil, "", "gpt-5.2"],
+    do: ModelHelpers.default_model_for("codex")
+
+  defp initial_model(session), do: session.model || Settings.default_model()
 
   defp assign_stream_defaults(socket) do
     socket

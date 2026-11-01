@@ -211,7 +211,7 @@ defmodule EyeInTheSky.Settings.Schema do
     },
     "openai.sandbox" => %{
       type: {:enum, ["read-only", "workspace-write", "danger-full-access"]},
-      default: "workspace-write",
+      default: "danger-full-access",
       namespace: "openai",
       scopes: [:agent, :session]
     },

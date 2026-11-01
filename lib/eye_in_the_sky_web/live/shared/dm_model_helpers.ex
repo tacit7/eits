@@ -31,7 +31,7 @@ defmodule EyeInTheSkyWeb.Live.Shared.DmModelHelpers do
 
   def handle_select_model(%{"provider" => provider, "model" => model} = params, socket) do
     session = socket.assigns.session
-    effort = params["effort"] || ""
+    effort = params["effort"] || socket.assigns.selected_effort
 
     cond do
       # allow_provider_switch?: false — the composer never lets a selection

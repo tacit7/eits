@@ -92,6 +92,7 @@ defmodule EyeInTheSky.Codex.CLI do
     * `:prompt` (required) - the user prompt (positional arg after flags)
     * `:resume` - `--resume <thread_id>`
     * `:model` - `-m <model>`
+    * `:reasoning_effort` - `-c model_reasoning_effort="<level>"`
     * `:full_auto` - current equivalent of the removed `--full-auto` shortcut
       (`--sandbox workspace-write` plus approval policy `on-request`)
     * `:sandbox` - `--sandbox <mode>`
@@ -134,6 +135,15 @@ defmodule EyeInTheSky.Codex.CLI do
         args ++ ["-m", model]
       else
         args
+      end
+
+    args =
+      case opts[:reasoning_effort] || opts[:effort] do
+        effort when is_binary(effort) and effort != "" ->
+          args ++ ["-c", "model_reasoning_effort=#{Jason.encode!(effort)}"]
+
+        _ ->
+          args
       end
 
     # Bypass takes precedence. Current Codex versions removed --full-auto, so

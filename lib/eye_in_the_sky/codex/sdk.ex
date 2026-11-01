@@ -517,10 +517,12 @@ defmodule EyeInTheSky.Codex.SDK do
       send(caller_pid, {:claude_message, sdk_ref, msg})
     end
 
+    MessageHandler.finalize_after_terminal_event(sdk_ref, final_session_id, @loop_opts)
+
+    # Do not let AgentWorker start a resume while this Codex process still owns
+    # the thread store. The terminal event can arrive before the OS process exits.
     send(caller_pid, {:claude_complete, sdk_ref, final_session_id})
     emit_completion_telemetry(final_session_id)
-
-    MessageHandler.finalize_after_terminal_event(sdk_ref, final_session_id, @loop_opts)
     :ok
   end
 

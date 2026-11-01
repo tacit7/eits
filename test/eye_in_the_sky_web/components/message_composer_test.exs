@@ -78,4 +78,66 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
 
     assert html =~ "disabled"
   end
+
+  test "Codex controls omit unsupported plan, budget, compact and clear actions" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{
+          provider: "codex",
+          selected_model: "gpt-6-astra",
+          context_used: 143_644,
+          context_window: 258_400,
+          active_overlay: :context_meter
+        })
+      )
+
+    document = LazyHTML.from_fragment(html)
+
+    assert LazyHTML.attribute(
+             LazyHTML.query(document, "[phx-click='toggle_plan_mode']"),
+             "phx-click"
+           ) == []
+
+    assert LazyHTML.attribute(LazyHTML.query(document, "[phx-blur='set_max_budget']"), "phx-blur") ==
+             []
+
+    assert LazyHTML.attribute(
+             LazyHTML.query(document, "[phx-click='send_slash_command']"),
+             "phx-click"
+           ) == []
+
+    details = LazyHTML.query(document, "[aria-label='Context window details']")
+    assert LazyHTML.text(details) =~ "143,644 / 258,400"
+    refute LazyHTML.text(details) =~ "Latest files"
+    refute LazyHTML.text(details) =~ "System + tools"
+  end
+
+  test "composer popovers open above the bottom toolbar" do
+    for {overlay, selector} <- [
+          {:context_meter, "[aria-label='Context window details']"},
+          {:effort_menu, "#reasoning-pill-effort-menu"}
+        ] do
+      document =
+        render_component(
+          &MessageComposer.message_composer/1,
+          base_assigns(%{
+            provider: "codex",
+            selected_model: "gpt-6-astra",
+            context_used: 143_644,
+            context_window: 258_400,
+            active_overlay: overlay
+          })
+        )
+        |> LazyHTML.from_fragment()
+
+      classes =
+        document
+        |> LazyHTML.query(selector)
+        |> LazyHTML.attribute("class")
+        |> Enum.flat_map(&String.split/1)
+
+      assert "bottom-full" in classes
+    end
+  end
 end

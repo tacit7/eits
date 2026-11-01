@@ -289,6 +289,38 @@ defmodule EyeInTheSky.Codex.SDKTest do
       assert_receive {:claude_complete, ^ref, "thread-xyz"}, 5_000
     end
 
+    test "turn.completed waits for the Codex process to exit before reporting complete" do
+      {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
+      mock_port = Registry.lookup(ref)
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "thread.started",
+           "thread_id" => "thread-writer"
+         })}
+      )
+
+      send(
+        mock_port,
+        {:send_output,
+         Jason.encode!(%{
+           "type" => "turn.completed",
+           "thread_id" => "thread-writer",
+           "usage" => %{"input_tokens" => 1, "output_tokens" => 1}
+         })}
+      )
+
+      refute_receive {:claude_complete, ^ref, "thread-writer"}, 100
+      assert Registry.lookup(ref) == mock_port
+
+      send(mock_port, {:exit, 0})
+
+      assert_receive {:claude_complete, ^ref, "thread-writer"}, 1_000
+      assert Registry.lookup(ref) == nil
+    end
+
     test "multiple agent_messages accumulate into result" do
       {:ok, ref, _handler} = SDK.start("test", to: self(), project_path: "/tmp")
       mock_port = Registry.lookup(ref)

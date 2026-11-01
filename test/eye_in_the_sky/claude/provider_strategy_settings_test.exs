@@ -35,4 +35,24 @@ defmodule EyeInTheSky.Claude.ProviderStrategySettingsTest do
     assert Keyword.fetch!(opts, :sandbox) == "read-only"
     assert Keyword.fetch!(opts, :ask_for_approval) == "never"
   end
+
+  test "Codex DM effort reaches both exec and app-server requests" do
+    for effort <- ["low", "medium", "high", "xhigh"] do
+      opts = Codex.build_opts(@state, %{effort_level: effort})
+
+      thread = EyeInTheSky.Codex.AppServer.Protocol.thread_resume_request(1, "thread", opts)
+      turn = EyeInTheSky.Codex.AppServer.Protocol.turn_start_request(2, "thread", "hello", opts)
+      args = EyeInTheSky.Codex.CLI.build_args(opts ++ [resume: "thread", prompt: "hello"])
+
+      assert thread["params"]["config"]["model_reasoning_effort"] == effort
+      assert turn["params"]["effort"] == effort
+
+      assert ["-c", ~s(model_reasoning_effort="#{effort}")] in Enum.chunk_every(
+               args,
+               2,
+               1,
+               :discard
+             )
+    end
+  end
 end

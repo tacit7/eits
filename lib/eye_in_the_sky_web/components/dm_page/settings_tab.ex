@@ -216,6 +216,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         </div>
       </.row>
       <.row
+        :if={@session.provider != "codex"}
         label="Max budget (USD)"
         help="Session halts once spend exceeds this"
         override={"max_budget_usd" in @overrides}
@@ -245,6 +246,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         />
       </.row>
       <.row
+        :if={@session.provider != "codex"}
         label="Thinking"
         help="Show Claude's extended thinking blocks inline"
         override={"thinking_enabled" in @overrides}

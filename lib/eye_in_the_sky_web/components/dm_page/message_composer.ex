@@ -167,6 +167,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           </button>
           <%!-- Plan mode toggle --%>
           <button
+            :if={@provider != "codex"}
             type="button"
             phx-click="toggle_plan_mode"
             title={
@@ -190,7 +191,10 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
                have no other dedicated toolbar control. --%>
           <.flags_badge session_cli_opts={@session_cli_opts} />
           <%!-- Budget cap input --%>
-          <div class="flex items-center gap-0.5 text-mini text-base-content/40">
+          <div
+            :if={@provider != "codex"}
+            class="flex items-center gap-0.5 text-mini text-base-content/40"
+          >
             <span class="font-mono">$</span>
             <input
               type="number"
@@ -214,8 +218,9 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
 
         <%!-- Center: context meter --%>
         <div class="inline-flex items-center gap-2">
-          <%= if @context_window > 0 and @context_used > 0 do %>
+          <%= if @context_window > 0 do %>
             <.context_meter
+              provider={@provider}
               context_used={@context_used}
               context_window={@context_window}
               total_cost={@total_cost}
@@ -428,7 +433,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
         <%= if @active_overlay == :effort_menu do %>
           <ul
             tabindex="0"
-            class="eits-menu absolute eits-menu-list z-[1] w-52 rounded-box border border-base-content/8 bg-base-100 p-1.5 shadow-lg mb-1"
+            class="eits-menu absolute bottom-full left-0 eits-menu-list z-[1] w-52 rounded-box border border-base-content/8 bg-base-100 p-1.5 shadow-lg mb-1"
             id="reasoning-pill-effort-menu"
           >
             <li class="eits-menu__label text-mini px-3 pt-1 pb-0.5 text-base-content/40">
@@ -486,6 +491,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
 
   attr :context_used, :integer, required: true
   attr :context_window, :integer, required: true
+  attr :provider, :string, required: true
   attr :total_cost, :float, default: 0.0
   attr :active_overlay, :any, default: nil
 
@@ -519,10 +525,11 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       |> Map.put(:progress_color, progress_color)
 
     ~H"""
-    <div class="relative relative ">
+    <div id="context-meter" class="relative">
       <%!-- Trigger: progress bar --%>
       <button
         type="button"
+        id="context-meter-button"
         phx-click="toggle_context_meter"
         class={"cursor-pointer flex items-center " <> @label_color}
         title={"#{format_number(@context_used)} / #{format_number(@context_window)} tokens | click for details"}
@@ -538,7 +545,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
       <%!-- Popover --%>
       <%= if @active_overlay == :context_meter do %>
         <div
-          class="eits-menu absolute z-50 mb-2 w-64 rounded-box border border-base-content/10 bg-base-100 shadow-xl p-4"
+          id="context-meter-details"
+          class="eits-menu absolute bottom-full left-0 z-50 mb-2 w-64 rounded-box border border-base-content/10 bg-base-100 shadow-xl p-4"
           role="dialog"
           aria-label="Context window details"
         >
@@ -560,7 +568,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           />
 
           <%!-- Legend --%>
-          <div class="space-y-1 mb-3">
+          <div :if={@provider != "codex"} class="space-y-1 mb-3">
             <div class="flex items-center justify-between text-mini text-base-content/50">
               <span class="flex items-center gap-1.5">
                 <span class="w-2 h-2 rounded-sm bg-base-content/30 flex-shrink-0" /> System + tools
@@ -597,7 +605,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           </div>
 
           <%!-- Compact + Clear --%>
-          <div class="flex gap-2">
+          <div :if={@provider != "codex"} class="flex gap-2">
             <button
               type="button"
               phx-click="send_slash_command"

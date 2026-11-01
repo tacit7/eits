@@ -169,6 +169,20 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTabTest do
       assert html =~ "medium"
     end
 
+    test "Codex general settings omit ignored Claude budget and thinking options" do
+      document = render_settings(session: %{provider: "codex"}) |> LazyHTML.from_fragment()
+
+      assert LazyHTML.attribute(
+               LazyHTML.query(document, "[phx-value-key='general.max_budget_usd']"),
+               "phx-value-key"
+             ) == []
+
+      assert LazyHTML.attribute(
+               LazyHTML.query(document, "[phx-value-key='general.thinking_enabled']"),
+               "phx-value-key"
+             ) == []
+    end
+
     test "renders override indicator when overrides present" do
       html = render_settings(overrides: ["model", "show_live_stream"])
       assert html =~ "bg-warning"

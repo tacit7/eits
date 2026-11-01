@@ -3,6 +3,7 @@ defmodule EyeInTheSky.Codex.SDKTest do
 
   alias EyeInTheSky.Claude.{Message, SDK.Registry}
   alias EyeInTheSky.Codex.SDK
+  alias EyeInTheSky.Codex.AppServer
 
   # ---------------------------------------------------------------------------
   # start/2
@@ -93,6 +94,54 @@ defmodule EyeInTheSky.Codex.SDKTest do
   end
 
   describe "app-server backend" do
+    test "interactive approval settings select app-server without the general flag" do
+      owner_key = System.unique_integer([:positive])
+      test_pid = self()
+      fake = start_supervised!({SDKTestFakeCodexAppServer, test_pid})
+
+      task =
+        Task.async(fn ->
+          SDK.start("hello",
+            to: test_pid,
+            project_path: "/tmp",
+            eits_session_id: owner_key,
+            transport_pid: fake,
+            bypass_sandbox: false,
+            ask_for_approval: "on-request"
+          )
+        end)
+
+      assert_receive {:sdk_fake_request, "initialize", init_id}
+      send_response(owner_key, init_id, %{})
+      assert_receive {:sdk_fake_notification, "initialized"}
+      assert_receive {:sdk_fake_request, "thread/start", thread_id}
+      send_response(owner_key, thread_id, %{"thread" => %{"id" => "thread-approvals"}})
+      assert_receive {:sdk_fake_request, "turn/start", turn_id}
+      send_response(owner_key, turn_id, %{"turn" => %{"id" => "turn-approvals"}})
+
+      assert {:ok, ref, pid} = Task.await(task)
+      assert AppServer.app_server_pid?(pid)
+      assert :ok = SDK.cancel(ref)
+    end
+
+    test "interactive approvals fail before execution when app-server is unavailable" do
+      executable = "/tmp/eits-codex-old-#{System.unique_integer([:positive])}"
+
+      runner = fn ^executable, ["--version"], [stderr_to_stdout: true] ->
+        {"codex-cli 0.148.0", 0}
+      end
+
+      assert {:error, {:app_server_gate_failed, {:codex_version_too_old, "0.148.0"}}} =
+               SDK.start("hello",
+                 to: self(),
+                 project_path: "/tmp",
+                 codex_executable: executable,
+                 app_server_command_runner: runner,
+                 bypass_sandbox: false,
+                 ask_for_approval: "on-request"
+               )
+    end
+
     test "is opt-in and preserves the public SDK tuple/event contract" do
       owner_key = System.unique_integer([:positive])
       test_pid = self()

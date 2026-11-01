@@ -79,6 +79,17 @@ defmodule EyeInTheSkyWeb.Components.MessageComposerTest do
     assert html =~ "disabled"
   end
 
+  test "unknown providers do not inherit Claude reasoning controls" do
+    html =
+      render_component(
+        &MessageComposer.message_composer/1,
+        base_assigns(%{provider: "unknown", selected_model: "custom-model"})
+      )
+
+    refute html =~ ~s(id="reasoning-pill")
+    refute html =~ ~s(phx-click="toggle_thinking")
+  end
+
   test "Codex controls omit unsupported plan, budget, compact and clear actions" do
     html =
       render_component(

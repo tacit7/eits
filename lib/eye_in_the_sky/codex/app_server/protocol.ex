@@ -133,6 +133,89 @@ defmodule EyeInTheSky.Codex.AppServer.Protocol do
     end
   end
 
+  @spec interactive_request?(map()) :: boolean()
+  def interactive_request?(%{"method" => method}), do: server_request_supported?(method)
+
+  @spec interactive_response(map(), String.t(), map()) :: {:ok, map()} | {:error, atom()}
+  def interactive_response(%{"id" => id, "method" => method} = request, action, answers \\ %{}) do
+    params = request["params"] || %{}
+
+    case method do
+      method
+      when method in ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"] ->
+        allowed = ["accept", "acceptForSession", "decline", "cancel"]
+        available = params["availableDecisions"]
+
+        if action in allowed and decision_available?(available, action) do
+          {:ok, result(id, %{"decision" => action})}
+        else
+          {:error, :invalid_decision}
+        end
+
+      "item/permissions/requestApproval" ->
+        case action do
+          "accept" ->
+            permissions = params["permissions"] || params["requestedPermissions"]
+
+            if is_map(permissions) do
+              {:ok, result(id, %{"permissions" => permissions, "scope" => "turn"})}
+            else
+              {:error, :invalid_permissions}
+            end
+
+          "decline" ->
+            {:ok, result(id, %{"permissions" => %{}, "scope" => "turn"})}
+
+          _ ->
+            {:error, :invalid_decision}
+        end
+
+      method when method in ["tool/requestUserInput", "item/tool/requestUserInput"] ->
+        case action do
+          "answer" when is_map(answers) ->
+            questions = params["questions"] || []
+
+            if is_list(questions) and
+                 Enum.all?(questions, fn question ->
+                   is_map(question) and is_binary(question["id"]) and
+                     is_binary(answers[question["id"]]) and
+                     String.trim(answers[question["id"]]) != ""
+                 end) do
+              payload =
+                Map.new(questions, fn question ->
+                  {question["id"], %{"answers" => [answers[question["id"]]]}}
+                end)
+
+              {:ok, result(id, %{"answers" => payload})}
+            else
+              {:error, :invalid_answers}
+            end
+
+          "decline" ->
+            {:ok, server_request_response(request)}
+
+          _ ->
+            {:error, :invalid_decision}
+        end
+
+      "mcpServer/elicitation/request" ->
+        case action do
+          "accept" when is_map(answers) ->
+            content = if params["mode"] == "url", do: nil, else: answers
+            {:ok, result(id, %{"action" => "accept", "content" => content, "_meta" => nil})}
+
+          action when action in ["decline", "cancel"] ->
+            {:ok, result(id, %{"action" => action, "content" => nil, "_meta" => nil})}
+
+          _ ->
+            {:error, :invalid_decision}
+        end
+
+      _ ->
+        {:error, :unsupported_request}
+    end
+  end
+
   @spec server_request_metadata(map()) :: map()
   def server_request_metadata(%{"id" => id, "method" => method} = request) do
     params = request["params"] || %{}
@@ -159,6 +242,16 @@ defmodule EyeInTheSky.Codex.AppServer.Protocol do
       "item/tool/requestUserInput",
       "mcpServer/elicitation/request"
     ]
+  end
+
+  defp decision_available?(available, _action) when not is_list(available), do: true
+
+  defp decision_available?(available, action) do
+    Enum.any?(available, fn
+      ^action -> true
+      %{"decision" => ^action} -> true
+      _ -> false
+    end)
   end
 
   defp server_request_category("item/commandExecution/requestApproval"), do: :command_approval

@@ -208,6 +208,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
           </div>
           <%!-- ReasoningPill: [🧠 Thinking] | [👁] | [effort ▾] --%>
           <.reasoning_pill
+            :if={@provider in ["claude", "codex", "pi"]}
             provider={@provider}
             thinking_enabled={@thinking_enabled}
             show_thinking_blocks={@show_thinking_blocks}
@@ -340,9 +341,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.MessageComposer do
   attr :active_overlay, :any, required: true
 
   defp reasoning_pill(assigns) do
-    # Classify provider for rendering decisions
-    assigns =
-      assign(assigns, :is_claude, assigns.provider not in ["codex", "pi"])
+    assigns = assign(assigns, :is_claude, assigns.provider == "claude")
 
     ~H"""
     <div

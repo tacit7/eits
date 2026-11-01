@@ -15,6 +15,7 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   alias EyeInTheSky.Claude.Message
   alias EyeInTheSky.Codex.AppServer.{Protocol, TurnBuffer}
+  alias EyeInTheSky.Events
 
   require Logger
 
@@ -23,6 +24,7 @@ defmodule EyeInTheSky.Codex.AppServer do
   @request_timeout_ms 30_000
   @interrupt_timeout_ms 5_000
   @cancel_terminal_timeout_ms 10_000
+  @server_request_timeout_ms 120_000
   @client_version "eits"
   @blocked_env_vars ~w[
     SECRET_KEY_BASE
@@ -48,6 +50,7 @@ defmodule EyeInTheSky.Codex.AppServer do
     :next_id,
     :stdout_buffer,
     pending: %{},
+    server_requests: %{},
     initialized?: false
   ]
 
@@ -101,6 +104,35 @@ defmodule EyeInTheSky.Codex.AppServer do
     GenServer.call(pid, :interrupt, @interrupt_timeout_ms)
   catch
     :exit, _ -> {:error, :not_found}
+  end
+
+  def pending_server_requests(owner_key) do
+    with {:ok, pid} <- lookup_owner(owner_key) do
+      GenServer.call(pid, :pending_server_requests)
+    else
+      _ -> []
+    end
+  catch
+    :exit, _ -> []
+  end
+
+  def respond_to_server_request(owner_key, request_id, action, answers \\ %{}) do
+    with {:ok, pid} <- lookup_owner(owner_key) do
+      GenServer.call(pid, {:respond_to_server_request, to_string(request_id), action, answers})
+    end
+  catch
+    :exit, _ -> {:error, :not_found}
+  end
+
+  defp lookup_owner(owner_key) do
+    if named_process?(@registry) do
+      case Registry.lookup(@registry, owner_key) do
+        [{pid, _}] -> {:ok, pid}
+        [] -> {:error, :not_found}
+      end
+    else
+      {:error, :not_found}
+    end
   end
 
   def app_server_pid?(pid) when is_pid(pid) do
@@ -171,6 +203,7 @@ defmodule EyeInTheSky.Codex.AppServer do
       opts: opts,
       turn_id: nil,
       buffer: TurnBuffer.new(),
+      items: %{},
       cancel_timer: nil,
       terminal?: false
     }
@@ -216,6 +249,41 @@ defmodule EyeInTheSky.Codex.AppServer do
     {:reply, {:error, :turn_already_active}, state}
   end
 
+  def handle_call(:pending_server_requests, _from, state) do
+    requests =
+      state.server_requests
+      |> Map.values()
+      |> Enum.sort_by(& &1.received_at)
+      |> Enum.map(& &1.request)
+
+    {:reply, requests, state}
+  end
+
+  def handle_call({:respond_to_server_request, request_id, action, answers}, _from, state) do
+    case Map.get(state.server_requests, request_id) do
+      nil ->
+        {:reply, {:error, :request_not_found}, state}
+
+      %{request: request} ->
+        case Protocol.interactive_response(request, action, answers) do
+          {:ok, response} ->
+            write_message(state, response)
+            state = remove_server_request(state, request_id)
+
+            emit_telemetry(
+              :server_request_replied,
+              %{},
+              telemetry_meta(state, Protocol.server_request_metadata(request))
+            )
+
+            {:reply, :ok, state}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
+    end
+  end
+
   @impl true
   def handle_call(:interrupt, _from, %__MODULE__{active_turn: nil} = state) do
     {:reply, {:error, :no_active_turn}, state}
@@ -258,6 +326,25 @@ defmodule EyeInTheSky.Codex.AppServer do
         state = %{state | pending: pending}
         emit_telemetry(:request_timeout, %{}, telemetry_meta(state, %{kind: kind}))
         {:noreply, fail_request(kind, state, {:codex_app_server_timeout, kind})}
+    end
+  end
+
+  def handle_info({:server_request_timeout, request_id, sdk_ref}, state) do
+    case Map.get(state.server_requests, request_id) do
+      %{request: request, sdk_ref: ^sdk_ref} ->
+        write_message(state, Protocol.server_request_response(request))
+        state = remove_server_request(state, request_id)
+
+        emit_telemetry(
+          :server_request_timeout,
+          %{},
+          telemetry_meta(state, Protocol.server_request_metadata(request))
+        )
+
+        {:noreply, state}
+
+      _ ->
+        {:noreply, state}
     end
   end
 
@@ -464,13 +551,22 @@ defmodule EyeInTheSky.Codex.AppServer do
 
       method == "serverRequest/resolved" ->
         emit_server_request_resolved_telemetry(params, state)
-        state
+        remove_server_request(state, to_string(params["requestId"] || params["id"]))
 
       stale_notification?(state, params) ->
         state
 
       method == "turn/completed" ->
         handle_turn_completed(params, state)
+
+      method == "item/started" ->
+        case params["item"] do
+          %{"id" => item_id} = item when is_binary(item_id) ->
+            put_in(state.active_turn.items[item_id], item)
+
+          _ ->
+            state
+        end
 
       true ->
         {buffer, messages} =
@@ -484,6 +580,7 @@ defmodule EyeInTheSky.Codex.AppServer do
   defp handle_notification(_notification, state), do: state
 
   defp handle_turn_completed(params, state) do
+    state = clear_server_requests(state)
     turn = params["turn"] || %{}
     status = turn["status"] || params["status"] || "completed"
     error = turn["error"] || params["error"] || %{}
@@ -534,17 +631,96 @@ defmodule EyeInTheSky.Codex.AppServer do
   end
 
   defp handle_server_request(request, state) do
-    response = Protocol.server_request_response(request)
-    metadata = Protocol.server_request_metadata(request)
-    write_message(state, response)
+    if (Protocol.interactive_request?(request) and state.active_turn) &&
+         not stale_notification?(state, request["params"] || %{}) do
+      params = request["params"] || %{}
+      preview = state.active_turn.items[params["itemId"]]
 
-    emit_telemetry(
-      :server_request_replied,
-      %{},
-      telemetry_meta(state, metadata)
-    )
+      request =
+        Map.put(
+          request,
+          "params",
+          if(preview, do: Map.put(params, "preview", preview), else: params)
+        )
 
-    state
+      request_id = to_string(request["id"])
+      state = remove_server_request(state, request_id)
+      auto_resolution_ms = get_in(request, ["params", "autoResolutionMs"])
+
+      timeout =
+        if is_integer(auto_resolution_ms) and auto_resolution_ms > 0,
+          do: min(auto_resolution_ms, @server_request_timeout_ms),
+          else: @server_request_timeout_ms
+
+      sdk_ref = state.active_turn.sdk_ref
+      timer = Process.send_after(self(), {:server_request_timeout, request_id, sdk_ref}, timeout)
+
+      entry = %{
+        request: request,
+        sdk_ref: sdk_ref,
+        timer: timer,
+        received_at: System.monotonic_time()
+      }
+
+      state = %{state | server_requests: Map.put(state.server_requests, request_id, entry)}
+      broadcast_server_requests(state)
+
+      emit_telemetry(
+        :server_request_pending,
+        %{},
+        telemetry_meta(state, Protocol.server_request_metadata(request))
+      )
+
+      state
+    else
+      write_message(state, Protocol.server_request_response(request))
+
+      emit_telemetry(
+        :server_request_replied,
+        %{},
+        telemetry_meta(state, Protocol.server_request_metadata(request))
+      )
+
+      state
+    end
+  end
+
+  defp remove_server_request(state, request_id) do
+    case Map.pop(state.server_requests, request_id) do
+      {nil, _} ->
+        state
+
+      {%{timer: timer}, remaining} ->
+        Process.cancel_timer(timer)
+        state = %{state | server_requests: remaining}
+        broadcast_server_requests(state)
+        state
+    end
+  end
+
+  defp clear_server_requests(state) do
+    if map_size(state.server_requests) > 0 do
+      Enum.each(state.server_requests, fn {_id, %{timer: timer}} ->
+        Process.cancel_timer(timer)
+      end)
+
+      state = %{state | server_requests: %{}}
+      broadcast_server_requests(state)
+      state
+    else
+      state
+    end
+  end
+
+  defp broadcast_server_requests(state) do
+    case state.active_turn do
+      %{opts: opts} ->
+        if is_integer(opts[:eits_session_id]),
+          do: Events.codex_server_requests_changed(opts[:eits_session_id])
+
+      _ ->
+        :ok
+    end
   end
 
   defp emit_server_request_resolved_telemetry(params, state) do
@@ -623,6 +799,7 @@ defmodule EyeInTheSky.Codex.AppServer do
 
   defp fail_active_turn(state, reason) do
     turn = state.active_turn
+    state = clear_server_requests(state)
     state = fail_pending(state, reason)
 
     emit_terminal_failure_telemetry(state, reason)

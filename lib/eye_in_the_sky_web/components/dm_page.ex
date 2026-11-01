@@ -7,6 +7,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   alias EyeInTheSkyWeb.Components.DmPage.ActionMenu
   alias EyeInTheSkyWeb.Components.DmPage.CommitsTab
   alias EyeInTheSkyWeb.Components.DmPage.Composer
+  alias EyeInTheSkyWeb.Components.DmPage.CodexRequestPanel
   alias EyeInTheSkyWeb.Components.DmPage.ContextTab
   alias EyeInTheSkyWeb.Components.DmPage.MessagesTab
   alias EyeInTheSkyWeb.Components.DmPage.NotesTab
@@ -62,6 +63,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
   attr :syncing, :boolean, default: false
   attr :pty_pid, :any, default: nil
   attr :session_init_data, :map, default: nil
+  attr :codex_requests, :list, default: []
 
   defp normalize_message_data(message_data) do
     Map.merge(
@@ -458,6 +460,8 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
         <% end %>
       </div>
 
+      <CodexRequestPanel.panel :if={@agent.provider == "codex"} requests={@codex_requests} />
+
       <%= if @pty_pid do %>
         <%!-- PTY terminal - always in DOM so xterm.js keeps its state; hidden when off messages tab --%>
         <div
@@ -501,7 +505,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage do
             <% "context" -> %>
               <ContextTab.context_tab session_context={@session_context} />
             <% "tools" -> %>
-              <ToolsTab.tools_tab session_init_data={@session_init_data} />
+              <ToolsTab.tools_tab session_init_data={@session_init_data} provider={@agent.provider} />
             <% "settings" -> %>
               <SettingsTab.settings_tab
                 scope={@dm_settings_scope}

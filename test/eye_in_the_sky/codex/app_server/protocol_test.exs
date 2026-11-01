@@ -99,6 +99,39 @@ defmodule EyeInTheSky.Codex.AppServer.ProtocolTest do
            })["result"] == %{"action" => "decline", "content" => nil, "_meta" => nil}
   end
 
+  test "interactive responses validate choices and answer shape" do
+    command = %{
+      "id" => "c1",
+      "method" => "item/commandExecution/requestApproval",
+      "params" => %{}
+    }
+
+    assert {:ok, %{"result" => %{"decision" => "acceptForSession"}}} =
+             Protocol.interactive_response(command, "acceptForSession")
+
+    assert {:error, :invalid_decision} = Protocol.interactive_response(command, "always")
+
+    permission = %{
+      "id" => 4,
+      "method" => "item/permissions/requestApproval",
+      "params" => %{"permissions" => %{"network" => true}}
+    }
+
+    assert {:ok, %{"result" => %{"permissions" => %{"network" => true}, "scope" => "turn"}}} =
+             Protocol.interactive_response(permission, "accept")
+
+    question = %{
+      "id" => "q",
+      "method" => "tool/requestUserInput",
+      "params" => %{"questions" => [%{"id" => "one"}]}
+    }
+
+    assert {:ok, %{"result" => %{"answers" => %{"one" => %{"answers" => ["yes"]}}}}} =
+             Protocol.interactive_response(question, "answer", %{"one" => "yes"})
+
+    assert {:error, :invalid_answers} = Protocol.interactive_response(question, "answer", %{})
+  end
+
   test "server request metadata classifies known and unknown requests" do
     metadata =
       Protocol.server_request_metadata(%{

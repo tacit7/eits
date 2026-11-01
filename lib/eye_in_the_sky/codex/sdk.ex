@@ -99,7 +99,7 @@ defmodule EyeInTheSky.Codex.SDK do
       "[telemetry] codex.sdk.start session_id=#{opts[:session_id]} model=#{opts[:model]}"
     )
 
-    if app_server_enabled?(opts) do
+    if app_server_enabled?(opts) or interactive_approvals?(opts) do
       run_app_server_or_fallback(
         sdk_ref,
         prompt,
@@ -125,7 +125,7 @@ defmodule EyeInTheSky.Codex.SDK do
     sdk_ref = make_ref()
     Logger.info("[telemetry] codex.sdk.resume session_id=#{session_id} model=#{opts[:model]}")
 
-    if app_server_enabled?(opts) do
+    if app_server_enabled?(opts) or interactive_approvals?(opts) do
       run_app_server_or_fallback(
         sdk_ref,
         prompt,
@@ -240,8 +240,12 @@ defmodule EyeInTheSky.Codex.SDK do
             result
 
           {:error, {:app_server_lookup_failed, reason}} ->
-            emit_app_server_gate(:fallback, opts, %{reason: reason, phase: :lookup})
-            fallback_fun.(sdk_ref, prompt, opts)
+            if interactive_approvals?(opts) do
+              {:error, {:app_server_lookup_failed, reason}}
+            else
+              emit_app_server_gate(:fallback, opts, %{reason: reason, phase: :lookup})
+              fallback_fun.(sdk_ref, prompt, opts)
+            end
 
           {:error, reason} ->
             {:error, reason}
@@ -249,8 +253,17 @@ defmodule EyeInTheSky.Codex.SDK do
 
       {:error, {:app_server_gate_failed, reason}} ->
         emit_app_server_gate(:gate_failed, opts, %{reason: reason})
-        fallback_fun.(sdk_ref, prompt, opts)
+
+        if interactive_approvals?(opts) do
+          {:error, {:app_server_gate_failed, reason}}
+        else
+          fallback_fun.(sdk_ref, prompt, opts)
+        end
     end
+  end
+
+  defp interactive_approvals?(opts) do
+    opts[:bypass_sandbox] == false and opts[:ask_for_approval] != "never"
   end
 
   defp run_app_server_turn(sdk_ref, prompt, opts) do

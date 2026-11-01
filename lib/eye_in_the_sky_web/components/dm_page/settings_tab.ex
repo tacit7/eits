@@ -670,7 +670,7 @@ defmodule EyeInTheSkyWeb.Components.DmPage.SettingsTab do
         <.select_input
           key="openai.ask_for_approval"
           scope={@scope}
-          value={setting_val(@effective, "openai.ask_for_approval") || "never"}
+          value={setting_val(@effective, "openai.ask_for_approval") || "on-request"}
           options={["never", "on-failure", "on-request", "untrusted"]}
         />
       </.row>

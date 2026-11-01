@@ -3,6 +3,7 @@ defmodule EyeInTheSkyWeb.DmLive do
 
   alias EyeInTheSky.{Agents, Events, Sessions}
   alias EyeInTheSky.Claude.AgentWorker
+  alias EyeInTheSky.Codex.AppServer
   alias EyeInTheSky.Pi.ModelDiscoveryCache
   alias EyeInTheSky.Terminal.{PtyServer, PtySupervisor}
   alias EyeInTheSkyWeb.Components.DmPage
@@ -143,6 +144,13 @@ defmodule EyeInTheSkyWeb.DmLive do
     |> then(fn s ->
       if connected, do: MountState.assign_connected_defaults(s, session), else: s
     end)
+    |> assign(
+      :codex_requests,
+      if(connected && session.provider == "codex",
+        do: AppServer.pending_server_requests(session.id),
+        else: []
+      )
+    )
     |> MessageHandlers.load_messages_on_mount()
   end
 
@@ -171,6 +179,55 @@ defmodule EyeInTheSkyWeb.DmLive do
 
     {:noreply, socket}
   end
+
+  def handle_event(
+        "codex_request_answer",
+        %{"approval" => %{"request_id" => request_id, "action" => action} = form},
+        socket
+      ) do
+    if socket.assigns.session && socket.assigns.session.provider == "codex" do
+      answers = form["answers"] || %{}
+
+      answers_result =
+        if action == "accept" and is_binary(form["content_json"]) do
+          case Jason.decode(form["content_json"]) do
+            {:ok, content} when is_map(content) -> {:ok, content}
+            _ -> {:error, :invalid_json}
+          end
+        else
+          {:ok, answers}
+        end
+
+      result =
+        with {:ok, response_answers} <- answers_result do
+          AppServer.respond_to_server_request(
+            socket.assigns.session_id,
+            request_id,
+            action,
+            response_answers
+          )
+        end
+
+      socket =
+        assign(
+          socket,
+          :codex_requests,
+          AppServer.pending_server_requests(socket.assigns.session_id)
+        )
+
+      case result do
+        :ok ->
+          {:noreply, socket}
+
+        {:error, reason} ->
+          {:noreply, put_flash(socket, :error, "Codex request could not be answered: #{reason}")}
+      end
+    else
+      {:noreply, socket}
+    end
+  end
+
+  def handle_event("codex_request_answer", _params, socket), do: {:noreply, socket}
 
   # ---------------------------------------------------------------------------
   # DM Settings tab — delegated to SettingsHandlers
@@ -535,6 +592,15 @@ defmodule EyeInTheSkyWeb.DmLive do
   # handle_info: message reload (event-driven, debounced)
   # ---------------------------------------------------------------------------
 
+  def handle_info(:codex_server_requests_changed, socket) do
+    requests =
+      if socket.assigns.session && socket.assigns.session.provider == "codex",
+        do: AppServer.pending_server_requests(socket.assigns.session_id),
+        else: []
+
+    {:noreply, assign(socket, :codex_requests, requests)}
+  end
+
   @impl true
   def handle_info(:do_reload_from_session_file, socket) do
     {_reply, new_socket} =
@@ -894,6 +960,7 @@ defmodule EyeInTheSkyWeb.DmLive do
         syncing={@syncing}
         session_cli_opts={@session_cli_opts}
         session_init_data={@session_init_data}
+        codex_requests={@codex_requests}
       />
 
       <EyeInTheSkyWeb.Components.NewTaskDrawer.new_task_drawer

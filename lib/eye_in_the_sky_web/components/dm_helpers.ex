@@ -159,8 +159,9 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   """
   def provider_icon("openai"), do: "/images/openai.svg"
   def provider_icon("codex"), do: "/images/openai.svg"
-  def provider_icon("pi"), do: "/images/claude.svg"
-  def provider_icon(_), do: "/images/claude.svg"
+  def provider_icon("claude"), do: "/images/claude.svg"
+  def provider_icon("gemini"), do: "/images/gemini.svg"
+  def provider_icon(_), do: "/images/logo.svg"
 
   @doc """
   Canonical provider icon CSS class modifier (dark-mode inversion etc.).
@@ -175,7 +176,9 @@ defmodule EyeInTheSkyWeb.Components.DmHelpers do
   def stream_provider_label(%{provider: "codex"}), do: "Codex"
   def stream_provider_label(%{provider: "openai"}), do: "Codex"
   def stream_provider_label(%{provider: "pi"}), do: "Pi"
-  def stream_provider_label(_session), do: "Claude"
+  def stream_provider_label(%{provider: "claude"}), do: "Claude"
+  def stream_provider_label(%{provider: "gemini"}), do: "Gemini"
+  def stream_provider_label(_session), do: "Agent"
 
   # ---------------------------------------------------------------------------
   # Message model / cost extraction

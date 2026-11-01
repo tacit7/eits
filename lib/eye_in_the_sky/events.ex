@@ -285,6 +285,10 @@ defmodule EyeInTheSky.Events do
     broadcast("session:#{session_id}", {:tool_result, tool_name, error?})
   end
 
+  def codex_server_requests_changed(session_id) do
+    broadcast("session:#{session_id}", :codex_server_requests_changed)
+  end
+
   # ---------------------------------------------------------------------------
   # Session status — topic: "session:<session_id>:status"
   # ---------------------------------------------------------------------------

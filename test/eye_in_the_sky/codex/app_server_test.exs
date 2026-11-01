@@ -8,7 +8,114 @@ defmodule EyeInTheSky.Codex.AppServerTest do
     owner_key = {:test, make_ref()}
     fake = start_supervised!({FakeCodexAppServer, self()})
     {:ok, pid} = AppServer.lookup_or_start(owner_key, project_path: "/tmp", transport_pid: fake)
-    %{pid: pid, fake: fake}
+    %{pid: pid, fake: fake, owner_key: owner_key}
+  end
+
+  test "holds a Codex approval until the DM replies and rejects duplicate replies", %{
+    pid: pid,
+    owner_key: owner_key
+  } do
+    ref = start_active_turn(pid, 12345)
+    EyeInTheSky.Events.subscribe_session(12345)
+
+    send_notification(pid, "item/started", %{
+      "threadId" => "thread-approval",
+      "turnId" => "turn-approval",
+      "item" => %{"id" => "cmd-1", "type" => "commandExecution", "command" => "git status"}
+    })
+
+    send_server_request(pid, "approval-1", "item/commandExecution/requestApproval", %{
+      "threadId" => "thread-approval",
+      "turnId" => "turn-approval",
+      "itemId" => "cmd-1"
+    })
+
+    assert_receive :codex_server_requests_changed
+
+    assert [%{"id" => "approval-1", "params" => %{"preview" => %{"command" => "git status"}}}] =
+             AppServer.pending_server_requests(owner_key)
+
+    refute_receive {:fake_response, "approval-1", _}, 30
+
+    assert :ok = AppServer.respond_to_server_request(owner_key, "approval-1", "accept")
+    assert_receive {:fake_response, "approval-1", %{"decision" => "accept"}}
+    assert_receive :codex_server_requests_changed
+    assert AppServer.pending_server_requests(owner_key) == []
+
+    assert {:error, :request_not_found} =
+             AppServer.respond_to_server_request(owner_key, "approval-1", "accept")
+
+    send_notification(pid, "turn/completed", %{
+      "threadId" => "thread-approval",
+      "turn" => %{"id" => "turn-approval", "status" => "completed"}
+    })
+
+    assert_receive {:claude_complete, ^ref, "thread-approval"}
+  end
+
+  test "clears pending requests when the turn ends and ignores late answers", %{
+    pid: pid,
+    owner_key: owner_key
+  } do
+    ref = start_active_turn(pid, 12346)
+    EyeInTheSky.Events.subscribe_session(12346)
+
+    send_server_request(pid, "approval-late", "item/fileChange/requestApproval", %{
+      "threadId" => "thread-approval",
+      "turnId" => "turn-approval",
+      "itemId" => "file-1"
+    })
+
+    assert_receive :codex_server_requests_changed
+    assert length(AppServer.pending_server_requests(owner_key)) == 1
+
+    send_notification(pid, "turn/completed", %{
+      "threadId" => "thread-approval",
+      "turn" => %{"id" => "turn-approval", "status" => "interrupted"}
+    })
+
+    assert_receive {:claude_error, ^ref, :canceled}
+    assert_receive :codex_server_requests_changed
+    assert AppServer.pending_server_requests(owner_key) == []
+
+    assert {:error, :request_not_found} =
+             AppServer.respond_to_server_request(owner_key, "approval-late", "accept")
+
+    refute_receive {:fake_response, "approval-late", _}, 30
+  end
+
+  test "times out a pending request with a conservative response", %{
+    pid: pid,
+    owner_key: owner_key
+  } do
+    ref = start_active_turn(pid, 12347)
+
+    send_server_request(pid, "approval-timeout", "item/commandExecution/requestApproval", %{
+      "threadId" => "thread-approval",
+      "turnId" => "turn-approval",
+      "itemId" => "cmd-2"
+    })
+
+    assert length(AppServer.pending_server_requests(owner_key)) == 1
+    send(pid, {:server_request_timeout, "approval-timeout", ref})
+    assert_receive {:fake_response, "approval-timeout", %{"decision" => "decline"}}
+    assert AppServer.pending_server_requests(owner_key) == []
+
+    assert {:error, :request_not_found} =
+             AppServer.respond_to_server_request(owner_key, "approval-timeout", "accept")
+  end
+
+  test "does not present a request from another turn", %{pid: pid, owner_key: owner_key} do
+    _ref = start_active_turn(pid, 12348)
+
+    send_server_request(pid, "stale-approval", "item/commandExecution/requestApproval", %{
+      "threadId" => "thread-approval",
+      "turnId" => "previous-turn",
+      "itemId" => "cmd-3"
+    })
+
+    assert_receive {:fake_response, "stale-approval", %{"decision" => "decline"}}
+    assert AppServer.pending_server_requests(owner_key) == []
   end
 
   test "starts a turn, maps notifications, and emits one terminal result", %{pid: pid} do
@@ -461,6 +568,43 @@ defmodule EyeInTheSky.Codex.AppServerTest do
       {:codex_app_server_output,
        Jason.encode!(%{"jsonrpc" => "2.0", "method" => method, "params" => params})}
     )
+  end
+
+  defp send_server_request(pid, id, method, params) do
+    send(
+      pid,
+      {:codex_app_server_output,
+       Jason.encode!(%{
+         "jsonrpc" => "2.0",
+         "id" => id,
+         "method" => method,
+         "params" => params
+       })}
+    )
+  end
+
+  defp start_active_turn(pid, session_id) do
+    ref = make_ref()
+    caller = self()
+
+    task =
+      Task.async(fn ->
+        AppServer.start_turn(pid, ref, caller, "hello",
+          project_path: "/tmp",
+          eits_session_id: session_id
+        )
+      end)
+
+    assert_receive {:fake_request, "initialize", init_id}
+    send_response(pid, init_id, %{})
+    assert_receive {:fake_notification, "initialized"}
+    assert_receive {:fake_request, "thread/start", thread_id}
+    send_response(pid, thread_id, %{"thread" => %{"id" => "thread-approval"}})
+    assert_receive {:codex_session_id, ^ref, "thread-approval"}
+    assert_receive {:fake_request, "turn/start", turn_id}
+    send_response(pid, turn_id, %{"turn" => %{"id" => "turn-approval"}})
+    assert {:ok, ^ref, ^pid} = Task.await(task)
+    ref
   end
 
   defp send_rpc_error(pid, id, message) do

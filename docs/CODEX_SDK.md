@@ -234,6 +234,12 @@ On subsequent messages to the same session:
 
 Codex stores session history locally at `$CODEX_HOME/sessions` for up to 30 days.
 
+### Resume Waits for Process Exit
+
+`Codex.SDK.handle_result/2` (`lib/eye_in_the_sky/codex/sdk.ex`) now calls `MessageHandler.finalize_after_terminal_event/3` **before** sending `{:claude_complete, sdk_ref, final_session_id}` to the caller — previously this was reversed. `finalize_after_terminal_event/3` blocks (up to the terminal-exit timeout) until it receives the `:claude_exit` message for the OS process, draining any trailing `:claude_output` lines first, then unregisters the SDK ref.
+
+Reordering this matters because `turn.completed` can arrive on stdout before the Codex OS process has actually exited and released its thread store. `AgentWorker` treats `:claude_complete` as the signal that it's safe to start a resume (`Codex.SDK.resume/3`). If `:claude_complete` fired first, a resume could race the still-exiting prior process for ownership of the same Codex thread. Waiting for exit first guarantees the thread store is free before any resume is attempted.
+
 ## Incremental Sync Watermark
 
 The `SessionImporter` tracks the last synced message UUID to avoid re-scanning the entire session history on each sync:
@@ -494,9 +500,13 @@ This enables live debugging and inspection of the raw Codex JSONL stream without
 
 By default, all Codex sessions bypass sandbox approval checks and tooling restrictions with the `--dangerously-bypass-approvals-and-sandbox` flag. This is configured in two places:
 
-1. **RuntimeContext**: Sets `bypass_sandbox: true` by default for Codex provider:
+1. **RuntimeContext**: Defaults to bypass only when the caller did not explicitly
+   set `bypass_sandbox`; an explicit `false` is preserved:
    ```elixir
-   bypass_sandbox: opts[:bypass_sandbox] || provider == "codex"
+   case Keyword.fetch(opts, :bypass_sandbox) do
+     {:ok, val} -> val
+     :error -> provider == "codex"
+   end
    ```
 
 2. **Codex.CLI.build_args/1**: Defaults `bypass_sandbox` option to `true`:
@@ -512,6 +522,20 @@ By default, all Codex sessions bypass sandbox approval checks and tooling restri
    ```
 
 This allows Codex agents to use file modifications, shell commands, and other restricted operations by default. To opt out (use approval requirements), explicitly pass `bypass_sandbox: false` when starting a session.
+
+### YOLO by Default (Agent Spawns)
+
+`AgentManager.SpawnParams.build/2` (`lib/eye_in_the_sky/agents/agent_manager/spawn_params.ex`) applies the same provider-aware default one layer up, for agents spawned via the agent/team spawn API:
+
+```elixir
+provider = params["provider"] || "claude"
+# ...
+bypass_sandbox: Map.get(params, "bypass_sandbox", provider == "codex") == true
+```
+
+Spawning with `"provider" => "codex"` and no explicit `"bypass_sandbox"` key defaults to full bypass (YOLO: no approvals, no sandbox). An explicit `"bypass_sandbox" => false` in the spawn params is preserved. Non-Codex providers (`claude`, `pi`, etc.) keep their existing default of `false`.
+
+The DM settings schema defaults (`EyeInTheSky.Settings.Schema`) match this stance: `openai.sandbox` defaults to `"danger-full-access"` (was `"workspace-write"`) and `openai.ask_for_approval` defaults to `"never"`, so a Codex session started from DM settings with no overrides also runs with no sandbox and no approval prompts.
 
 ### `--full-auto` Removed
 
@@ -539,10 +563,10 @@ The deprecated `"on-failure"` approval policy is transparently upgraded to `"on-
 
 | Settings key | Keyword opt | Description |
 |--------------|-------------|-------------|
-| `openai.sandbox` | `:sandbox` | Sandbox mode (e.g. `"read-only"`, `"workspace-write"`) |
-| `openai.ask_for_approval` | `:ask_for_approval` | Approval policy (e.g. `"on-request"`, `"never"`) |
+| `openai.sandbox` | `:sandbox` | Sandbox mode (e.g. `"read-only"`, `"workspace-write"`, `"danger-full-access"`); schema default is `"danger-full-access"` |
+| `openai.ask_for_approval` | `:ask_for_approval` | Approval policy (e.g. `"on-request"`, `"never"`); schema default is `"never"` |
 | `openai.full_auto` | `:full_auto` | Legacy full-auto shortcut |
-| `openai.dangerously_bypass_approvals_and_sandbox` | `:bypass_sandbox` | Full bypass |
+| `openai.dangerously_bypass_approvals_and_sandbox` | `:bypass_sandbox` | Full bypass; schema default is `true` |
 
 These opts are merged into `extra_cli_opts` via `RuntimeContext.build/3` and forwarded through `ProviderStrategy.Codex.build_opts/2` using `Keyword.merge/2`, so DM-scoped settings override strategy defaults. The `"claude"` provider maps `anthropic.*` keys instead; unknown providers return `[]`.
 

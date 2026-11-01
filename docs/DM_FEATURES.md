@@ -1001,7 +1001,7 @@ The border/bg/rounded styles moved from the inner div to the `<details>` element
 
 ## DM Message Bubble Format with Sender Chip
 
-**Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`, `0c999311`
+**Commits:** `4e0b0f12`, `677a0c78`, `16b3a213`, `6edecd7e`, `0c999311`, `d2aa3bb2`
 
 Agent DMs now use a structured format with a sender chip that shows agent name and session ID.
 
@@ -1027,6 +1027,7 @@ Reply: eits dm --to <session_id> --message ""
   - Handles both current compact format and legacy bracketed format
   - Regex updated (commit 6edecd7e) to use `(.*)` capture to handle header-only DMs where the message body is empty
   - Regex tolerates no space after session UUID in legacy format
+  - Legacy sender-name pattern shared via `@legacy_dm_pattern` (commit d2aa3bb2): matches non-greedily up to the first `(session:...)` marker, so a sender name that itself contains parentheses (e.g. `"chirpi M0 review (codex astra)"`) is captured in full instead of being truncated at its first `(`
 
 - `parse_dm_info/1`: Extracts sender name, status (done/failed), and URL from DM body
   - Returns map with sender name, status, url, session_id, and format type
